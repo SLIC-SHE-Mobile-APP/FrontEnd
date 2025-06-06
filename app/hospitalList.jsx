@@ -2,6 +2,7 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { FlatList, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 
 const approvedHospitals = [
   { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
@@ -14,13 +15,19 @@ const approvedHospitals = [
   { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
 ];
 
-const notApprovedHospitals = Array.from({ length: 8 }, (_, i) => ({
-  id: `${i + 1}`,
-  name: 'Borella Pvt Hospital',
-  location: 'Colombo',
-}));
+const notApprovedHospitals = [
+  { id: '1', name: 'Number 1 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '2', name: 'Number 2 Hospital', location: 'Wattala', phone: '011 - 4530 000' },
+  { id: '3', name: 'Number 3 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '4', name: 'Number 4 Hospital', location: 'Ragama', phone: '011 - 4530 000' },
+  { id: '5', name: 'Number 5 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '6', name: 'Number 6 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '7', name: 'Number 7 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '8', name: 'Number 8 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+];
 
 const HospitalList = () => {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('Approved');
   const [searchApproved, setSearchApproved] = useState('');
   const [searchNotApproved, setSearchNotApproved] = useState('');
@@ -71,7 +78,9 @@ const HospitalList = () => {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Ionicons name="arrow-back" size={26} color="#003B4A" />
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={26} color="#003B4A" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Hospitals</Text>
           <View style={{ width: 24 }} />
         </View>
