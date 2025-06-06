@@ -4,6 +4,8 @@ import Home from './home.jsx';
 import HospitalList from './hospitalList.jsx';
 import DependentDetails from './dependentDetails.jsx';
 import HealthPolicyDetails from './HealthPolicyDetails.jsx';
+import DownloadClaimForms from './DownloadClaimForms.jsx';
+import OnlineClaimIntimations from './OnlineClaimIntimations.jsx';
 
 
 export default function HomeScreen() {

@@ -5,14 +5,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 
 const approvedHospitals = [
-  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 010' },
-  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '011 - 4530 057' },
-  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 018' },
-  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '011 - 4530 058' },
-  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 028' },
-  { id: '6', name: 'Nawaloka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '7', name: 'Durdans Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 010' },
+  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '0114 - 530 057' },
+  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 018' },
+  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '0114 - 530 058' },
+  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 028' },
+  { id: '6', name: 'Nawaloka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
+  { id: '7', name: 'Durdans Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
+  { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
 ];
 
 const notApprovedHospitals = [
@@ -51,7 +51,7 @@ const HospitalList = () => {
           style={styles.phoneContainer}
           onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
         >
-          <FontAwesome name="phone" size={16} color="#003B4A" />
+          <FontAwesome name="phone" size={16} color="#00ADBB" />
           <Text style={styles.phoneText}>{item.phone}</Text>
         </TouchableOpacity>
       )}
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   phoneText: {
   fontSize: 16,
   marginLeft: 5,
-  color: '#003B4A', 
+  color: '#00ADBB', 
   fontWeight: 'bold',
 },
 

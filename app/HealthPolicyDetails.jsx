@@ -11,7 +11,12 @@ const HealthPolicyDetails = () => {
     if (buttonLabel === 'Hospitals List') {
       navigation.navigate('hospitalList');
     }
-    
+    if (buttonLabel === 'Download Claim Forms') {
+      navigation.navigate('DownloadClaimForms');
+    }
+    if (buttonLabel === 'Claim Intimations') {
+      navigation.navigate('OnlineClaimIntimations');
+    }
   };
 
   const buttons = [
