@@ -5,11 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 
 const approvedHospitals = [
-  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '011 - 4530 000' },
-  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '011 - 4530 000' },
-  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 010' },
+  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '011 - 4530 057' },
+  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 018' },
+  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '011 - 4530 058' },
+  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 028' },
   { id: '6', name: 'Nawaloka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
   { id: '7', name: 'Durdans Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
   { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
@@ -31,7 +31,6 @@ const HospitalList = () => {
   const [activeTab, setActiveTab] = useState('Approved');
   const [searchApproved, setSearchApproved] = useState('');
   const [searchNotApproved, setSearchNotApproved] = useState('');
-  const [selectedCardId, setSelectedCardId] = useState(null);
 
   const handleCardPress = (id) => {
     if (selectedCardId !== id) {
@@ -40,28 +39,26 @@ const HospitalList = () => {
   };
 
   const renderItem = ({ item }) => {
-    const isSelected = selectedCardId === item.id;
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+    >
+      <Text style={styles.hospitalName}>{item.name}</Text>
+      <Text style={styles.location}>{item.location}</Text>
+      {item.phone && (
+        <TouchableOpacity
+          style={styles.phoneContainer}
+          onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
+        >
+          <FontAwesome name="phone" size={16} color="#003B4A" />
+          <Text style={styles.phoneText}>{item.phone}</Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+};
 
-    return (
-      <TouchableOpacity
-        style={[styles.card, isSelected && styles.highlightedCard]}
-        onPress={() => handleCardPress(item.id)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.hospitalName}>{item.name}</Text>
-        <Text style={styles.location}>{item.location}</Text>
-        {isSelected && item.phone && (
-          <TouchableOpacity
-            style={styles.phoneContainer}
-            onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
-          >
-            <FontAwesome name="phone" size={16} color="#FF0000" />
-            <Text style={styles.phoneText}>{item.phone}</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
-  };
 
   const filteredApproved = approvedHospitals.filter((h) =>
     h.name.toLowerCase().includes(searchApproved.toLowerCase())
@@ -209,10 +206,6 @@ const styles = StyleSheet.create({
     borderColor: '#16858D',
     borderWidth: 0.5,
   },
-  highlightedCard: {
-    borderColor: '#F31E0A',
-    borderWidth: 1.25,
-  },
   hospitalName: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -228,9 +221,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   phoneText: {
-    fontSize: 14,
-    marginLeft: 5,
-    color: '#FF0000',
-    fontWeight: 'bold',
-  },
+  fontSize: 16,
+  marginLeft: 5,
+  color: '#003B4A', 
+  fontWeight: 'bold',
+},
+
 });

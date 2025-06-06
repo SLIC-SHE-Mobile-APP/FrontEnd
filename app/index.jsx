@@ -8,7 +8,7 @@ import HealthPolicyDetails from './HealthPolicyDetails.jsx';
 
 export default function HomeScreen() {
   return (
-    <HealthPolicyDetails/>
+    <Home/>
   );
 }
 
