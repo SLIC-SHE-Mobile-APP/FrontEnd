@@ -1,13 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 
 const HealthPolicyDetails = () => {
   const navigation = useNavigation();
 
   const handleButtonPress = (buttonLabel) => {
+    if (buttonLabel === 'Health Insurance Card') {
+      navigation.navigate('HealthInsuCard');
+    }
+    if (buttonLabel === 'Dependent Details') {
+      navigation.navigate('DependentDetails');
+    }
     if (buttonLabel === 'Hospitals List') {
       navigation.navigate('hospitalList');
     }

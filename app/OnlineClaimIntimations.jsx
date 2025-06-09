@@ -18,7 +18,7 @@ const OnlineClaimIntimations = () => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={26} color="#003B4A" />
+            <Ionicons name="arrow-back" size={26} color="#13646D" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Online Claim Intimations</Text>
           <View style={{ width: 26 }}></View>
