@@ -17,17 +17,22 @@ const HealthPolicyDetails = () => {
     if (buttonLabel === 'Claim Intimations') {
       navigation.navigate('OnlineClaimIntimations');
     }
+    if (buttonLabel === 'Bank Details') {
+      navigation.navigate('BankDetailsSum');
+    }
   };
 
   const buttons = [
     'Health Insurance Card',
     'Dependent Details',
     'Bank Details',
-    'Claim Payments',
-    'Download Claim Forms',
-    'Hospitals List',
     'Claim Documents Required',
-    'Claim Intimations'
+    'Hospitals List',
+    'Download Claim Forms',
+    'Claim Intimations',
+    'Claim History',
+    'Pending Requirements',
+    'Payment History'
   ];
 
   return (
@@ -35,9 +40,10 @@ const HealthPolicyDetails = () => {
       colors={['#FFFFFF', '#6DD3D3']}
       style={{ flex: 1 }}
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 15 }}>
+      {/* Fixed Header Section */}
+      <View style={{ paddingHorizontal: 15 }}>
         {/* Back Icon + Title */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 40 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 50 }}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="#13646D" style={{ marginRight: 1, marginLeft: 12 }} />
           </TouchableOpacity>
@@ -62,7 +68,7 @@ const HealthPolicyDetails = () => {
           padding: 20,
           marginTop: 30,
           marginHorizontal: 13,
-          height: 150,
+          height: 130,
           justifyContent: 'space-between'
         }}>
           {[
@@ -85,43 +91,52 @@ const HealthPolicyDetails = () => {
             </Text>
           ))}
         </View>
+      </View>
 
-        {/* Rectangle 26 Background Card */}
+      {/* Scrollable Buttons Section */}
+      <View style={{ flex: 1, marginTop: 35, marginBottom:30 }}>
         <View style={{
-          borderRadius: 35,
+          borderRadius: 30,
           backgroundColor: '#FFFF',
-          marginTop: 40,
-          marginHorizontal: 20,
-          padding: 20,
-          alignItems: 'center'
+          marginHorizontal: 30,
+          flex: 1,
+          overflow: 'hidden'
         }}>
-          {/* Buttons */}
-          {buttons.map((label, index) => (
-            <TouchableOpacity
-              key={index}
-              style={{
-                backgroundColor: '#17ABB7',
-                width: '100%',
-                fontFamily: 'Adamina',
-                paddingVertical: 12,
-                borderRadius: 10,
-                marginBottom: 12,
-                alignItems: 'center'
-              }}
-              onPress={() => handleButtonPress(label)}
-            >
-              <Text style={{
-                color: '#fff',
-                fontSize: 16,
-                fontFamily: 'AbhayaLibreMedium',
-                fontWeight: '500'
-              }}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <ScrollView 
+            contentContainerStyle={{ 
+              padding: 20,
+              paddingBottom: 30 
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Buttons */}
+            {buttons.map((label, index) => (
+              <TouchableOpacity
+                key={index}
+                style={{
+                  backgroundColor: '#17ABB7',
+                  width: '100%',
+                  fontFamily: 'Adamina',
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  marginBottom: 12,
+                  alignItems: 'center'
+                }}
+                onPress={() => handleButtonPress(label)}
+              >
+                <Text style={{
+                  color: '#fff',
+                  fontSize: 16,
+                  fontFamily: 'AbhayaLibreMedium',
+                  fontWeight: '500'
+                }}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      </ScrollView>
+      </View>
     </LinearGradient>
   );
 };
