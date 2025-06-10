@@ -76,7 +76,7 @@ const HospitalList = () => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={26} color="#003B4A" />
+            <Ionicons name="arrow-back" size={26} color="#13646D" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Hospitals</Text>
           <View style={{ width: 24 }} />
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#13646D',
     textAlign: 'center',
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: '#D7F4F5',
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 17,
   },
   activeTabText: {
     color: 'white',

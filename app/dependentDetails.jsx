@@ -7,7 +7,6 @@ import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-nati
 const DependentDetails = () => {
   const navigation = useNavigation();
 
-  // Sample JSON data for dependents
   const dependentsData = [
     {
       id: 1,
@@ -86,7 +85,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#13646D',
     textAlign: 'center',

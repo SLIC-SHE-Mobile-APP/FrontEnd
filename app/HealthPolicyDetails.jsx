@@ -26,6 +26,9 @@ const HealthPolicyDetails = () => {
     if (buttonLabel === 'Bank Details') {
       navigation.navigate('BankDetailsSum');
     }
+    if (buttonLabel === 'Claim Documents Required') {
+      navigation.navigate('ClaimDocRequired');
+    }
   };
 
   const buttons = [
@@ -51,10 +54,10 @@ const HealthPolicyDetails = () => {
         {/* Back Icon + Title */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 50 }}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#13646D" style={{ marginRight: 1, marginLeft: 12 }} />
+            <Ionicons name="arrow-back" size={23} color="#13646D" style={{ marginRight: 1, marginLeft: 12 }} />
           </TouchableOpacity>
           <Text style={{
-            fontSize: 26,
+            fontSize: 22,
             fontFamily: 'Adamina',
             fontWeight:'800',
             color: '#13646D',
