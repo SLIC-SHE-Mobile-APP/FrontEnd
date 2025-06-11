@@ -7,6 +7,7 @@ import DownloadClaimForms from './DownloadClaimForms.jsx';
 import OnlineClaimIntimations from './OnlineClaimIntimations.jsx';
 import BankDetailsSum from './BankDetailsSum.jsx';
 import DependentDetails from './dependentDetails.jsx';
+import LoginRequestOTP from './loginRequestOTP.jsx';
 
 
 export default function HomeScreen() {
