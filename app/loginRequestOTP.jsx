@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
   Linking,
   Platform,
   ScrollView,
@@ -62,7 +63,17 @@ function LoginRequestOTPContent() {
 
           <TouchableOpacity
             style={styles.button}
-            onPress={() => router.push('/OTPVerification')}
+            onPress={() => {
+              if (!mobile || mobile.length < 9) {
+                Alert.alert('Error', 'Please enter a valid mobile number');
+                return;
+              }
+              Alert.alert('Success', `OTP sent to +94 ${mobile}`);
+              router.push({
+                pathname: '/OTPVerification',
+                params: { contactInfo: `+94${mobile}`, contactType: 'phone' }
+              });
+            }}
           >
             <Text style={styles.buttonText}>Request OTP</Text>
           </TouchableOpacity>
