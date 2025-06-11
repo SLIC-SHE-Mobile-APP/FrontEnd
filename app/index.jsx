@@ -6,7 +6,7 @@ import HealthPolicyDetails from './HealthPolicyDetails.jsx';
 import DownloadClaimForms from './DownloadClaimForms.jsx';
 import OnlineClaimIntimations from './OnlineClaimIntimations.jsx';
 import BankDetailsSum from './BankDetailsSum.jsx';
-import DependentDetails from './DependentDetails.jsx';
+import DependentDetails from './dependentDetails.jsx';
 
 
 export default function HomeScreen() {

@@ -12,7 +12,7 @@ const HealthPolicyDetails = () => {
       navigation.navigate('HealthInsuCard');
     }
     if (buttonLabel === 'Dependent Details') {
-      navigation.navigate('DependentDetails');
+      navigation.navigate('dependentDetails');
     }
     if (buttonLabel === 'Hospitals List') {
       navigation.navigate('hospitalList');
