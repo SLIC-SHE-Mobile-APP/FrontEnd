@@ -3,17 +3,32 @@ import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { router } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 
 export default function PolicyHome() {
+  const navigation = useNavigation();
   const [policyDetails, setPolicyDetails] = useState(null);
 
   useEffect(() => {
-    // Simulate fetching policy detailsk
+    // Simulate fetching policy details
     setPolicyDetails({
       insuranceCover: 'Rs. 0.00',
       policyPeriod: '2020-02-13 - 2020-02-13',
     });
   }, []);
+
+  const handleNavigation = (label) => {
+    if (label === 'Policy Details') {
+      navigation.navigate('HealthPolicyDetails');
+    }
+    // Add other navigation cases here as needed
+    // else if (label === 'Profile') {
+    //   navigation.navigate('Profile');
+    // }
+    // else if (label === 'Notification') {
+    //   navigation.navigate('Notification');
+    // }
+  };
 
   return (
     <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
@@ -71,10 +86,10 @@ export default function PolicyHome() {
       </ScrollView>
       {/* Bottom NavBar */}
       <View style={styles.navbar}>
-        {renderNavItem('home', 'Home')}
-        {renderNavItem('bell', 'Notification')}
-        {renderNavItem('file-text', 'Policy Details')}
-        {renderNavItem('user', 'Profile')}
+        {renderNavItem('home', 'Home', handleNavigation)}
+        {renderNavItem('bell', 'Notification', handleNavigation)}
+        {renderNavItem('file-text', 'Policy Details', handleNavigation)}
+        {renderNavItem('user', 'Profile', handleNavigation)}
       </View>
     </LinearGradient>
   );
@@ -97,8 +112,8 @@ const renderMember = (name) => (
   </TouchableOpacity>
 );
 
-const renderNavItem = (iconName, label) => (
-  <TouchableOpacity style={styles.navItem}>
+const renderNavItem = (iconName, label, onPress) => (
+  <TouchableOpacity style={styles.navItem} onPress={() => onPress(label)}>
     <Icon name={iconName} size={25} color="white" />
     <Text style={styles.navText}>{label}</Text>
   </TouchableOpacity>
@@ -224,7 +239,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,
-    shadowRadius: 4, marginBottom: 15,
+    shadowRadius: 4, 
+    marginBottom: 15,
   },
   navItem: {
     alignItems: 'center',

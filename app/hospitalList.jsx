@@ -2,29 +2,35 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { FlatList, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 
 const approvedHospitals = [
-  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '011 - 4530 000' },
-  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '011 - 4530 000' },
-  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '6', name: 'Nawaloka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '7', name: 'Durdans Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 010' },
+  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '0114 - 530 057' },
+  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 018' },
+  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '0114 - 530 058' },
+  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 028' },
+  { id: '6', name: 'Nawaloka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
+  { id: '7', name: 'Durdans Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
+  { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
 ];
 
-const notApprovedHospitals = Array.from({ length: 8 }, (_, i) => ({
-  id: `${i + 1}`,
-  name: 'Borella Pvt Hospital',
-  location: 'Colombo',
-}));
+const notApprovedHospitals = [
+  { id: '1', name: 'Number 1 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '2', name: 'Number 2 Hospital', location: 'Wattala', phone: '011 - 4530 000' },
+  { id: '3', name: 'Number 3 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '4', name: 'Number 4 Hospital', location: 'Ragama', phone: '011 - 4530 000' },
+  { id: '5', name: 'Number 5 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '6', name: 'Number 6 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '7', name: 'Number 7 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+  { id: '8', name: 'Number 8 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
+];
 
 const HospitalList = () => {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('Approved');
   const [searchApproved, setSearchApproved] = useState('');
   const [searchNotApproved, setSearchNotApproved] = useState('');
-  const [selectedCardId, setSelectedCardId] = useState(null);
 
   const handleCardPress = (id) => {
     if (selectedCardId !== id) {
@@ -33,28 +39,26 @@ const HospitalList = () => {
   };
 
   const renderItem = ({ item }) => {
-    const isSelected = selectedCardId === item.id;
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+    >
+      <Text style={styles.hospitalName}>{item.name}</Text>
+      <Text style={styles.location}>{item.location}</Text>
+      {item.phone && (
+        <TouchableOpacity
+          style={styles.phoneContainer}
+          onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
+        >
+          <FontAwesome name="phone" size={16} color="#00ADBB" />
+          <Text style={styles.phoneText}>{item.phone}</Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+};
 
-    return (
-      <TouchableOpacity
-        style={[styles.card, isSelected && styles.highlightedCard]}
-        onPress={() => handleCardPress(item.id)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.hospitalName}>{item.name}</Text>
-        <Text style={styles.location}>{item.location}</Text>
-        {isSelected && item.phone && (
-          <TouchableOpacity
-            style={styles.phoneContainer}
-            onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
-          >
-            <FontAwesome name="phone" size={16} color="#FF0000" />
-            <Text style={styles.phoneText}>{item.phone}</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
-  };
 
   const filteredApproved = approvedHospitals.filter((h) =>
     h.name.toLowerCase().includes(searchApproved.toLowerCase())
@@ -71,7 +75,9 @@ const HospitalList = () => {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Ionicons name="arrow-back" size={26} color="#003B4A" />
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={26} color="#13646D" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Hospitals</Text>
           <View style={{ width: 24 }} />
         </View>
@@ -144,7 +150,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#13646D',
     textAlign: 'center',
@@ -172,7 +178,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: '#D7F4F5',
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 17,
   },
   activeTabText: {
     color: 'white',
@@ -200,10 +206,6 @@ const styles = StyleSheet.create({
     borderColor: '#16858D',
     borderWidth: 0.5,
   },
-  highlightedCard: {
-    borderColor: '#F31E0A',
-    borderWidth: 1.25,
-  },
   hospitalName: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -219,9 +221,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   phoneText: {
-    fontSize: 14,
-    marginLeft: 5,
-    color: '#FF0000',
-    fontWeight: 'bold',
-  },
+  fontSize: 16,
+  marginLeft: 5,
+  color: '#00ADBB', 
+  fontWeight: 'bold',
+},
+
 });
