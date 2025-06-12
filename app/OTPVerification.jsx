@@ -32,7 +32,7 @@ function OTPVerificationContent() {
   
   // State for OTP digits
   const [otp, setOtp] = useState(['', '', '', '']);
-  const [timer, setTimer] = useState(35); // 35 seconds countdown
+  const [timer, setTimer] = useState(60); // 60 seconds countdown
   const [canResend, setCanResend] = useState(false);
   
   // Handle timer countdown
@@ -97,7 +97,7 @@ function OTPVerificationContent() {
       inputRefs[0].current.focus();
       
       // Reset timer
-      setTimer(35);
+      setTimer(90);
       setCanResend(false);
       
       // Show confirmation
@@ -113,8 +113,15 @@ function OTPVerificationContent() {
   return (
     <LinearGradient
       colors={['#6DD3D3', '#FAFAFA']}
-      style={[styles.gradient, { paddingBottom: insets.bottom }]}
+      style={[styles.gradient, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
     >
+      {/* Back button at the top */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity onPress={goBack} style={styles.backButton}>
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+      </View>
+      
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -124,15 +131,10 @@ function OTPVerificationContent() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.innerContainer}>
-            <View style={styles.header}>
-              <TouchableOpacity onPress={goBack} style={styles.backButton}>
-                <Text style={styles.backButtonText}>←</Text>
-              </TouchableOpacity>
-              <Text style={styles.title}>OTP Verification</Text>
-            </View>
+            <Text style={styles.title}>OTP Verification</Text>
             
             <Text style={styles.instructions}>
-              Enter the verification code we just send your {contactType === 'phone' ? 'registered number' : 'email'}:
+              Enter the verification code we just sent to your {contactType === 'phone' ? 'registered number' : 'email'}:
             </Text>
             
             <Text style={styles.contactInfo}>{contactInfo}</Text>
@@ -198,24 +200,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 40,
-    alignSelf: 'stretch',
+  topHeader: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    width: '100%',
   },
   backButton: {
-    padding: 10,
+    padding: 5,
   },
   backButtonText: {
-    fontSize: 24,
+    fontSize: 35,
     color: 'rgba(19,100,109,1)',
+    fontWeight: '500',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: 'rgba(19,100,109,1)',
-    marginLeft: 10,
+    marginBottom: 30,
     fontFamily: Platform.OS === 'ios' ? 'Arial' : 'Abhaya Libre ExtraBold',
   },
   instructions: {

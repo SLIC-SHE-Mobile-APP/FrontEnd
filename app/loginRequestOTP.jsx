@@ -29,6 +29,27 @@ function LoginRequestOTPContent() {
     router.push('/login');
   };
 
+  // Handle mobile number input - restrict to 9 digits
+  const handleMobileChange = (text) => {
+    // Remove any non-digit characters
+    const cleaned = text.replace(/\D/g, '');
+    
+    // Limit to 9 digits
+    if (cleaned.length <= 9) {
+      setMobile(cleaned);
+    }
+  };
+
+  // Mask the phone number for privacy
+  const maskPhoneNumber = (number) => {
+    if (!number || number.length < 9) return number;
+    
+    // Keep first 2 and last 3 digits visible, mask the middle
+    const firstPart = number.substring(0, 2);
+    const lastPart = number.substring(number.length - 3);
+    return `${firstPart}****${lastPart}`;
+  };
+
   return (
     <LinearGradient
       colors={['#6DD3D3', '#FAFAFA']}
@@ -52,26 +73,37 @@ function LoginRequestOTPContent() {
             onChangeText={setNIC}
             placeholderTextColor="#666"
           />
-          <TextInput
-            placeholder="Mobile Number"
-            keyboardType="numeric"
-            style={styles.input}
-            value={mobile}
-            onChangeText={setMobile}
-            placeholderTextColor="#666"
-          />
+          
+          <View style={styles.phoneInputContainer}>
+            <View style={styles.countryCode}>
+              <Text style={styles.countryCodeText}>+94</Text>
+            </View>
+            <TextInput
+              placeholder="Mobile Number"
+              keyboardType="numeric"
+              style={styles.phoneInput}
+              value={mobile}
+              onChangeText={handleMobileChange}
+              placeholderTextColor="#666"
+              maxLength={9}
+            />
+          </View>
 
           <TouchableOpacity
             style={styles.button}
             onPress={() => {
               if (!mobile || mobile.length < 9) {
-                Alert.alert('Error', 'Please enter a valid mobile number');
+                Alert.alert('Error', 'Please enter a valid 9-digit mobile number');
                 return;
               }
-              Alert.alert('Success', `OTP sent to +94 ${mobile}`);
+              
+              // Mask the phone number for display
+              const maskedNumber = maskPhoneNumber(mobile);
+              
+              Alert.alert('Success', `OTP sent to +94 ${maskedNumber}`);
               router.push({
                 pathname: '/OTPVerification',
-                params: { contactInfo: `+94${mobile}`, contactType: 'phone' }
+                params: { contactInfo: `+94${maskedNumber}`, contactType: 'phone' }
               });
             }}
           >
@@ -145,6 +177,34 @@ const styles = StyleSheet.create({
     fontSize: 32,
     color: 'white',
     fontFamily: Platform.OS === 'ios' ? 'Arial' : 'Abhaya Libre ExtraBold',
+  },
+  phoneInputContainer: {
+    width: 300,
+    height: 48,
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderColor: '#6DD3D3',
+    borderWidth: 1,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  countryCode: {
+    // backgroundColor: '#f0f0f0',
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#6DD3D3',
+  },
+  countryCodeText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  phoneInput: {
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 15,
+    fontSize: 16,
   },
   input: {
     width: 300,
