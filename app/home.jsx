@@ -9,6 +9,11 @@ export default function PolicyHome() {
   const navigation = useNavigation();
   const [policyDetails, setPolicyDetails] = useState(null);
 
+  const handleInfoPress = () => {
+    navigation.navigate('PolicyMemberDetails');
+  };
+
+
   useEffect(() => {
     // Simulate fetching policy details
     setPolicyDetails({
@@ -21,6 +26,11 @@ export default function PolicyHome() {
   const handleNavigation = (label) => {
     if (label === 'Policy Details') {
       navigation.navigate('HealthPolicyDetails');
+    } else if (label === 'Add') {
+      // Handle plus button action
+      console.log('Plus button pressed');
+      // You can navigate to add screen or show modal
+      // navigation.navigate('AddScreen');
     }
     // Add other navigation cases here as needed
     // else if (label === 'Profile') {
@@ -84,7 +94,7 @@ export default function PolicyHome() {
                 <Text style={styles.insuranceText}>Policy Period : <Text style={styles.boldText}>{policyDetails?.policyPeriod}</Text></Text>
               </View>
               <View style={styles.policyIcons}>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity style={styles.iconButton} onPress={handleInfoPress}>
                   <Icon name="info-circle" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton}>
@@ -102,9 +112,9 @@ export default function PolicyHome() {
         <Text style={styles.sectionTitle}>TYPE</Text>
         <View style={styles.typeContainer}>
           {renderType('Outdoor', 'stethoscope')}
-          {renderType('Spectacles', 'eye')}
-          {renderType('Dental', 'heartbeat')}
           {renderType('Indoor', 'bed')}
+          {renderType('Dental', 'heartbeat')}
+          {renderType('Spectacles', 'eye')}
         </View>
 
         {/* Health Card */}
@@ -118,7 +128,7 @@ export default function PolicyHome() {
       <View style={styles.navbar}>
         {renderNavItem('home', 'Home', handleNavigation)}
         {renderNavItem('bell', 'Notification', handleNavigation)}
-        {renderNavItem('', '', handleNavigation)}
+        {renderPlusNavItem('Add', handleNavigation)}
         {renderNavItem('file-text', 'Policy Details', handleNavigation)}
         {renderNavItem('user', 'Profile', handleNavigation)}
       </View>
@@ -140,6 +150,14 @@ const renderNavItem = (iconName, label, onPress) => (
   <TouchableOpacity style={styles.navItem} onPress={() => onPress(label)} key={label}>
     <Icon name={iconName} size={25} color="white" />
     <Text style={styles.navText}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const renderPlusNavItem = (label, onPress) => (
+  <TouchableOpacity style={styles.plusNavItem} onPress={() => onPress(label)} key={label}>
+    <View style={styles.plusIconContainer}>
+      <Icon name="plus" size={35} color="#6DD3D3" />
+    </View>
   </TouchableOpacity>
 );
 
@@ -262,7 +280,7 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: 'bold',
     color: 'white',
-    fontSize:14
+    fontSize: 14
   },
   moreButton: {
     alignSelf: 'flex-end',
@@ -313,8 +331,10 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,
-    shadowRadius: 4, 
+    shadowRadius: 4,
     marginBottom: 15,
+    alignItems: 'center',
+    height: 70,
   },
   navItem: {
     alignItems: 'center',
@@ -323,5 +343,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     color: '#FFFFFF',
+  },
+  plusNavItem: {
+    alignItems: 'center',
+    position: 'absolute',
+    top: -25,
+    left: '50%',
+    marginLeft: -30,
+    zIndex: 10,
+  },
+  plusIconContainer: {
+    marginTop: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
 });
