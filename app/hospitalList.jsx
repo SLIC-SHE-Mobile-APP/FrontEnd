@@ -1,8 +1,16 @@
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { FlatList, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState } from 'react';
+import {
+  FlatList,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 const approvedHospitals = [
   { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 010' },
@@ -26,39 +34,31 @@ const notApprovedHospitals = [
   { id: '8', name: 'Number 8 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
 ];
 
-const HospitalList = () => {
-  const navigation = useNavigation();
+const HospitalList = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState('Approved');
   const [searchApproved, setSearchApproved] = useState('');
   const [searchNotApproved, setSearchNotApproved] = useState('');
 
-  const handleCardPress = (id) => {
-    if (selectedCardId !== id) {
-      setSelectedCardId(id);
-    }
-  };
-
   const renderItem = ({ item }) => {
-  return (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.8}
-    >
-      <Text style={styles.hospitalName}>{item.name}</Text>
-      <Text style={styles.location}>{item.location}</Text>
-      {item.phone && (
-        <TouchableOpacity
-          style={styles.phoneContainer}
-          onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
-        >
-          <FontAwesome name="phone" size={16} color="#00ADBB" />
-          <Text style={styles.phoneText}>{item.phone}</Text>
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  );
-};
-
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.hospitalName}>{item.name}</Text>
+        <Text style={styles.location}>{item.location}</Text>
+        {item.phone && (
+          <TouchableOpacity
+            style={styles.phoneContainer}
+            onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
+          >
+            <FontAwesome name="phone" size={16} color="#00ADBB" />
+            <Text style={styles.phoneText}>{item.phone}</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const filteredApproved = approvedHospitals.filter((h) =>
     h.name.toLowerCase().includes(searchApproved.toLowerCase())
@@ -70,18 +70,24 @@ const HospitalList = () => {
   return (
     <LinearGradient
       colors={['#FFFFFF', '#6DD3D3']}
-      style={{ flex: 1 }}
+      style={{
+        flex: 1,
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        overflow: 'hidden',
+      }}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={26} color="#13646D" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Hospitals</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      {/* Fixed Header */}
+      <View style={styles.header}>
+        <View style={{ width: 26 }} />
+        <Text style={styles.headerTitle}>Hospitals</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
+        </TouchableOpacity>
+      </View>
 
+      {/* Scrollable Content */}
+      <View style={styles.contentContainer}>
         {/* Tabs */}
         <View style={styles.tabsContainer}>
           <View style={styles.tabs}>
@@ -135,26 +141,25 @@ const HospitalList = () => {
   );
 };
 
-export default HospitalList;
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    paddingTop: 50,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    justifyContent: 'space-between',
+    paddingTop: 15,
+    paddingBottom: 10,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#13646D',
-    textAlign: 'center',
+    textAlign: 'left',
     flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   tabsContainer: {
     marginVertical: 10,
@@ -183,6 +188,10 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: 'white',
   },
+  tabDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
   searchInput: {
     backgroundColor: '#f4f4f4',
     borderRadius: 20,
@@ -190,7 +199,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginVertical: 10,
     height: 40,
-    marginBottom:20,
+    marginBottom: 20,
     borderColor: '#B2B2B2',
     borderWidth: 0.5,
   },
@@ -221,10 +230,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   phoneText: {
-  fontSize: 16,
-  marginLeft: 5,
-  color: '#00ADBB', 
-  fontWeight: 'bold',
-},
-
+    fontSize: 16,
+    marginLeft: 5,
+    color: '#00ADBB', 
+    fontWeight: 'bold',
+  },
+  centeredContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
 });
+
+export default HospitalList;

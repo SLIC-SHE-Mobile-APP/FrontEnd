@@ -1,12 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-const BankDetailsSum = () => {
-  const navigation = useNavigation();
-
+const BankDetailsSum = ({ onClose }) => {
   // Utility to mask string with only first 2 and last 2 characters visible
   const maskValue = (value) => {
     if (!value || value.length <= 4) return value;
@@ -23,19 +26,27 @@ const BankDetailsSum = () => {
   };
 
   return (
-    <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={{ flex: 1 }}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={26} color="#13646D" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Bank Details</Text>
-          <View style={{ width: 26 }}></View>
-        </View>
+    <LinearGradient
+      colors={['#FFFFFF', '#6DD3D3']}
+      style={{
+        flex: 1,
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Fixed Header */}
+      <View style={styles.header}>
+        <View style={{ width: 26 }} />
+        <Text style={styles.headerTitle}>Bank Details</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Details Card */}
-        <View style={styles.cardContainer}>
+      {/* Scrollable Content */}
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.centeredContainer}>
           <View style={styles.card}>
             <View style={styles.leftColumn}>
               <Text style={styles.label}>Bank Name</Text>
@@ -54,33 +65,35 @@ const BankDetailsSum = () => {
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    paddingTop: 50,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    justifyContent: 'space-between',
+    paddingTop: 15,
+    paddingBottom: 10,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#13646D',
-    textAlign: 'center',
+    textAlign: 'left',
     flex: 1,
   },
-  cardContainer: {
-    flex: 1,
+  scrollContainer: {
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  centeredContainer: {
     justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
   card: {
     flexDirection: 'row',
@@ -89,6 +102,8 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: 'space-between',
     elevation: 5,
+    width: '100%',
+    marginTop: 30,
   },
   leftColumn: {
     flex: 1,
@@ -100,7 +115,7 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: 'bold',
     marginBottom: 15,
-    color:'#003B4A',
+    color: '#003B4A',
   },
   value: {
     marginBottom: 15,
@@ -108,7 +123,7 @@ const styles = StyleSheet.create({
   viewDetailsText: {
     color: '#13646D',
     fontWeight: 'bold',
-    fontSize: 18
+    fontSize: 18,
   },
 });
 
