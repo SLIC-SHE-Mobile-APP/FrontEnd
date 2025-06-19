@@ -1,54 +1,125 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  Animated,
+  Dimensions,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import PendingIntimations from './PendingIntimations'; // Import the PendingIntimations component
+
+const { height: screenHeight } = Dimensions.get('window');
 
 const OnlineClaimIntimations = ({ onClose }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [slideAnim] = useState(new Animated.Value(screenHeight));
+
   const forms = [
-    { title: 'Go to Online Claims' },
-    { title: 'Enter New Claims' },
+    { title: 'Go to Online Claims', action: 'pending' },
+    { title: 'Enter New Claims', action: 'new' },
   ];
 
-  return (
-    <LinearGradient
-      colors={['#FFFFFF', '#6DD3D3']}
-      style={{
-        flex: 1,
-        borderTopLeftRadius: 25,
-        borderTopRightRadius: 25,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Fixed Header */}
-      <View style={styles.header}>
-        <View style={{ width: 26 }} />
-        <Text style={styles.headerTitle}>Online Claim Intimations</Text>
-        <TouchableOpacity onPress={onClose}>
-          <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
-        </TouchableOpacity>
-      </View>
+  const handleButtonPress = (action) => {
+    if (action === 'pending') {
+      // Show PendingIntimations modal
+      setModalVisible(true);
+      // Animate slide in from bottom
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else if (action === 'new') {
+      console.log('Enter New Claims pressed');
+      // Handle new claims action
+    }
+  };
 
-      {/* Scrollable Content */}
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Content Card - Centered */}
-        <View style={styles.contentContainer}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Online Claim Intimations Exits !</Text>
-            {forms.map((form, index) => (
-              <TouchableOpacity key={index} style={styles.button}>
-                <Text style={styles.buttonText}>{form.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+  const handleCloseModal = () => {
+    // Animate slide out to bottom
+    Animated.timing(slideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+    });
+  };
+
+  return (
+    <>
+      <LinearGradient
+        colors={['#FFFFFF', '#6DD3D3']}
+        style={{
+          flex: 1,
+          borderTopLeftRadius: 25,
+          borderTopRightRadius: 25,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Fixed Header */}
+        <View style={styles.header}>
+          <View style={{ width: 26 }} />
+          <Text style={styles.headerTitle}>Online Claim Intimations</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </LinearGradient>
+
+        {/* Scrollable Content */}
+        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          {/* Content Card - Centered */}
+          <View style={styles.contentContainer}>
+            <View style={styles.card}>
+              <Text style={styles.title}>Online Claim Intimations Exits !</Text>
+              {forms.map((form, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.button}
+                  onPress={() => handleButtonPress(form.action)}
+                >
+                  <Text style={styles.buttonText}>{form.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
+
+      {/* PendingIntimations Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleCloseModal}
+      >
+        {/* Dark overlay background */}
+        <View style={styles.overlay}>
+          <TouchableOpacity 
+            style={styles.overlayTouchable} 
+            activeOpacity={1} 
+            onPress={handleCloseModal}
+          />
+          
+          {/* Animated modal content */}
+          <Animated.View
+            style={[
+              styles.animatedModal,
+              {
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <PendingIntimations onClose={handleCloseModal} />
+          </Animated.View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -109,10 +180,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  centeredContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
+  // Modal styles
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  overlayTouchable: {
+    flex: 1,
+  },
+  animatedModal: {
+    height: 600, // Height for PendingIntimations modal
+    backgroundColor: 'transparent',
   },
 });
 

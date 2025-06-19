@@ -2,14 +2,20 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { Ionicons } from '@expo/vector-icons';
 import IllnessPopup from './IllnessPopup'; // Import the popup component
+import OnlineClaimIntimations from './OnlineClaimIntimations'; // Import the OnlineClaimIntimations component
+
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function PolicyHome() {
   const navigation = useNavigation();
   const [policyDetails, setPolicyDetails] = useState(null);
   const [showIllnessPopup, setShowIllnessPopup] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [slideAnim] = useState(new Animated.Value(screenHeight));
 
   const handleInfoPress = () => {
     navigation.navigate('PolicyMemberDetails');
@@ -51,11 +57,29 @@ export default function PolicyHome() {
 
   const handleTypePress = (type) => {
     if (type === 'Outdoor') {
-      setShowIllnessPopup(true);
+      // Show OnlineClaimIntimations modal
+      setModalVisible(true);
+      // Animate slide in from bottom
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else {
       console.log(`${type} pressed`);
       // Handle other type presses here
     }
+  };
+
+  const handleCloseModal = () => {
+    // Animate slide out to bottom
+    Animated.timing(slideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+    });
   };
 
   const handleCloseIllnessPopup = () => {
@@ -152,6 +176,35 @@ export default function PolicyHome() {
         {renderNavItem('file-text', 'Policy Details', handleNavigation)}
         {renderNavItem('user', 'Profile', handleNavigation)}
       </View>
+
+      {/* OnlineClaimIntimations Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleCloseModal}
+      >
+        {/* Dark overlay background */}
+        <View style={styles.overlay}>
+          <TouchableOpacity 
+            style={styles.overlayTouchable} 
+            activeOpacity={1} 
+            onPress={handleCloseModal}
+          />
+          
+          {/* Animated modal content */}
+          <Animated.View
+            style={[
+              styles.animatedModal,
+              {
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <OnlineClaimIntimations onClose={handleCloseModal} />
+          </Animated.View>
+        </View>
+      </Modal>
 
       {/* Illness Popup */}
       <IllnessPopup
@@ -395,5 +448,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 6,
+  },
+  // Modal styles
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  overlayTouchable: {
+    flex: 1,
+  },
+  animatedModal: {
+    height: 400, // Fixed height for OnlineClaimIntimations modal
+    backgroundColor: 'transparent',
   },
 });
