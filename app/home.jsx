@@ -4,15 +4,16 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import IllnessPopup from './IllnessPopup'; // Import the popup component
 
 export default function PolicyHome() {
   const navigation = useNavigation();
   const [policyDetails, setPolicyDetails] = useState(null);
+  const [showIllnessPopup, setShowIllnessPopup] = useState(false);
 
   const handleInfoPress = () => {
     navigation.navigate('PolicyMemberDetails');
   };
-
 
   useEffect(() => {
     // Simulate fetching policy details
@@ -46,6 +47,25 @@ export default function PolicyHome() {
     console.log('Add user pressed');
     // You can navigate to add user screen or show modal
     // navigation.navigate('AddUser');
+  };
+
+  const handleTypePress = (type) => {
+    if (type === 'Outdoor') {
+      setShowIllnessPopup(true);
+    } else {
+      console.log(`${type} pressed`);
+      // Handle other type presses here
+    }
+  };
+
+  const handleCloseIllnessPopup = () => {
+    setShowIllnessPopup(false);
+  };
+
+  const handleIllnessNext = () => {
+    console.log('Illness Next pressed');
+    setShowIllnessPopup(false);
+    // Handle next action here
   };
 
   return (
@@ -111,10 +131,10 @@ export default function PolicyHome() {
         {/* Type Section */}
         <Text style={styles.sectionTitle}>TYPE</Text>
         <View style={styles.typeContainer}>
-          {renderType('Outdoor', 'stethoscope')}
-          {renderType('Indoor', 'bed')}
-          {renderType('Dental', 'heartbeat')}
-          {renderType('Spectacles', 'eye')}
+          {renderType('Outdoor', 'stethoscope', handleTypePress)}
+          {renderType('Indoor', 'bed', handleTypePress)}
+          {renderType('Dental', 'heartbeat', handleTypePress)}
+          {renderType('Spectacles', 'eye', handleTypePress)}
         </View>
 
         {/* Health Card */}
@@ -132,13 +152,24 @@ export default function PolicyHome() {
         {renderNavItem('file-text', 'Policy Details', handleNavigation)}
         {renderNavItem('user', 'Profile', handleNavigation)}
       </View>
+
+      {/* Illness Popup */}
+      <IllnessPopup
+        visible={showIllnessPopup}
+        onClose={handleCloseIllnessPopup}
+        onNext={handleIllnessNext}
+      />
     </LinearGradient>
   );
 }
 
 // Helpers
-const renderType = (label, iconName) => (
-  <TouchableOpacity style={styles.typeItem} key={label}>
+const renderType = (label, iconName, onPress) => (
+  <TouchableOpacity 
+    style={styles.typeItem} 
+    key={label}
+    onPress={() => onPress(label)}
+  >
     <View style={styles.iconBackground}>
       <Icon name={iconName} size={30} color="#000000" />
     </View>

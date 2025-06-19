@@ -135,7 +135,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     width: '100%',
     maxHeight: '100%',
-    marginTop:30,
+    marginTop:10,
+    marginBottom:5
   },
   tableRowHeader: {
     flexDirection: 'row',

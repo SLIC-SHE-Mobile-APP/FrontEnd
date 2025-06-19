@@ -22,12 +22,12 @@ export default function UserDetailsScreen() {
 
   const menuItems = [
     { icon: 'person-outline', label: 'View / Edit Profile', route: '/profile', top: 240, backgroundColor:'black' },
-    { icon: 'settings-outline', label: 'Settings', route: '/settings', top: 310 },
-    { icon: 'person-outline', label: 'Help', route: '/help', top: 380 },
-    { icon: 'shield-outline', label: 'Privacy Policy', route: '/privacy-policy', top: 450 },
-    { icon: 'call-outline', label: 'Contact Us', route: '/contact', top: 520 },
-    { icon: 'newspaper-outline', label: 'Corporate News', route: '/news', top: 590 },
-    { icon: 'log-out-outline', label: 'Logout', route: '/loginRequestOTP', top: 660 }
+    // { icon: 'settings-outline', label: 'Settings', route: '/settings', top: 310 },
+    { icon: 'person-outline', label: 'Help', route: '/help', top: 310 },
+    { icon: 'shield-outline', label: 'Privacy Policy', route: '/privacy-policy', top: 380 },
+    { icon: 'call-outline', label: 'Contact Us', route: '/contact', top: 450 },
+    { icon: 'newspaper-outline', label: 'Corporate News', route: '/news', top: 520 },
+    { icon: 'log-out-outline', label: 'Logout', route: '/loginRequestOTP', top: 590 }
   ];
 
   return (

@@ -50,7 +50,7 @@ const HospitalList = ({ onClose }) => {
         {item.phone && (
           <TouchableOpacity
             style={styles.phoneContainer}
-            onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
+            onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-5]/g, '')}`)}
           >
             <FontAwesome name="phone" size={16} color="#00ADBB" />
             <Text style={styles.phoneText}>{item.phone}</Text>

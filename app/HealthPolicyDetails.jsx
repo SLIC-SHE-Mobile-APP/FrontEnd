@@ -13,6 +13,8 @@ import DownloadClaimForms from './DownloadClaimForms';
 import HealthInsuCard from './HealthInsuCard';
 import HospitalList from './hospitalList';
 import OnlineClaimIntimations from './OnlineClaimIntimations';
+import PaymentHistory from './PaymentHistory';
+import PendingRequirement from './PendingRequirement'; // Add this import
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -156,6 +158,10 @@ const HealthPolicyDetails = () => {
         return <DownloadClaimForms {...commonProps} />;
       case 'Online Claim Intimations':
         return <OnlineClaimIntimations {...commonProps} />;
+      case 'Payment History':
+        return <PaymentHistory {...commonProps} />;
+      case 'Pending Requirements':
+        return <PendingRequirement {...commonProps} />;
       default:
         return <PlaceholderPage title={currentPage} onClose={handleCloseModal} />;
     }
