@@ -11,12 +11,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import PendingIntimations from './PendingIntimations'; // Import the PendingIntimations component
+import PendingIntimations from './PendingIntimations';
+import AddPatientDetails from './AddPatientDetails'; // Import the new page
 
 const { height: screenHeight } = Dimensions.get('window');
 
 const OnlineClaimIntimations = ({ onClose }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [showAddPatientDetails, setShowAddPatientDetails] = useState(false);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
 
   const forms = [
@@ -35,8 +37,8 @@ const OnlineClaimIntimations = ({ onClose }) => {
         useNativeDriver: true,
       }).start();
     } else if (action === 'new') {
-      console.log('Enter New Claims pressed');
-      // Handle new claims action
+      // Navigate to AddPatientDetails page
+      setShowAddPatientDetails(true);
     }
   };
 
@@ -50,6 +52,27 @@ const OnlineClaimIntimations = ({ onClose }) => {
       setModalVisible(false);
     });
   };
+
+  const handleCloseAddPatientDetails = () => {
+    setShowAddPatientDetails(false);
+  };
+
+  const handlePatientDetailsNext = (patientData) => {
+    console.log('Patient data received:', patientData);
+    // Handle the next step after patient details are entered
+    // You can navigate to the next page or process the data
+    setShowAddPatientDetails(false);
+  };
+
+  // If showing AddPatientDetails page, render only that
+  if (showAddPatientDetails) {
+    return (
+      <AddPatientDetails 
+        onClose={handleCloseAddPatientDetails}
+        onNext={handlePatientDetailsNext}
+      />
+    );
+  }
 
   return (
     <>
