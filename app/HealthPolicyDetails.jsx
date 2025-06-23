@@ -8,13 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Import your separate page components
 import BankDetailsSum from './BankDetailsSum';
 import ClaimDocRequired from './ClaimDocRequired';
+import ClaimHistory from './ClaimHistory'; // Add this import
 import DependentDetails from './dependentDetails';
 import DownloadClaimForms from './DownloadClaimForms';
 import HealthInsuCard from './HealthInsuCard';
 import HospitalList from './hospitalList';
 import OnlineClaimIntimations from './OnlineClaimIntimations';
 import PaymentHistory from './PaymentHistory';
-import PendingRequirement from './PendingRequirement'; // Add this import
+import PendingRequirement from './PendingRequirement';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -158,6 +159,8 @@ const HealthPolicyDetails = () => {
         return <DownloadClaimForms {...commonProps} />;
       case 'Online Claim Intimations':
         return <OnlineClaimIntimations {...commonProps} />;
+      case 'Claim History':
+        return <ClaimHistory {...commonProps} />;
       case 'Payment History':
         return <PaymentHistory {...commonProps} />;
       case 'Pending Requirements':
