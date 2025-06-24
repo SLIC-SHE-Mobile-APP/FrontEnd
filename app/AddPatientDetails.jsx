@@ -52,8 +52,8 @@ const AddPatientDetails = ({ onClose, onNext }) => {
     };
 
     try {
-      // Navigate to UploadDetails screen (note: changed from UploadDocuments to UploadDetails)
-      navigation.navigate('UploadDetails', { patientData });
+      // Navigate to UploadDocuments screen
+      navigation.navigate('UploadDocuments', { patientData });
     } catch (error) {
       console.error('Navigation error:', error);
       // Fallback to onNext callback if navigation fails
