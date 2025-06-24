@@ -32,7 +32,7 @@ function OTPVerificationContent() {
   
   // State for OTP digits
   const [otp, setOtp] = useState(['', '', '', '']);
-  const [timer, setTimer] = useState(60); // 60 seconds countdown
+  const [timer, setTimer] = useState(90); // 90 seconds countdown
   const [canResend, setCanResend] = useState(false);
   
   // Handle timer countdown
