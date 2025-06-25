@@ -2,11 +2,22 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Animated, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { Ionicons } from '@expo/vector-icons';
-import IllnessPopup from './IllnessPopup'; // Import the popup component
-import OnlineClaimIntimations from './OnlineClaimIntimations'; // Import the OnlineClaimIntimations component
+import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
+import Fontisto from '@expo/vector-icons/Fontisto';
+import IllnessPopup from './IllnessPopup';
+import OnlineClaimIntimations from './OnlineClaimIntimations';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -17,49 +28,51 @@ export default function PolicyHome() {
   const [modalVisible, setModalVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
 
-  const handleInfoPress = () => {
-    navigation.navigate('PolicyMemberDetails');
-  };
+  const [members, setMembers] = useState([]);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
 
   useEffect(() => {
-    // Simulate fetching policy details
     setPolicyDetails({
       insuranceCover: 'Rs. 0.00',
       policyNumber: 'G/010/SHE/16666/25',
       policyPeriod: '2020-02-13 - 2020-02-13',
     });
+
+    const membersList = [
+      { id: 1, name: 'H.M.Menaka Herath', relationship: 'Self' },
+      { id: 2, name: 'Kamal Perera', relationship: 'Spouse' },
+      { id: 3, name: 'Saman Herath', relationship: 'Child' },
+      { id: 4, name: 'Nimal Silva', relationship: 'Child' },
+      { id: 5, name: 'Kamala Herath', relationship: 'Parent' },
+    ];
+    setMembers(membersList);
+    setSelectedMember(membersList[0]);
   }, []);
 
   const handleNavigation = (label) => {
     if (label === 'Policy Details') {
       navigation.navigate('HealthPolicyDetails');
     } else if (label === 'Add') {
-      // Handle plus button action
-      console.log('Plus button pressed');
-      // You can navigate to add screen or show modal
-      // navigation.navigate('AddScreen');
+      router.push('/AddPolicy');
+    } else if (label === 'Profile') {
+      navigation.navigate('Profile');
+    } else if (label === 'Home') {
+      router.push('/PolicyHome');
     }
-    // Add other navigation cases here as needed
-    // else if (label === 'Profile') {
-    //   navigation.navigate('Profile');
-    // }
-    // else if (label === 'Notification') {
-    //   navigation.navigate('Notification');
-    // }
+  };
+
+  const handleInfoPress = () => {
+    navigation.navigate('PolicyMemberDetails');
   };
 
   const handleAddUser = () => {
-    // Handle add user functionality
     console.log('Add user pressed');
-    // You can navigate to add user screen or show modal
-    // navigation.navigate('AddUser');
   };
 
   const handleTypePress = (type) => {
     if (type === 'Outdoor') {
-      // Show OnlineClaimIntimations modal
       setModalVisible(true);
-      // Animate slide in from bottom
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
@@ -67,12 +80,10 @@ export default function PolicyHome() {
       }).start();
     } else {
       console.log(`${type} pressed`);
-      // Handle other type presses here
     }
   };
 
   const handleCloseModal = () => {
-    // Animate slide out to bottom
     Animated.timing(slideAnim, {
       toValue: screenHeight,
       duration: 300,
@@ -89,12 +100,51 @@ export default function PolicyHome() {
   const handleIllnessNext = () => {
     console.log('Illness Next pressed');
     setShowIllnessPopup(false);
-    // Handle next action here
   };
+
+  const handleMemberSelect = (member) => {
+    setSelectedMember(member);
+    setShowMemberDropdown(false);
+  };
+
+  const toggleMemberDropdown = () => {
+    setShowMemberDropdown(!showMemberDropdown);
+  };
+
+  const renderType = (label, icon, onPress) => (
+    <TouchableOpacity
+      style={styles.typeItem}
+      key={label}
+      onPress={() => onPress(label)}
+    >
+      <View style={styles.iconBackground}>
+        {typeof icon === 'string' ? (
+          <Icon name={icon} size={30} color="#000000" />
+        ) : (
+          icon
+        )}
+      </View>
+      <Text style={styles.typeText}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderNavItem = (iconName, label, onPress) => (
+    <TouchableOpacity style={styles.navItem} onPress={() => onPress(label)} key={label}>
+      <Icon name={iconName} size={25} color="white" />
+      <Text style={styles.navText}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderPlusNavItem = (label, onPress) => (
+    <TouchableOpacity style={styles.plusNavItem} onPress={() => onPress(label)} key={label}>
+      <View style={styles.plusIconContainer}>
+        <Icon name="plus" size={35} color="#6DD3D3" />
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
-      {/* Header */}
       <LinearGradient colors={['#FFFFFF', '#FFFFFF']} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.push('/userDetails')}>
@@ -109,33 +159,79 @@ export default function PolicyHome() {
         </View>
       </LinearGradient>
 
-      {/* Body */}
       <ScrollView contentContainerStyle={styles.body}>
-        {/* Logo Banner */}
         <View style={styles.bannerContainer}>
-          <Image source={require('../assets/images/logo.png')} style={styles.banner} resizeMode="contain" />
+          <Image
+            source={require('../assets/images/logo.png')}
+            style={styles.banner}
+            resizeMode="contain"
+          />
         </View>
 
-        {/* Member Section */}
         <Text style={styles.sectionTitle}>MEMBER</Text>
         <View style={styles.memberCard}>
-          <View style={styles.memberRow}>
-            <Text style={styles.memberName}>H.M.Menaka Herath</Text>
-            <View style={styles.totalBadge}>
-              <Text style={styles.totalText}>Total </Text>
-              <Text style={styles.totalNumber}>05</Text>
+          <TouchableOpacity style={styles.memberRow} onPress={toggleMemberDropdown}>
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>
+                {selectedMember ? selectedMember.name : 'Select Member'}
+              </Text>
+              {selectedMember && (
+                <Text style={styles.memberRelationship}>
+                  {selectedMember.relationship}
+                </Text>
+              )}
             </View>
-          </View>
+            <View style={styles.memberActions}>
+              <View style={styles.totalBadge}>
+                <Text style={styles.totalText}>Total </Text>
+                <Text style={styles.totalNumber}>
+                  {members.length.toString().padStart(2, '0')}
+                </Text>
+              </View>
+              <Icon
+                name={showMemberDropdown ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#666"
+                style={styles.dropdownIcon}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {showMemberDropdown && (
+            <View style={styles.dropdownContainer}>
+              {members.map((member) => (
+                <TouchableOpacity
+                  key={member.id}
+                  style={[
+                    styles.dropdownItem,
+                    selectedMember?.id === member.id && styles.selectedDropdownItem,
+                  ]}
+                  onPress={() => handleMemberSelect(member)}
+                >
+                  <View style={styles.dropdownMemberInfo}>
+                    <Text style={styles.dropdownMemberName}>{member.name}</Text>
+                    <Text style={styles.dropdownMemberRelationship}>{member.relationship}</Text>
+                  </View>
+                  {selectedMember?.id === member.id && (
+                    <Icon name="check" size={16} color="#16858D" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Policy Details */}
         <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
         <View style={styles.cardOutline}>
           <View style={styles.insuranceCard}>
             <View style={styles.policyHeader}>
               <View style={styles.policyInfo}>
-                <Text style={styles.insuranceText}>Policy Number : <Text style={styles.boldText}>{policyDetails?.policyNumber}</Text></Text>
-                <Text style={styles.insuranceText}>Policy Period : <Text style={styles.boldText}>{policyDetails?.policyPeriod}</Text></Text>
+                <Text style={styles.insuranceText}>
+                  Policy Number : <Text style={styles.boldText}>{policyDetails?.policyNumber}</Text>
+                </Text>
+                <Text style={styles.insuranceText}>
+                  Policy Period : <Text style={styles.boldText}>{policyDetails?.policyPeriod}</Text>
+                </Text>
               </View>
               <View style={styles.policyIcons}>
                 <TouchableOpacity style={styles.iconButton} onPress={handleInfoPress}>
@@ -152,23 +248,24 @@ export default function PolicyHome() {
           </View>
         </View>
 
-        {/* Type Section */}
         <Text style={styles.sectionTitle}>TYPE</Text>
         <View style={styles.typeContainer}>
           {renderType('Outdoor', 'stethoscope', handleTypePress)}
           {renderType('Indoor', 'bed', handleTypePress)}
-          {renderType('Dental', 'heartbeat', handleTypePress)}
-          {renderType('Spectacles', 'eye', handleTypePress)}
+          {renderType('Dental', <FontAwesome6 name="tooth" size={30} color="#000000" />, handleTypePress)}
+          {renderType('Spectacles', <Fontisto name="sunglasses-alt" size={30} color="#000000" />, handleTypePress)}
         </View>
 
-        {/* Health Card */}
         <Text style={styles.sectionTitle}>HEALTH CARD</Text>
         <View style={styles.healthCardContainer}>
-          <Image source={require('../assets/images/healthcard.png')} style={styles.healthCard} resizeMode="contain" />
+          <Image
+            source={require('../assets/images/healthcard.png')}
+            style={styles.healthCard}
+            resizeMode="contain"
+          />
         </View>
       </ScrollView>
 
-      {/* Bottom NavBar */}
       <View style={styles.navbar}>
         {renderNavItem('home', 'Home', handleNavigation)}
         {renderNavItem('bell', 'Notification', handleNavigation)}
@@ -177,73 +274,20 @@ export default function PolicyHome() {
         {renderNavItem('user', 'Profile', handleNavigation)}
       </View>
 
-      {/* OnlineClaimIntimations Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="none"
-        onRequestClose={handleCloseModal}
-      >
-        {/* Dark overlay background */}
+      <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleCloseModal}>
         <View style={styles.overlay}>
-          <TouchableOpacity 
-            style={styles.overlayTouchable} 
-            activeOpacity={1} 
-            onPress={handleCloseModal}
-          />
-          
-          {/* Animated modal content */}
-          <Animated.View
-            style={[
-              styles.animatedModal,
-              {
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            <OnlineClaimIntimations onClose={handleCloseModal} />
+          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleCloseModal} />
+          <Animated.View style={[styles.animatedModal, { transform: [{ translateY: slideAnim }] }]}>
+            <OnlineClaimIntimations onClose={handleCloseModal} selectedMember={selectedMember} />
           </Animated.View>
         </View>
       </Modal>
 
-      {/* Illness Popup */}
-      <IllnessPopup
-        visible={showIllnessPopup}
-        onClose={handleCloseIllnessPopup}
-        onNext={handleIllnessNext}
-      />
+      <IllnessPopup visible={showIllnessPopup} onClose={handleCloseIllnessPopup} onNext={handleIllnessNext} />
     </LinearGradient>
   );
 }
 
-// Helpers
-const renderType = (label, iconName, onPress) => (
-  <TouchableOpacity 
-    style={styles.typeItem} 
-    key={label}
-    onPress={() => onPress(label)}
-  >
-    <View style={styles.iconBackground}>
-      <Icon name={iconName} size={30} color="#000000" />
-    </View>
-    <Text style={styles.typeText}>{label}</Text>
-  </TouchableOpacity>
-);
-
-const renderNavItem = (iconName, label, onPress) => (
-  <TouchableOpacity style={styles.navItem} onPress={() => onPress(label)} key={label}>
-    <Icon name={iconName} size={25} color="white" />
-    <Text style={styles.navText}>{label}</Text>
-  </TouchableOpacity>
-);
-
-const renderPlusNavItem = (label, onPress) => (
-  <TouchableOpacity style={styles.plusNavItem} onPress={() => onPress(label)} key={label}>
-    <View style={styles.plusIconContainer}>
-      <Icon name="plus" size={35} color="#6DD3D3" />
-    </View>
-  </TouchableOpacity>
-);
 
 // Styles
 const styles = StyleSheet.create({
@@ -308,10 +352,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  memberInfo: {
+    flex: 1,
+  },
   memberName: {
     fontSize: 16,
     color: '#333333',
     fontWeight: '500',
+  },
+  memberRelationship: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  memberActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   totalBadge: {
     backgroundColor: '#16858D',
@@ -320,6 +376,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 10,
   },
   totalText: {
     color: '#FFFFFF',
@@ -329,6 +386,39 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  dropdownIcon: {
+    marginLeft: 5,
+  },
+  dropdownContainer: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+    paddingTop: 10,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    borderRadius: 5,
+  },
+  selectedDropdownItem: {
+    backgroundColor: '#F0F8FF',
+  },
+  dropdownMemberInfo: {
+    flex: 1,
+  },
+  dropdownMemberName: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownMemberRelationship: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   cardOutline: {
     borderWidth: 1,
@@ -459,7 +549,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animatedModal: {
-    height: 400, // Fixed height for OnlineClaimIntimations modal
+    height: 375,
     backgroundColor: 'transparent',
   },
 });
