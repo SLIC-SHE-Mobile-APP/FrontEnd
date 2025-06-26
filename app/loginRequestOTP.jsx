@@ -42,20 +42,30 @@ function LoginRequestOTPContent() {
     }
   };
 
-  // Handle NIC input with validation
+  // Handle NIC input with validation - Updated to handle V, v, X, x
   const handleNICChange = (text) => {
-    // Remove any spaces and convert to uppercase
-    const cleaned = text.replace(/\s/g, '').toUpperCase();
+    // Remove any spaces but keep original case
+    const cleaned = text.replace(/\s/g, '');
     
-    // Allow only digits and V for the old format
-    const validChars = cleaned.replace(/[^0-9V]/g, '');
+    // Allow only digits, V, v, X, x for the old format
+    const validChars = cleaned.replace(/[^0-9VvXx]/g, '');
     
     // Limit length based on format
     if (validChars.length <= 12) {
-      // If it contains V, it should be max 10 characters (9 digits + V)
-      if (validChars.includes('V')) {
-        if (validChars.length <= 10 && validChars.indexOf('V') === validChars.length - 1) {
-          setNIC(validChars);
+      // If it contains V, v, X, or x, it should be max 10 characters (9 digits + V/v/X/x)
+      if (validChars.includes('V') || validChars.includes('v') || validChars.includes('X') || validChars.includes('x')) {
+        const lastChar = validChars.charAt(validChars.length - 1);
+        const hasValidSuffix = lastChar === 'V' || lastChar === 'v' || lastChar === 'X' || lastChar === 'x';
+        
+        if (validChars.length <= 10 && hasValidSuffix) {
+          // Ensure only one V/v/X/x at the end
+          const digitPart = validChars.slice(0, -1);
+          const suffixPart = validChars.slice(-1);
+          
+          // Check if digit part contains only digits
+          if (/^\d*$/.test(digitPart)) {
+            setNIC(validChars);
+          }
         }
       } else {
         // Pure digits, allow up to 12
@@ -64,7 +74,7 @@ function LoginRequestOTPContent() {
     }
   };
 
-  // Validate NIC format
+  // Validate NIC format - Updated to handle both V/v and X/x
   const validateNIC = (nicValue) => {
     if (!nicValue) {
       return false;
@@ -75,8 +85,8 @@ function LoginRequestOTPContent() {
       return true;
     }
 
-    // Check for 10-character format with V at the end (old NIC format)
-    if (/^\d{9}V$/.test(nicValue)) {
+    // Check for 10-character format with V/v or X/x at the end (old NIC format)
+    if (/^\d{9}[VvXx]$/.test(nicValue)) {
       return true;
     }
 
@@ -118,7 +128,7 @@ function LoginRequestOTPContent() {
   const handleRequestOTP = async () => {
     // Validate NIC first
     if (!validateNIC(nic)) {
-      Alert.alert('', 'Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)');
+      Alert.alert('', 'Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200118202342)\n• 9 digits + V (e.g., 622020343V)\n• 9 digits + v (e.g., 622020343v)\n• 9 digits + X (e.g., 622020343X)\n• 9 digits + x (e.g., 622020343x)');
       return;
     }
 
@@ -195,7 +205,6 @@ function LoginRequestOTPContent() {
             value={nic}
             onChangeText={handleNICChange}
             placeholderTextColor="#666"
-            autoCapitalize="characters"
             editable={!loading}
           />
           
@@ -370,3 +379,4 @@ const styles = StyleSheet.create({
     color: 'rgba(19,100,109,1)',
   },
 });
+
