@@ -211,7 +211,7 @@ const HealthPolicyDetails = () => {
 
         {/* Policy Info Card */}
         <View style={{
-          backgroundColor: '#51A7AE80',
+          backgroundColor: '#48bfc8',
           borderRadius: 15,
           padding: 20,
           marginTop: 30,
