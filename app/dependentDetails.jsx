@@ -38,21 +38,7 @@ const DependentDetails = ({ onClose }) => {
       dateOfBirth: '2010/12/08',
       enrollmentDate: '2025/03/01',
       relationship: 'Child',
-    },
-    {
-      id: 5,
-      name: 'U S Fernando',
-      dateOfBirth: '2010/12/08',
-      enrollmentDate: '2025/03/01',
-      relationship: 'Child',
-    },
-    {
-      id: 6,
-      name: 'U S Fernando',
-      dateOfBirth: '2010/12/08',
-      enrollmentDate: '2025/03/01',
-      relationship: 'Child',
-    },
+    }
   ];
 
   return (

@@ -56,10 +56,8 @@ export default function PolicyHome() {
     } else if (label === 'Add') {
       router.push('/AddPolicy');
     } else if (label === 'Profile') {
-      navigation.navigate('Profile');
-    } else if (label === 'Home') {
-      router.push('/PolicyHome');
-    }
+      router.push('/userDetails');
+    } 
   };
 
   const handleInfoPress = () => {
@@ -145,29 +143,20 @@ export default function PolicyHome() {
 
   return (
     <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
-      <LinearGradient colors={['#FFFFFF', '#FFFFFF']} style={styles.header}>
+      
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.push('/userDetails')}>
-            <Icon name="bars" size={24} color="#13515C" />
-          </TouchableOpacity>
-          <Text style={styles.headerText}>
-            <Text style={styles.sheText}>SHE </Text>Home
-          </Text>
-          <TouchableOpacity onPress={handleAddUser}>
-            <Icon name="" size={24} color="#13515C" />
-          </TouchableOpacity>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../assets/images/logo.png')}
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={styles.sheText}>SHE <Text style={styles.sheText1}>Digital</Text></Text>
         </View>
-      </LinearGradient>
+      
 
       <ScrollView contentContainerStyle={styles.body}>
-        <View style={styles.bannerContainer}>
-          <Image
-            source={require('../assets/images/logo.png')}
-            style={styles.banner}
-            resizeMode="contain"
-          />
-        </View>
-
         <Text style={styles.sectionTitle}>MEMBER</Text>
         <View style={styles.memberCard}>
           <TouchableOpacity style={styles.memberRow} onPress={toggleMemberDropdown}>
@@ -237,9 +226,7 @@ export default function PolicyHome() {
                 <TouchableOpacity style={styles.iconButton} onPress={handleInfoPress}>
                   <Icon name="info-circle" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                  <Icon name="trash-o" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
+                
               </View>
             </View>
             <TouchableOpacity style={styles.moreButton}>
@@ -311,24 +298,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 40
   },
-  headerText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#13515C',
+  logoContainer: {
+    marginLeft: 20,
+  },
+  headerLogo: {
+    width: 120,
+    height: 60,
   },
   sheText: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#E12427',
+    marginRight: 20,
+  },
+  sheText1: {
+    fontSize: 20,
+    marginRight: 20,
+    color: '#16858D',
   },
   body: {
     padding: 15,
-  },
-  bannerContainer: {
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  banner: {
-    width: 200,
-    height: 60,
   },
   sectionTitle: {
     fontSize: 18,
@@ -436,9 +425,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  policyInfo: {
-    flex: 1,
-  },
+ 
   policyIcons: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -492,7 +479,7 @@ const styles = StyleSheet.create({
   },
   healthCard: {
     width: 300,
-    height: 180,
+    height: 160,
     borderRadius: 10,
   },
   navbar: {

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
@@ -13,7 +14,9 @@ import {
   View,
 } from 'react-native';
 
-const UploadDocuments = ({ route, navigation }) => {
+const UploadDocuments = ({ route }) => {
+  const navigation = useNavigation(); // Use this hook to ensure navigation is available
+  
   // Get patient data from navigation params
   const patientData = route?.params?.patientData || {};
   
@@ -149,9 +152,7 @@ const UploadDocuments = ({ route, navigation }) => {
           text: 'OK',
           onPress: () => {
             // Navigate to next screen or go back
-            if (navigation) {
-              navigation.goBack(); // or navigate to next screen
-            }
+            navigation.goBack();
           },
         },
       ]
@@ -159,8 +160,13 @@ const UploadDocuments = ({ route, navigation }) => {
   };
 
   const handleBackPress = () => {
-    if (navigation) {
+    console.log('Back button pressed'); // Add this for debugging
+    try {
       navigation.goBack();
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback - you might want to navigate to a specific screen
+      // navigation.navigate('YourPreviousScreenName');
     }
   };
 
@@ -176,7 +182,11 @@ const UploadDocuments = ({ route, navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={handleBackPress} 
+          style={styles.backButton}
+          activeOpacity={0.7} // Add visual feedback
+        >
           <Ionicons name="arrow-back" size={24} color="#13646D" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Upload Documents</Text>
@@ -356,6 +366,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 5,
+    borderRadius: 20, // Add rounded corners for better touch area
+    minWidth: 34, // Ensure minimum touch area
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,

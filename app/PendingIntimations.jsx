@@ -2,42 +2,45 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const PendingIntimations = ({ onClose }) => {
   const [pendingClaims, setPendingClaims] = useState([
     {
-        id: '1',
-        referenceNo: 'M000428',
-        enteredBy: 'D.A.R.C Dahanayake',
-        relationship: 'Son',
-        claimType: 'Out-door',
-        createdOn: '24-12-2020',
-      },
-      {
-        id: '2',
-        referenceNo: 'M000429',
-        enteredBy: 'D.A.R.C Dahanayake',
-        relationship: 'Son',
-        claimType: 'In-door',
-        createdOn: '25-12-2020',
-      },
-      {
-        id: '3',
-        referenceNo: 'M000429',
-        enteredBy: 'D.A.R.C Dahanayake',
-        relationship: 'Son',
-        claimType: 'In-door',
-        createdOn: '25-12-2020',
-      },
+      id: '1',
+      referenceNo: 'M000428',
+      enteredBy: 'D.A.R.C Dahanayake',
+      relationship: 'Son',
+      claimType: 'Out-door',
+      createdOn: '24-12-2020',
+      status: 'Status',
+    },
+    {
+      id: '2',
+      referenceNo: 'M000429',
+      enteredBy: 'D.A.R.C Dahanayake',
+      relationship: 'Son',
+      claimType: 'In-door',
+      createdOn: '25-12-2020', 
+      status: 'Status',
+    },
+    {
+      id: '3',
+      referenceNo: 'M000429',
+      enteredBy: 'D.A.R.C Dahanayake',
+      relationship: 'Son',
+      claimType: 'In-door',
+      createdOn: '25-12-2020', 
+      status: 'Status',
+    },
   ]);
 
   const [selectedClaim, setSelectedClaim] = useState(null);
@@ -116,6 +119,9 @@ const PendingIntimations = ({ onClose }) => {
               <View style={styles.claimRow}>
                 <Text style={styles.claimLabel}>Created on :</Text>
                 <Text style={styles.claimValue}>{claim.createdOn}</Text>
+              </View><View style={styles.claimRow}>
+                <Text style={styles.claimLabel}>Status :</Text>
+                <Text style={styles.claimValue}>{claim.status}</Text>
               </View>
             </View>
 
