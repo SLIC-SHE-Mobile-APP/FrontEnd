@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -19,7 +20,7 @@ const UploadDocuments = ({ route }) => {
   
   // Get patient data from navigation params
   const patientData = route?.params?.patientData || {};
-  
+
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
   const [amount, setAmount] = useState('');
   const [documentDate, setDocumentDate] = useState('');
@@ -114,7 +115,7 @@ const UploadDocuments = ({ route }) => {
           text: 'Remove',
           style: 'destructive',
           onPress: () => {
-            setUploadedDocuments(prev => 
+            setUploadedDocuments(prev =>
               prev.filter(doc => doc.id !== documentId)
             );
           },
@@ -143,7 +144,7 @@ const UploadDocuments = ({ route }) => {
     };
 
     console.log('Document submission data:', documentInfo);
-    
+
     Alert.alert(
       'Success',
       'Documents added successfully!',
@@ -179,6 +180,7 @@ const UploadDocuments = ({ route }) => {
   };
 
   return (
+
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -193,162 +195,183 @@ const UploadDocuments = ({ route }) => {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Patient Info Display */}
-        {patientData.patientName && (
-          <View style={styles.patientInfoCard}>
-            <Text style={styles.patientInfoTitle}>Patient Information</Text>
-            <Text style={styles.patientName}>Name: {patientData.patientName}</Text>
-            {patientData.illness && (
-              <Text style={styles.patientIllness}>Illness: {patientData.illness}</Text>
-            )}
-          </View>
-        )}
+    <LinearGradient
+      colors={['#6DD3D3', '#FAFAFA']}
+      style={[styles.gradient]}
+    >
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#13646D" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Upload Documents</Text>
+          <View style={styles.placeholder} />
+        </View>
 
-        {/* Document Type Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Document Type</Text>
-          <View style={styles.documentTypeContainer}>
-            {documentTypes.map((type) => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.documentTypeOption,
-                  selectedDocumentType === type.id && styles.documentTypeSelected,
-                ]}
-                onPress={() => handleDocumentTypeSelect(type.id)}
-              >
-                <View style={styles.radioContainer}>
-                  <View style={[
-                    styles.radioButton,
-                    selectedDocumentType === type.id && styles.radioButtonSelected,
-                  ]}>
-                    {selectedDocumentType === type.id && (
-                      <View style={styles.radioButtonInner} />
-                    )}
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Patient Info Display */}
+          {patientData.patientName && (
+            <View style={styles.patientInfoCard}>
+              <Text style={styles.patientInfoTitle}>Patient Information</Text>
+              <Text style={styles.patientName}>Name: {patientData.patientName}</Text>
+              {patientData.illness && (
+                <Text style={styles.patientIllness}>Illness: {patientData.illness}</Text>
+              )}
+            </View>
+          )}
+
+          {/* Document Type Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Document Type</Text>
+            <View style={styles.documentTypeContainer}>
+              {documentTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.documentTypeOption,
+                    selectedDocumentType === type.id && styles.documentTypeSelected,
+                  ]}
+                  onPress={() => handleDocumentTypeSelect(type.id)}
+                >
+                  <View style={styles.radioContainer}>
+                    <View style={[
+                      styles.radioButton,
+                      selectedDocumentType === type.id && styles.radioButtonSelected,
+                    ]}>
+                      {selectedDocumentType === type.id && (
+                        <View style={styles.radioButtonInner} />
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.documentTypeText,
+                      selectedDocumentType === type.id && styles.documentTypeTextSelected,
+                    ]}>
+                      {type.label}
+                    </Text>
                   </View>
-                  <Text style={[
-                    styles.documentTypeText,
-                    selectedDocumentType === type.id && styles.documentTypeTextSelected,
-                  ]}>
-                    {type.label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Amount Input */}
-        <View style={styles.section}>
-          <Text style={styles.inputLabel}>Amount</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter amount"
-            placeholderTextColor="#B0B0B0"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-          />
-        </View>
-
-        {/* Document Date Input */}
-        <View style={styles.section}>
-          <Text style={styles.inputLabel}>Document Date</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter document date (DD/MM/YYYY)"
-            placeholderTextColor="#B0B0B0"
-            value={documentDate}
-            onChangeText={setDocumentDate}
-          />
-        </View>
-
-        {/* Sample Images Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sample Images</Text>
-          <Text style={styles.sectionSubtitle}>Only support JPG, JPEG, TIFF and PNG</Text>
-          <View style={styles.sampleImagesContainer}>
-            {sampleImages.map((image) => (
-              <View key={image.id} style={styles.sampleImageCard}>
-                <View style={styles.sampleImagePlaceholder}>
-                  <Ionicons name="image-outline" size={30} color="#B0B0B0" />
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Document Upload Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Document</Text>
-          <Text style={styles.sectionSubtitle}>Allowed formats: JPG, JPEG, TIFF, PNG</Text>
-          
-          <View style={styles.uploadContainer}>
-            <View style={styles.uploadArea}>
-              <Ionicons name="cloud-upload-outline" size={40} color="#00C4CC" />
-              <Text style={styles.uploadText}>Upload your documents here</Text>
-              
-              <View style={styles.uploadButtons}>
-                <TouchableOpacity 
-                  style={styles.uploadButton}
-                  onPress={handleBrowseFiles}
-                >
-                  <Text style={styles.uploadButtonText}>Browse files</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.uploadButton}
-                  onPress={handleTakePhoto}
-                >
-                  <Text style={styles.uploadButtonText}>Take Photo</Text>
-                </TouchableOpacity>
-              </View>
+              ))}
             </View>
           </View>
 
-          {/* Uploaded Documents List */}
-          {uploadedDocuments.length > 0 && (
-            <View style={styles.uploadedDocuments}>
-              <Text style={styles.uploadedDocumentsTitle}>Uploaded Documents:</Text>
-              {uploadedDocuments.map((doc) => (
-                <View key={doc.id} style={styles.documentItem}>
-                  {doc.type?.startsWith('image/') && (
-                    <Image source={{ uri: doc.uri }} style={styles.documentThumbnail} />
-                  )}
-                  <View style={styles.documentInfo}>
-                    <Text style={styles.documentName} numberOfLines={1}>
-                      {doc.name}
-                    </Text>
-                    <Text style={styles.documentSize}>
-                      {formatFileSize(doc.size)}
-                    </Text>
+          {/* Amount Input */}
+          <View style={styles.section}>
+            <Text style={styles.inputLabel}>Amount</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Enter amount"
+              placeholderTextColor="#B0B0B0"
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Document Date Input */}
+          <View style={styles.section}>
+            <Text style={styles.inputLabel}>Document Date</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Enter document date (DD/MM/YYYY)"
+              placeholderTextColor="#B0B0B0"
+              value={documentDate}
+              onChangeText={setDocumentDate}
+            />
+          </View>
+
+          {/* Sample Images Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sample Images</Text>
+            <Text style={styles.sectionSubtitle}>Only support JPG, JPEG, TIFF and PNG</Text>
+            <View style={styles.sampleImagesContainer}>
+              {sampleImages.map((image) => (
+                <View key={image.id} style={styles.sampleImageCard}>
+                  <View style={styles.sampleImagePlaceholder}>
+                    <Ionicons name="image-outline" size={30} color="#B0B0B0" />
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveDocument(doc.id)}
-                    style={styles.removeButton}
-                  >
-                    <Ionicons name="close" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
                 </View>
               ))}
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Add Document Button */}
-        <TouchableOpacity 
-          style={styles.addDocumentButton}
-          onPress={handleAddDocument}
-        >
-          <Text style={styles.addDocumentButtonText}>Add Document</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+          {/* Document Upload Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Document</Text>
+            <Text style={styles.sectionSubtitle}>Allowed formats: JPG, JPEG, TIFF, PNG</Text>
+
+            <View style={styles.uploadContainer}>
+              <View style={styles.uploadArea}>
+                <Ionicons name="cloud-upload-outline" size={40} color="#00C4CC" />
+                <Text style={styles.uploadText}>Upload your documents here</Text>
+
+                <View style={styles.uploadButtons}>
+                  <TouchableOpacity
+                    style={styles.uploadButton}
+                    onPress={handleBrowseFiles}
+                  >
+                    <Text style={styles.uploadButtonText}>Browse files</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.uploadButton}
+                    onPress={handleTakePhoto}
+                  >
+                    <Text style={styles.uploadButtonText}>Take Photo</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Uploaded Documents List */}
+            {uploadedDocuments.length > 0 && (
+              <View style={styles.uploadedDocuments}>
+                <Text style={styles.uploadedDocumentsTitle}>Uploaded Documents:</Text>
+                {uploadedDocuments.map((doc) => (
+                  <View key={doc.id} style={styles.documentItem}>
+                    {doc.type?.startsWith('image/') && (
+                      <Image source={{ uri: doc.uri }} style={styles.documentThumbnail} />
+                    )}
+                    <View style={styles.documentInfo}>
+                      <Text style={styles.documentName} numberOfLines={1}>
+                        {doc.name}
+                      </Text>
+                      <Text style={styles.documentSize}>
+                        {formatFileSize(doc.size)}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveDocument(doc.id)}
+                      style={styles.removeButton}
+                    >
+                      <Ionicons name="close" size={20} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Add Document Button */}
+          <TouchableOpacity
+            style={styles.addDocumentButton}
+            onPress={handleAddDocument}
+          >
+            <Text style={styles.addDocumentButtonText}>Add Document</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </LinearGradient >
   );
 };
 
 const styles = StyleSheet.create({
+
+  gradient: {
+    flex: 1,
+    backgroundColor: '#6DD3D3',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',

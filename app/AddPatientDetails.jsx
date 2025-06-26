@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+<<<<<<< RS
   FlatList,
+=======
+>>>>>>> main
   StyleSheet,
   Text,
   TextInput,
@@ -65,11 +68,24 @@ const AddPatientDetails = ({ onClose }) => {
       illness
     };
 
+<<<<<<< RS
     // ✅ Navigate to UploadDocuments.jsx
     router.push({
       pathname: '/UploadDocuments',
       params: { ...patientData },
     });
+=======
+    try {
+      // Navigate to UploadDocuments screen
+      navigation.navigate('UploadDocuments', { patientData });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback to onNext callback if navigation fails
+      if (onNext) {
+        onNext(patientData);
+      }
+    }
+>>>>>>> main
   };
 
   const handlePatientNameChange = (text) => {
