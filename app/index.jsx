@@ -1,11 +1,11 @@
 import { StyleSheet } from 'react-native';
 
-import LoginRequestOTP from './loginRequestOTP.jsx';
+import Home from './loginRequestOTP.jsx';
 
 
 export default function HomeScreen() {
   return (
-    <LoginRequestOTP/>
+    <Home/>
   );
 }
 
