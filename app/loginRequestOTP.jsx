@@ -1,9 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Image,
+  Keyboard,
   Linking,
   Platform,
   ScrollView,
@@ -19,7 +22,43 @@ function LoginRequestOTPContent() {
   const [nic, setNIC] = useState('');
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const slideAnim = new Animated.Value(0);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setIsKeyboardVisible(true);
+        Animated.timing(slideAnim, {
+          toValue: -100, // Slide up by 100 pixels
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        Animated.timing(slideAnim, {
+          toValue: 0, // Slide back to original position
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   const makePhoneCall = () => {
     Linking.openURL('tel:0112252596').catch(err => {
@@ -35,7 +74,7 @@ function LoginRequestOTPContent() {
   const handleMobileChange = (text) => {
     // Remove any non-digit characters
     const cleaned = text.replace(/\D/g, '');
-    
+
     // Limit to 9 digits
     if (cleaned.length <= 9) {
       setMobile(cleaned);
@@ -46,10 +85,10 @@ function LoginRequestOTPContent() {
   const handleNICChange = (text) => {
     // Remove any spaces and convert to uppercase
     const cleaned = text.replace(/\s/g, '').toUpperCase();
-    
+
     // Allow only digits and V for the old format
     const validChars = cleaned.replace(/[^0-9V]/g, '');
-    
+
     // Limit length based on format
     if (validChars.length <= 12) {
       // If it contains V, it should be max 10 characters (9 digits + V)
@@ -86,7 +125,7 @@ function LoginRequestOTPContent() {
   // Mask the phone number for privacy
   const maskPhoneNumber = (number) => {
     if (!number || number.length < 9) return number;
-    
+
     // Keep first 2 and last 3 digits visible, mask the middle
     const firstPart = number.substring(0, 2);
     const lastPart = number.substring(number.length - 3);
@@ -132,26 +171,26 @@ function LoginRequestOTPContent() {
 
     try {
       const result = await checkAvailability(nic, mobile);
-      
+
       if (result.success && result.isValid && result.otpSent) {
         // Success - OTP sent
         const maskedNumber = maskPhoneNumber(mobile);
         Alert.alert('Success', `OTP sent to +94 ${maskedNumber}`);
-        
+
         router.push({
           pathname: '/OTPVerification',
-          params: { 
-            contactInfo: `+94${maskedNumber}`, 
+          params: {
+            contactInfo: `+94${maskedNumber}`,
             contactType: 'phone',
             nicNumber: nic,
             mobileNumber: mobile
           }
         });
-        
+
       } else {
         // Handle different error types
         let errorMessage = result.message || 'An error occurred. Please try again.';
-        
+
         switch (result.errorType) {
           case 'NIC_NOT_FOUND':
             errorMessage = 'NIC number is not registered in our system. Please contact customer service.';
@@ -162,10 +201,10 @@ function LoginRequestOTPContent() {
           default:
             errorMessage = result.message || 'Validation failed. Please check your details and try again.';
         }
-        
+
         Alert.alert('', errorMessage);
       }
-      
+
     } catch (error) {
       Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
     } finally {
@@ -174,79 +213,133 @@ function LoginRequestOTPContent() {
   };
 
   return (
-    <LinearGradient
-      colors={['#6DD3D3', '#FAFAFA']}
-      style={[styles.gradient, { paddingBottom: insets.bottom }]}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      {/* Top Section with Gradient and City Skyline */}
+      <LinearGradient
+        colors={['#CDEAED', '#6DD3D3', '#6DD3D3']}
+        style={[styles.topSection, isKeyboardVisible && styles.topSectionKeyboard]}
       >
-        <View style={styles.innerContainer}>
-          <Text style={styles.title}>Welcome</Text>
-
-          <View style={styles.box}>
-            <Text style={styles.subtitle}>SHE Digital</Text>
-          </View>
-
-          <TextInput
-            placeholder="NIC"
-            style={styles.input}
-            value={nic}
-            onChangeText={handleNICChange}
-            placeholderTextColor="#666"
-            autoCapitalize="characters"
-            editable={!loading}
+        {/* Header with SLIC Logo */}
+        <View style={styles.header}>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.logo}
           />
-          
-          <View style={styles.phoneInputContainer}>
-            <View style={styles.countryCode}>
-              <Text style={styles.countryCodeText}>+94</Text>
+        </View>
+
+        <View style={styles.skylineContainer}>
+          <Image
+            source={require('@/assets/images/cover.png')}
+            style={styles.cover}
+          />
+        </View>
+      </LinearGradient>
+
+      {/* Bottom Section with Form */}
+      <Animated.View 
+        style={[
+          styles.bottomSection, 
+          {
+            transform: [{ translateY: slideAnim }],
+            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0
+          }
+        ]}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Welcome Card */}
+          <View style={styles.welcomeCard}>
+            <Text style={styles.welcomeText}>Welcome To</Text>
+            <View style={styles.sheDigitalBadge}>
+              <Text style={styles.sheDigitalText}>SHE Digital</Text>
             </View>
-            <TextInput
-              placeholder="Mobile Number"
-              keyboardType="numeric"
-              style={styles.phoneInput}
-              value={mobile}
-              onChangeText={handleMobileChange}
-              placeholderTextColor="#666"
-              maxLength={9}
-              editable={!loading}
-            />
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleRequestOTP}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.buttonText}>Request OTP</Text>
-            )}
-          </TouchableOpacity>
+          {/* Form Section */}
+          <View style={styles.formSection}>
+           
+            {/* NIC Input */}
+            <View style={styles.inputGroup}>
+              <View style={styles.inputContainer}>
+                <View style={styles.iconContainer}>
+                  <Image
+                    source={require('@/assets/images/Idicon.png')}
+                    style={styles.inputIcon}
+                  />
+                </View>
+                <TextInput
+                  placeholder="NIC"
+                  style={styles.input}
+                  value={nic}
+                  onChangeText={handleNICChange}
+                  placeholderTextColor="#999"
+                  autoCapitalize="characters"
+                  editable={!loading}
+                />
+              </View>
+            </View>
 
-          {/* Already Registered */}
-          <TouchableOpacity onPress={handlePress} disabled={loading}>
-            <Text style={styles.link}>
-              <Text style={{ color: 'rgba(23,171,183,1)' }}>Already Registered? </Text>
-              <Text>Login</Text>
-            </Text>
-          </TouchableOpacity>
+            {/* Mobile Number Input */}
+            <View style={styles.inputGroup}>
+              <View style={styles.inputContainer}>
+                <View style={styles.iconContainer}>
+                  <Image
+                    source={require('@/assets/images/phoneicon.png')}
+                    style={styles.inputIcon}
+                  />
+                </View>
+                <View style={styles.countryCodeContainer}>
+                  <Text style={styles.countryCodeText}>+94</Text>
+                </View>
+                <TextInput
+                  placeholder="000 000 000"
+                  keyboardType="numeric"
+                  style={styles.phoneInput}
+                  value={mobile}
+                  onChangeText={handleMobileChange}
+                  placeholderTextColor="#999"
+                  maxLength={9}
+                  editable={!loading}
+                />
+              </View>
+            </View>
 
-          {/* Footer */}
-          <View style={styles.footerContainer}>
-            <Text style={styles.troubleText}>Having Trouble?</Text>
-            <TouchableOpacity onPress={makePhoneCall}>
-              <Text style={styles.footer}>
-                <Text style={{ color: 'rgba(23,171,183,1)' }}>Contact us through</Text> 0112252596
+            {/* Already Registered Link */}
+            <TouchableOpacity onPress={handlePress} disabled={loading} style={styles.linkContainer}>
+              <Text style={styles.alreadyRegisteredText}>
+                Already Registered? <Text style={styles.loginLinkText}>Login</Text>
               </Text>
             </TouchableOpacity>
+
+            {/* Request OTP Button */}
+            <TouchableOpacity
+              style={[styles.requestButton, loading && styles.buttonDisabled]}
+              onPress={handleRequestOTP}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.requestButtonText}>Request OTP</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Footer */}
+            <View style={styles.footerContainer}>
+              <Text style={styles.troubleText}>Having Trouble ?</Text>
+              <TouchableOpacity onPress={makePhoneCall}>
+                <Text style={styles.contactText}>
+                  Contact Us 011 - 2252596
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </LinearGradient>
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -259,114 +352,192 @@ export default function LoginRequestOTP() {
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  container: {
     flex: 1,
-    backgroundColor: '#6DD3D3',
+    backgroundColor: '#fff',
+  },
+  topSection: {
+    flex: 0.6,
+    paddingTop: 50,
+  },
+  topSectionKeyboard: {
+    flex: 0.3, // Reduce top section when keyboard is visible
+  },
+  logo: {
+    width: 180,
+    height: 60,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    marginTop: 10,
+  },
+  cover: {
+    width: '100%',
+    height: '100%'
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+ 
+  slicText: {
+    color: '#4ECDC4',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  generalBadge: {
+    backgroundColor: '#FF4757',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  generalText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  skylineContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 40,
+  },
+  skylineText: {
+    fontSize: 40,
+    opacity: 0.3,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -120,
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
-  innerContainer: {
+  welcomeCard: {
     padding: 20,
     alignItems: 'center',
-    marginTop: 160
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: 'rgba(19,100,109,1)',
-    marginBottom: 16,
-    fontFamily: Platform.OS === 'ios' ? 'Arial' : 'Abhaya Libre ExtraBold',
+  welcomeText: {
+    fontSize: 25,
+    color: '#13646D',
+    marginBottom: 10,
+    fontWeight: '500',
   },
-  box: {
-    width: 269,
-    height: 54,
-    backgroundColor: 'rgba(255,0,0,1)',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderTopRightRadius: 20,
+  sheDigitalBadge: {
+    width: 192,
+    height: 44,
+    backgroundColor: '#FF4757',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderTopRightRadius: 15,
+    borderBottomLeftRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
   },
-  subtitle: {
-    fontSize: 32,
-    color: 'white',
-    fontFamily: Platform.OS === 'ios' ? 'Arial' : 'Abhaya Libre ExtraBold',
+  sheDigitalText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
-  phoneInputContainer: {
-    width: 300,
-    height: 48,
+ 
+  logInText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 15,
+  },
+  inputContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
     borderRadius: 10,
-    borderColor: '#6DD3D3',
     borderWidth: 1,
-    marginBottom: 14,
-    overflow: 'hidden',
+    borderColor: '#e9ecef',
+    paddingHorizontal: 15,
+    height: 50,
   },
-  countryCode: {
-    paddingHorizontal: 10,
-    justifyContent: 'center',
+  iconContainer: {
+    marginRight: 10,
+  },
+  inputIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  countryCodeContainer: {
+    marginRight: 10,
+    paddingRight: 10,
     borderRightWidth: 1,
-    borderRightColor: '#6DD3D3',
+    borderRightColor: '#e9ecef',
   },
   countryCodeText: {
     fontSize: 16,
     color: '#333',
+    fontWeight: '500',
   },
   phoneInput: {
     flex: 1,
-    height: '100%',
-    paddingHorizontal: 15,
     fontSize: 16,
+    color: '#333',
   },
-  input: {
-    width: 300,
-    height: 48,
-    borderColor: '#6DD3D3',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 14,
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: 'rgba(23,171,183,1)',
-    paddingVertical: 14,
-    borderRadius: 15,
-    width: 300,
+  linkContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginVertical: 15,
+  },
+  alreadyRegisteredText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  loginLinkText: {
+    color: '#4ECDC4',
+    fontWeight: '500',
+  },
+  requestButton: {
+    backgroundColor: '#4ECDC4',
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginVertical: 20,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
-  buttonText: {
+  requestButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  link: {
-    fontSize: 16,
-    color: 'rgba(19,100,109,1)',
-    textAlign: 'center',
-    marginBottom: 30,
+    fontWeight: 'bold',
   },
   footerContainer: {
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 20,
   },
   troubleText: {
-    fontSize: 15,
-    color: 'rgba(23,171,183,1)',
-    marginTop: 135,
+    fontSize: 14,
+    color: '#666',
+    marginTop: 45,
   },
-  footer: {
-    marginTop: 5,
-    fontSize: 16,
-    color: 'rgba(19,100,109,1)',
+  contactText: {
+    fontSize: 14,
+    color: '#4ECDC4',
+    fontWeight: '500',
   },
 });
