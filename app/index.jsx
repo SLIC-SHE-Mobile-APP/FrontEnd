@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import Home from './loginRequestOTP.jsx';
+import Home from './home.jsx';
 
 
 export default function HomeScreen() {

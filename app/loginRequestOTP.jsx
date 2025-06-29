@@ -310,8 +310,8 @@ function LoginRequestOTPContent() {
             {/* Already Registered Link */}
             <TouchableOpacity onPress={handlePress} disabled={loading} style={styles.linkContainer}>
               <Text style={styles.alreadyRegisteredText}>
-                Already Registered? <Text style={styles.loginLinkText}>Login</Text>
-              </Text>
+                Already Registered with our customer portal?</Text> <Text style={styles.loginLinkText}>Login</Text>
+              
             </TouchableOpacity>
 
             {/* Request OTP Button */}
