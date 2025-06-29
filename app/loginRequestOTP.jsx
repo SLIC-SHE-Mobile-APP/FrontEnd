@@ -1,6 +1,6 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,13 +14,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+  View,
+} from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 function LoginRequestOTPContent() {
-  const [nic, setNIC] = useState('');
-  const [mobile, setMobile] = useState('');
+  const [nic, setNIC] = useState("");
+  const [mobile, setMobile] = useState("");
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -29,7 +32,7 @@ function LoginRequestOTPContent() {
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
         setIsKeyboardVisible(true);
@@ -42,7 +45,7 @@ function LoginRequestOTPContent() {
     );
 
     const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardHeight(0);
         setIsKeyboardVisible(false);
@@ -61,19 +64,19 @@ function LoginRequestOTPContent() {
   }, []);
 
   const makePhoneCall = () => {
-    Linking.openURL('tel:0112252596').catch(err => {
-      console.error('Phone call error:', err);
+    Linking.openURL("tel:0112252596").catch((err) => {
+      console.error("Phone call error:", err);
     });
   };
 
   const handlePress = () => {
-    router.push('/login');
+    router.push("/login");
   };
 
   // Handle mobile number input - restrict to 9 digits
   const handleMobileChange = (text) => {
     // Remove any non-digit characters
-    const cleaned = text.replace(/\D/g, '');
+    const cleaned = text.replace(/\D/g, "");
 
     // Limit to 9 digits
     if (cleaned.length <= 9) {
@@ -84,16 +87,19 @@ function LoginRequestOTPContent() {
   // Handle NIC input with validation
   const handleNICChange = (text) => {
     // Remove any spaces and convert to uppercase
-    const cleaned = text.replace(/\s/g, '').toUpperCase();
+    const cleaned = text.replace(/\s/g, "").toUpperCase();
 
     // Allow only digits and V for the old format
-    const validChars = cleaned.replace(/[^0-9V]/g, '');
+    const validChars = cleaned.replace(/[^0-9V]/g, "");
 
     // Limit length based on format
     if (validChars.length <= 12) {
       // If it contains V, it should be max 10 characters (9 digits + V)
-      if (validChars.includes('V')) {
-        if (validChars.length <= 10 && validChars.indexOf('V') === validChars.length - 1) {
+      if (validChars.includes("V")) {
+        if (
+          validChars.length <= 10 &&
+          validChars.indexOf("V") === validChars.length - 1
+        ) {
           setNIC(validChars);
         }
       } else {
@@ -135,35 +141,43 @@ function LoginRequestOTPContent() {
   // API call to check NIC and mobile number availability
   const checkAvailability = async (nicNumber, mobileNumber) => {
     try {
-      const response = await fetch('http://203.115.11.229:1002/api/LoginNicMnumber/CheckAvailability', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nicNumber: nicNumber,
-          mobileNumber: mobileNumber,
-        }),
-      });
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/LoginNicMnumber/CheckAvailability",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nicNumber: nicNumber,
+            mobileNumber: mobileNumber,
+          }),
+        }
+      );
 
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('API Error:', error);
-      throw new Error('Network error. Please check your connection and try again.');
+      console.error("API Error:", error);
+      throw new Error(
+        "Network error. Please check your connection and try again."
+      );
     }
   };
 
   const handleRequestOTP = async () => {
     // Validate NIC first
     if (!validateNIC(nic)) {
-      Alert.alert('', 'Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)');
+      Alert.alert(
+        "",
+        "Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)"
+      );
       return;
     }
 
     // Validate mobile number
     if (!mobile || mobile.length < 9) {
-      Alert.alert('', 'Please enter a valid 9-digit mobile number');
+      Alert.alert("", "Please enter a valid 9-digit mobile number");
       return;
     }
 
@@ -175,38 +189,44 @@ function LoginRequestOTPContent() {
       if (result.success && result.isValid && result.otpSent) {
         // Success - OTP sent
         const maskedNumber = maskPhoneNumber(mobile);
-        Alert.alert('Success', `OTP sent to +94 ${maskedNumber}`);
+        Alert.alert("Success", `OTP sent to +94 ${maskedNumber}`);
 
         router.push({
-          pathname: '/OTPVerification',
+          pathname: "/OTPVerification",
           params: {
             contactInfo: `+94${maskedNumber}`,
-            contactType: 'phone',
+            contactType: "phone",
             nicNumber: nic,
-            mobileNumber: mobile
-          }
+            mobileNumber: mobile,
+          },
         });
-
       } else {
         // Handle different error types
-        let errorMessage = result.message || 'An error occurred. Please try again.';
+        let errorMessage =
+          result.message || "An error occurred. Please try again.";
 
         switch (result.errorType) {
-          case 'NIC_NOT_FOUND':
-            errorMessage = 'NIC number is not registered in our system. Please contact customer service.';
+          case "NIC_NOT_FOUND":
+            errorMessage =
+              "NIC number is not registered in our system. Please contact customer service.";
             break;
-          case 'MOBILE_NUMBER_MISMATCH':
-            errorMessage = 'The mobile number is mismatch with this NIC. Please verify your mobile number.';
+          case "MOBILE_NUMBER_MISMATCH":
+            errorMessage =
+              "The mobile number is mismatch with this NIC. Please verify your mobile number.";
             break;
           default:
-            errorMessage = result.message || 'Validation failed. Please check your details and try again.';
+            errorMessage =
+              result.message ||
+              "Validation failed. Please check your details and try again.";
         }
 
-        Alert.alert('', errorMessage);
+        Alert.alert("", errorMessage);
       }
-
     } catch (error) {
-      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+      Alert.alert(
+        "Error",
+        error.message || "Something went wrong. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -216,33 +236,36 @@ function LoginRequestOTPContent() {
     <View style={styles.container}>
       {/* Top Section with Gradient and City Skyline */}
       <LinearGradient
-        colors={['#CDEAED', '#6DD3D3', '#6DD3D3']}
-        style={[styles.topSection, isKeyboardVisible && styles.topSectionKeyboard]}
+        colors={["#CDEAED", "#6DD3D3", "#6DD3D3"]}
+        style={[
+          styles.topSection,
+          isKeyboardVisible && styles.topSectionKeyboard,
+        ]}
       >
         {/* Header with SLIC Logo */}
         <View style={styles.header}>
           <Image
-            source={require('@/assets/images/logo.png')}
+            source={require("@/assets/images/logo.png")}
             style={styles.logo}
           />
         </View>
 
         <View style={styles.skylineContainer}>
           <Image
-            source={require('@/assets/images/cover.png')}
+            source={require("@/assets/images/cover.png")}
             style={styles.cover}
           />
         </View>
       </LinearGradient>
 
       {/* Bottom Section with Form */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.bottomSection, 
+          styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
-            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0
-          }
+            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0,
+          },
         ]}
       >
         <ScrollView
@@ -260,13 +283,12 @@ function LoginRequestOTPContent() {
 
           {/* Form Section */}
           <View style={styles.formSection}>
-           
             {/* NIC Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputContainer}>
                 <View style={styles.iconContainer}>
                   <Image
-                    source={require('@/assets/images/Idicon.png')}
+                    source={require("@/assets/images/Idicon.png")}
                     style={styles.inputIcon}
                   />
                 </View>
@@ -287,7 +309,7 @@ function LoginRequestOTPContent() {
               <View style={styles.inputContainer}>
                 <View style={styles.iconContainer}>
                   <Image
-                    source={require('@/assets/images/phoneicon.png')}
+                    source={require("@/assets/images/phoneicon.png")}
                     style={styles.inputIcon}
                   />
                 </View>
@@ -308,10 +330,15 @@ function LoginRequestOTPContent() {
             </View>
 
             {/* Already Registered Link */}
-            <TouchableOpacity onPress={handlePress} disabled={loading} style={styles.linkContainer}>
+            <TouchableOpacity
+              onPress={handlePress}
+              disabled={loading}
+              style={styles.linkContainer}
+            >
               <Text style={styles.alreadyRegisteredText}>
-                Already Registered with our customer portal?</Text> <Text style={styles.loginLinkText}>Login</Text>
-              
+                Already Registered with our customer portal?
+                <Text style={styles.loginLinkText}> Login</Text>
+              </Text>
             </TouchableOpacity>
 
             {/* Request OTP Button */}
@@ -331,9 +358,7 @@ function LoginRequestOTPContent() {
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>
-                  Contact Us 011 - 2252596
-                </Text>
+                <Text style={styles.contactText}>Contact Us 0112 - 252596</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -354,7 +379,7 @@ export default function LoginRequestOTP() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   topSection: {
     flex: 0.6,
@@ -366,43 +391,43 @@ const styles = StyleSheet.create({
   logo: {
     width: 180,
     height: 60,
-    resizeMode: 'contain',
-    alignSelf: 'center',
+    resizeMode: "contain",
+    alignSelf: "center",
     marginTop: 10,
   },
   cover: {
-    width: '100%',
-    height: '100%'
+    width: "100%",
+    height: "100%",
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 10,
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
- 
+
   slicText: {
-    color: '#4ECDC4',
+    color: "#4ECDC4",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   generalBadge: {
-    backgroundColor: '#FF4757',
+    backgroundColor: "#FF4757",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   generalText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   skylineContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingBottom: 40,
   },
   skylineText: {
@@ -411,7 +436,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -120,
@@ -424,49 +449,49 @@ const styles = StyleSheet.create({
   },
   welcomeCard: {
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   welcomeText: {
     fontSize: 25,
-    color: '#13646D',
+    color: "#13646D",
     marginBottom: 10,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   sheDigitalBadge: {
     width: 192,
     height: 44,
-    backgroundColor: '#FF4757',
+    backgroundColor: "#FF4757",
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderTopRightRadius: 15,
     borderBottomLeftRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   sheDigitalText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
   },
- 
+
   logInText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 20,
   },
   inputGroup: {
     marginBottom: 15,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: "#e9ecef",
     paddingHorizontal: 15,
     height: 50,
   },
@@ -476,68 +501,68 @@ const styles = StyleSheet.create({
   inputIcon: {
     width: 20,
     height: 20,
-    resizeMode: 'contain',
+    resizeMode: "contain",
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   countryCodeContainer: {
     marginRight: 10,
     paddingRight: 10,
     borderRightWidth: 1,
-    borderRightColor: '#e9ecef',
+    borderRightColor: "#e9ecef",
   },
   countryCodeText: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    color: "#333",
+    fontWeight: "500",
   },
   phoneInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   linkContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 15,
   },
   alreadyRegisteredText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   loginLinkText: {
-    color: '#4ECDC4',
-    fontWeight: '500',
+    color: "#4ECDC4",
+    fontWeight: "500",
   },
   requestButton: {
-    backgroundColor: '#4ECDC4',
+    backgroundColor: "#4ECDC4",
     borderRadius: 10,
     paddingVertical: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 20,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   requestButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   footerContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 20,
   },
   troubleText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginTop: 45,
   },
   contactText: {
     fontSize: 14,
-    color: '#4ECDC4',
-    fontWeight: '500',
+    color: "#4ECDC4",
+    fontWeight: "500",
   },
 });
