@@ -1,19 +1,18 @@
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  Dimensions,
   FlatList,
   Linking,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Dimensions,
+  View
 } from 'react-native';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Sample data for different sections
 const approvedHospitals = [
@@ -48,6 +47,8 @@ const pharmacy = [
   { id: '1', name: 'New Lanka Medicare (Pvt) Ltd', location: 'Kandy', phone: '011 - 3456 789' },
   { id: '2', name: 'Health Plus Pharmacy', location: 'Colombo', phone: '011 - 3456 790' },
   { id: '3', name: 'Care Pharmacy', location: 'Galle', phone: '011 - 3456 791' },
+  { id: '4', name: 'Health Plus Pharmacy', location: 'Colombo', phone: '011 - 3456 790' },
+  { id: '5', name: 'Care Pharmacy', location: 'Galle', phone: '011 - 3456 791' },
 ];
 
 const optical = [
@@ -60,21 +61,24 @@ const medical = [
   { id: '1', name: 'Medcare Medical Services', location: 'Katunayake', phone: '011 - 5678 903' },
   { id: '2', name: 'Prime Medical Center', location: 'Colombo', phone: '011 - 5678 904' },
   { id: '3', name: 'Health First Medical', location: 'Kandy', phone: '011 - 5678 905' },
+  { id: '4', name: 'Medcare Medical Services', location: 'Katunayake', phone: '011 - 5678 903' },
+  { id: '5', name: 'Prime Medical Center', location: 'Colombo', phone: '011 - 5678 904' },
+  
 ];
 
 const navigationItems = [
-  { id: 'approved', title: 'Approved\nHospital', data: approvedHospitals },
-  { id: 'notApproved', title: 'Not Approved\nHospital', data: notApprovedHospitals },
-  { id: 'dental', title: 'Dental', data: dentalCare },
-  { id: 'pharmacy', title: 'Pharmacy', data: pharmacy },
-  { id: 'optical', title: 'Optical / Eye', data: optical },
-  { id: 'medical', title: 'Medical', data: medical },
+  { id: 'approved', title: 'Approved Hospital', data: approvedHospitals, icon: 'shield-checkmark' },
+  { id: 'notApproved', title: 'Not Approved Hospital', data: notApprovedHospitals, icon: 'shield-half' },
+  { id: 'dental', title: 'Dental Care', data: dentalCare, icon: 'medical' },
+  { id: 'pharmacy', title: 'Pharmacy', data: pharmacy, icon: 'fitness' },
+  { id: 'optical', title: 'Optical / Eye Care', data: optical, icon: 'eye' },
+  { id: 'medical', title: 'Medical Services', data: medical, icon: 'heart' },
 ];
 
 const HospitalList = ({ onClose }) => {
   const [activeSection, setActiveSection] = useState('approved');
   const [searchText, setSearchText] = useState('');
-  const horizontalScrollRef = useRef(null);
+  const sidebarScrollRef = useRef(null);
   const contentScrollRef = useRef(null);
 
   const getCurrentData = () => {
@@ -86,36 +90,33 @@ const HospitalList = ({ onClose }) => {
     item.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const handleNavItemPress = (sectionId, index) => {
+  const handleNavItemPress = (sectionId) => {
     setActiveSection(sectionId);
     setSearchText('');
-    
-    // Scroll to center the selected item using scrollToIndex
-    try {
-      horizontalScrollRef.current?.scrollToIndex({
-        index: index,
-        animated: true,
-        viewPosition: 0.5, // Center the item
-      });
-    } catch (error) {
-      // Fallback to scrollToOffset if scrollToIndex fails
-      const itemWidth = 120;
-      const scrollToX = Math.max(0, (index * itemWidth) - (screenWidth / 2) + (itemWidth / 2));
-      horizontalScrollRef.current?.scrollToOffset({ offset: scrollToX, animated: true });
-    }
+    // Reset content scroll to top when switching categories
+    contentScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
-  const renderNavItem = ({ item, index }) => {
+  const renderSidebarItem = ({ item }) => {
     const isActive = activeSection === item.id;
     return (
       <TouchableOpacity
-        style={[styles.navItem, isActive && styles.activeNavItem]}
-        onPress={() => handleNavItemPress(item.id, index)}
+        style={[styles.sidebarItem, isActive && styles.activeSidebarItem]}
+        onPress={() => handleNavItemPress(item.id)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.navItemText, isActive && styles.activeNavItemText]}>
-          {item.title}
-        </Text>
+        <View style={styles.sidebarItemContent}>
+          <Ionicons 
+            name={item.icon} 
+            size={20} 
+            color={isActive ? '#FFFFFF' : '#00ADBB'} 
+            style={styles.sidebarIcon}
+          />
+          <Text style={[styles.sidebarItemText, isActive && styles.activeSidebarItemText]}>
+            {item.title}
+          </Text>
+          <View style={[styles.activeIndicator, isActive && styles.activeIndicatorVisible]} />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -138,6 +139,11 @@ const HospitalList = ({ onClose }) => {
     );
   };
 
+  const getCurrentTitle = () => {
+    const currentItem = navigationItems.find(item => item.id === activeSection);
+    return currentItem ? currentItem.title : 'Hospital List';
+  };
+
   return (
     <LinearGradient
       colors={['#FFFFFF', '#6DD3D3']}
@@ -152,40 +158,56 @@ const HospitalList = ({ onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Horizontal Navigation */}
-      <View style={styles.navigationContainer}>
-        <FlatList
-          ref={horizontalScrollRef}
-          data={navigationItems}
-          renderItem={renderNavItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.navContentContainer}
-          style={styles.horizontalNav}
-        />
-      </View>
+      {/* Main Content Area */}
+      <View style={styles.mainContent}>
+        {/* Vertical Sidebar Navigation */}
+        <View style={styles.sidebar}>
+          
+          <FlatList
+            ref={sidebarScrollRef}
+            data={navigationItems}
+            renderItem={renderSidebarItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.sidebarContent}
+            style={styles.sidebarList}
+          />
+        </View>
 
-      {/* Content Container */}
-      <View style={styles.contentContainer}>
-        {/* Search Bar */}
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search"
-          placeholderTextColor="#999"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
+        {/* Content Area */}
+        <View style={styles.contentArea}>
+          {/* Section Title */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{getCurrentTitle()}</Text>
+            <Text style={styles.sectionCount}>({filteredData.length} found)</Text>
+          </View>
 
-        {/* Hospital List */}
-        <FlatList
-          ref={contentScrollRef}
-          data={filteredData}
-          keyExtractor={(item) => `${activeSection}-${item.id}`}
-          renderItem={renderHospitalItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+          {/* Search Bar */}
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search hospitals..."
+            placeholderTextColor="#999"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+
+          {/* Hospital List */}
+          <FlatList
+            ref={contentScrollRef}
+            data={filteredData}
+            keyExtractor={(item) => `${activeSection}-${item.id}`}
+            renderItem={renderHospitalItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="search" size={48} color="#B0B0B0" />
+                <Text style={styles.emptyText}>No hospitals found</Text>
+                <Text style={styles.emptySubText}>Try adjusting your search</Text>
+              </View>
+            }
+          />
+        </View>
       </View>
     </LinearGradient>
   );
@@ -202,77 +224,128 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 15,
-    paddingBottom: 10,
+    paddingBottom: 15,
     backgroundColor: 'transparent',
     zIndex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(19, 100, 109, 0.1)',
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#13646D',
-    textAlign: 'left',
+    // textAlign: 'center',
     flex: 1,
   },
-  navigationContainer: {
-    backgroundColor: '#E8F8F8',
-    paddingVertical: 10,
+  mainContent: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  sidebar: {
+    width: 100,
+    backgroundColor: 'rgba(232, 248, 248, 0.8)',
+    borderRightWidth: 2,
+    borderRightColor: 'rgba(0, 173, 187, 0.2)',
+  },
+  sidebarHeader: {
+    padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#D0E8E8',
+    borderBottomColor: 'rgba(0, 173, 187, 0.2)',
+    backgroundColor: 'rgba(0, 173, 187, 0.1)',
   },
-  horizontalNav: {
-    flexGrow: 0,
+  sidebarHeaderText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#13646D',
+    textAlign: 'center',
   },
-  navContentContainer: {
-    paddingHorizontal: 10,
+  sidebarList: {
+    flex: 1,
   },
-  navItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    marginHorizontal: 5,
-    minWidth: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#B2DFDF',
+  sidebarContent: {
+    paddingVertical: 5,
+  },
+  sidebarItem: {
+    marginVertical: 2,
+    marginHorizontal: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  activeSidebarItem: {
+    backgroundColor: '#00ADBB',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  activeNavItem: {
-    backgroundColor: '#00ADBB',
-    borderColor: '#0093A4',
+  sidebarItemContent: {
+    padding: 12,
+    alignItems: 'center',
+    position: 'relative',
   },
-  navItemText: {
-    fontSize: 12,
+  sidebarIcon: {
+    marginBottom: 5,
+  },
+  sidebarItemText: {
+    fontSize: 10,
     fontWeight: '600',
     color: '#13646D',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 12,
   },
-  activeNavItemText: {
+  activeSidebarItemText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  contentContainer: {
+  activeIndicator: {
+    position: 'absolute',
+    right: 0,
+    top: '50%',
+    width: 3,
+    height: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+    transform: [{ translateY: -10 }],
+  },
+  activeIndicatorVisible: {
+    height: 20,
+  },
+  contentArea: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    paddingHorizontal: 5,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#13646D',
+    flex: 1,
+  },
+  sectionCount: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
   searchInput: {
-    backgroundColor: '#f4f4f4',
-    borderRadius: 20,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
     paddingHorizontal: 20,
-    paddingVertical: 8,
-    marginVertical: 15,
+    paddingVertical: 12,
+    marginBottom: 15,
     height: 40,
-    borderColor: '#B2B2B2',
-    borderWidth: 0.5,
+    borderColor: '#E0E0E0',
+    borderWidth: 1,
+    fontSize: 13,
   },
   listContent: {
     paddingBottom: 20,
@@ -281,7 +354,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 15,
     padding: 15,
-    marginBottom: 10,
+    marginBottom: 12,
     alignItems: 'center',
     borderColor: '#16858D',
     borderWidth: 0.5,
@@ -299,23 +372,43 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#003B4A',
     textAlign: 'center',
+    marginBottom: 4,
   },
   location: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
     marginBottom: 8,
     textAlign: 'center',
   },
   phoneContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 173, 187, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   phoneText: {
     fontSize: 14,
-    marginLeft: 5,
+    marginLeft: 8,
     color: '#00ADBB', 
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+    marginTop: 15,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 5,
   },
 });
 

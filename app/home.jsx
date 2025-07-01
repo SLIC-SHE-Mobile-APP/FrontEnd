@@ -14,12 +14,10 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
-import Fontisto from '@expo/vector-icons/Fontisto';
 import IllnessPopup from './IllnessPopup';
 import OnlineClaimIntimations from './OnlineClaimIntimations';
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function PolicyHome() {
   const navigation = useNavigation();
@@ -27,17 +25,68 @@ export default function PolicyHome() {
   const [showIllnessPopup, setShowIllnessPopup] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
+  
+  // Policy selection modal state
+  const [showPolicySelection, setShowPolicySelection] = useState(false);
+  const [policySelectSlideAnim] = useState(new Animated.Value(screenHeight));
+  const [selectedPolicyNumber, setSelectedPolicyNumber] = useState(null);
+  const [isFirstTime, setIsFirstTime] = useState(true);
 
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
 
-  useEffect(() => {
-    setPolicyDetails({
-      insuranceCover: 'Rs. 0.00',
+  // Available policies
+  const [availablePolicies] = useState([
+    {
+      id: 1,
       policyNumber: 'G/010/SHE/16666/25',
-      policyPeriod: '2020-02-13 - 2020-02-13',
-    });
+      policyPeriod: '2020-02-13 - 2025-02-13',
+      insuranceCover: 'Rs. 500,000.00',
+      type: 'GENERAL'
+    },
+    {
+      id: 2,
+      policyNumber: 'G/010/SHE/16667/25',
+      policyPeriod: '2021-03-15 - 2026-03-15',
+      insuranceCover: 'Rs. 750,000.00',
+      type: 'GENERAL'
+    },
+    {
+      id: 3,
+      policyNumber: 'G/010/SHE/16668/25',
+      policyPeriod: '2022-01-10 - 2027-01-10',
+      insuranceCover: 'Rs. 1,000,000.00',
+      type: 'GENERAL'
+    },
+    {
+      id: 4,
+      policyNumber: 'G/010/SHE/16669/25',
+      policyPeriod: '2023-06-20 - 2028-06-20',
+      insuranceCover: 'Rs. 300,000.00',
+      type: 'GENERAL'
+    },
+    {
+      id: 5,
+      policyNumber: 'G/010/SHE/16670/25',
+      policyPeriod: '2024-04-12 - 2029-04-12',
+      insuranceCover: 'Rs. 800,000.00',
+      type: 'GENERAL'
+    }
+  ]);
+
+  useEffect(() => {
+    // Show policy selection modal on first load
+    if (isFirstTime) {
+      setTimeout(() => {
+        setShowPolicySelection(true);
+        Animated.timing(policySelectSlideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, 500);
+    }
 
     const membersList = [
       { id: 1, name: 'H.M.Menaka Herath', relationship: 'Self' },
@@ -50,6 +99,26 @@ export default function PolicyHome() {
     setSelectedMember(membersList[0]);
   }, []);
 
+  const handlePolicySelection = (policy) => {
+    setSelectedPolicyNumber(policy.policyNumber);
+    setPolicyDetails({
+      insuranceCover: policy.insuranceCover,
+      policyNumber: policy.policyNumber,
+      policyPeriod: policy.policyPeriod,
+      type: policy.type
+    });
+    setIsFirstTime(false);
+    
+    // Close modal
+    Animated.timing(policySelectSlideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPolicySelection(false);
+    });
+  };
+
   const handleNavigation = (label) => {
     if (label === 'Policy Details') {
       navigation.navigate('HealthPolicyDetails');
@@ -60,7 +129,7 @@ export default function PolicyHome() {
     } 
   };
 
-  const handleInfoPress = () => {
+  const handleMoreDetails = () => {
     navigation.navigate('PolicyMemberDetails');
   };
 
@@ -69,7 +138,7 @@ export default function PolicyHome() {
   };
 
   const handleTypePress = (type) => {
-    if (type === 'Outdoor') {
+    if (type === 'New Claim') {
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -91,6 +160,21 @@ export default function PolicyHome() {
     });
   };
 
+  const handleClosePolicySelection = () => {
+    if (!selectedPolicyNumber) {
+      // If no policy selected, select the first one by default
+      handlePolicySelection(availablePolicies[0]);
+    } else {
+      Animated.timing(policySelectSlideAnim, {
+        toValue: screenHeight,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowPolicySelection(false);
+      });
+    }
+  };
+
   const handleCloseIllnessPopup = () => {
     setShowIllnessPopup(false);
   };
@@ -109,18 +193,27 @@ export default function PolicyHome() {
     setShowMemberDropdown(!showMemberDropdown);
   };
 
-  const renderType = (label, icon, onPress) => (
+  const showPolicySelectionModal = () => {
+    setShowPolicySelection(true);
+    Animated.timing(policySelectSlideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const renderType = (label, imageSource, onPress) => (
     <TouchableOpacity
       style={styles.typeItem}
       key={label}
       onPress={() => onPress(label)}
     >
-      <View style={styles.iconBackground}>
-        {typeof icon === 'string' ? (
-          <Icon name={icon} size={30} color="#000000" />
-        ) : (
-          icon
-        )}
+      <View style={styles.iconCircle}>
+        <Image
+          source={imageSource}
+          style={styles.typeIcon}
+          resizeMode="contain"
+        />
       </View>
       <Text style={styles.typeText}>{label}</Text>
     </TouchableOpacity>
@@ -133,30 +226,51 @@ export default function PolicyHome() {
     </TouchableOpacity>
   );
 
-  const renderPlusNavItem = (label, onPress) => (
-    <TouchableOpacity style={styles.plusNavItem} onPress={() => onPress(label)} key={label}>
-      <View style={styles.plusIconContainer}>
-        <Icon name="plus" size={35} color="#6DD3D3" />
-      </View>
-    </TouchableOpacity>
-  );
-
   return (
     <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
-      
-        <View style={styles.headerContent}>
-          <View style={styles.logoContainer}>
-            <Image
+      <View style={styles.headerContent}>
+        <View style={styles.logoContainer}>
+          <View style={styles.logoRow}>
+          <Image
               source={require('../assets/images/logo.png')}
-              style={styles.headerLogo}
+              style={styles.logo}
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.sheText}>SHE <Text style={styles.sheText1}>Digital</Text></Text>
+          <View style={styles.userSection}>
+            <Image
+              source={require('../assets/images/userhome.png')}
+              style={styles.userAvatar}
+              resizeMode="contain"
+            />
+            <Text style={styles.userName}>Kumuduni Rajapakshe</Text>
+            <TouchableOpacity onPress={showPolicySelectionModal}>
+              <Icon name="chevron-down" size={16} color="#666" />
+            </TouchableOpacity>
+          </View>
         </View>
-      
+      </View>
 
       <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
+        <View style={styles.cardOutline}>
+          <View style={styles.insuranceCard}>
+            <View style={styles.policyHeader}>
+              <View style={styles.policyInfo}>
+                <Text style={styles.insuranceText}>
+                  Policy Number : <Text style={styles.boldText}>{policyDetails?.policyNumber}</Text>
+                </Text>
+                <Text style={styles.insuranceText}>
+                  Policy Period : <Text style={styles.boldText}>{policyDetails?.policyPeriod}</Text>
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.moreButton} onPress={handleMoreDetails}>
+              <Text style={styles.moreText}>More Details</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <Text style={styles.sectionTitle}>MEMBER</Text>
         <View style={styles.memberCard}>
           <TouchableOpacity style={styles.memberRow} onPress={toggleMemberDropdown}>
@@ -210,37 +324,12 @@ export default function PolicyHome() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
-        <View style={styles.cardOutline}>
-          <View style={styles.insuranceCard}>
-            <View style={styles.policyHeader}>
-              <View style={styles.policyInfo}>
-                <Text style={styles.insuranceText}>
-                  Policy Number : <Text style={styles.boldText}>{policyDetails?.policyNumber}</Text>
-                </Text>
-                <Text style={styles.insuranceText}>
-                  Policy Period : <Text style={styles.boldText}>{policyDetails?.policyPeriod}</Text>
-                </Text>
-              </View>
-              <View style={styles.policyIcons}>
-                <TouchableOpacity style={styles.iconButton} onPress={handleInfoPress}>
-                  <Icon name="info-circle" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-                
-              </View>
-            </View>
-            <TouchableOpacity style={styles.moreButton}>
-              <Text style={styles.moreText}>More</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         <Text style={styles.sectionTitle}>TYPE</Text>
         <View style={styles.typeContainer}>
-          {renderType('Outdoor', 'stethoscope', handleTypePress)}
-          {renderType('Indoor', 'bed', handleTypePress)}
-          {renderType('Dental', <FontAwesome6 name="tooth" size={30} color="#000000" />, handleTypePress)}
-          {renderType('Spectacles', <Fontisto name="sunglasses-alt" size={30} color="#000000" />, handleTypePress)}
+          {renderType('New\nClaim', require('../assets/images/newclaimicon.png'), handleTypePress)}
+          {renderType('Saved\nClaims', require('../assets/images/savedclaimicon.png'), handleTypePress)}
+          {renderType('Claim\nHistory', require('../assets/images/claimhistoryicon.png'), handleTypePress)}
+          {renderType('Pending\nRequirement', require('../assets/images/pendingicon.png'), handleTypePress)}
         </View>
 
         <Text style={styles.sectionTitle}>HEALTH CARD</Text>
@@ -256,11 +345,40 @@ export default function PolicyHome() {
       <View style={styles.navbar}>
         {renderNavItem('home', 'Home', handleNavigation)}
         {renderNavItem('bell', 'Notification', handleNavigation)}
-        {renderPlusNavItem('Add', handleNavigation)}
         {renderNavItem('file-text', 'Policy Details', handleNavigation)}
         {renderNavItem('user', 'Profile', handleNavigation)}
       </View>
 
+      {/* Policy Selection Modal */}
+      <Modal visible={showPolicySelection} transparent animationType="none" onRequestClose={handleClosePolicySelection}>
+        <View style={styles.overlay}>
+          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePolicySelection} />
+          <Animated.View style={[styles.policySelectionModal, { transform: [{ translateY: policySelectSlideAnim }] }]}>
+            <View style={styles.policyModalHeader}>
+              <Text style={styles.policyModalTitle}>Select Your Policy</Text>
+
+            </View>
+            <ScrollView style={styles.policyList}>
+              {availablePolicies.map((policy) => (
+                <TouchableOpacity
+                  key={policy.id}
+                  style={[
+                    styles.policyItem,
+                    selectedPolicyNumber === policy.policyNumber && styles.selectedPolicyItem
+                  ]}
+                  onPress={() => handlePolicySelection(policy)}
+                >
+                  <Text style={styles.policyNumber}>{policy.policyNumber}</Text>
+                  <Text style={styles.policyPeriod}>{policy.policyPeriod}</Text>
+                  <Text style={styles.policyCover}>{policy.insuranceCover}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Existing Modal for Claims */}
       <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleCloseModal}>
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleCloseModal} />
@@ -275,46 +393,69 @@ export default function PolicyHome() {
   );
 }
 
-
-// Styles
 const styles = StyleSheet.create({
   container: {
-    flex: 2,
-  },
-  header: {
-    height: 100,
-    justifyContent: 'center',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: 'white',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    flex: 1,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: 40
+    paddingTop: 50,
+    paddingBottom: 20,
   },
   logoContainer: {
-    marginLeft: 20,
+    marginLeft: 10,
   },
-  headerLogo: {
-    width: 120,
-    height: 60,
+  logoRow: {
+   alignItems: 'center',
+    marginBottom: 15,
+    display:'flex',
+    alignItems:'left',
+    justifyContent:'center'
   },
-  sheText: {
-    fontSize: 24,
+  logo:{
+    width: 130,
+    height: 30,
+  },
+  
+  sligBadge: {
+    backgroundColor: '#16858D',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  sligText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#E12427',
-    marginRight: 20,
   },
-  sheText1: {
-    fontSize: 20,
-    marginRight: 20,
-    color: '#16858D',
+  generalBadge: {
+    backgroundColor: '#E12427',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  generalText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  userSection: {
+    display:'flex',
+    alignItems:'center',justifyContent:'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
+  },
+  userName: {
+    fontSize: 16,
+    color: '#333',
+    marginRight: 8,
   },
   body: {
     padding: 15,
@@ -420,18 +561,22 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
   },
+  healthCardContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  healthCard: {
+    width: 300,
+    height: 160,
+    borderRadius: 10,
+  },
   policyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
- 
-  policyIcons: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  iconButton: {
-    marginLeft: 15,
+  policyInfo: {
+    flex: 1,
   },
   insuranceText: {
     fontSize: 16,
@@ -441,7 +586,7 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: 'bold',
     color: 'white',
-    fontSize: 14
+    fontSize: 14,
   },
   moreButton: {
     alignSelf: 'flex-end',
@@ -454,33 +599,126 @@ const styles = StyleSheet.create({
   },
   typeContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     marginBottom: 15,
+    paddingHorizontal: 5,
   },
   typeItem: {
     alignItems: 'center',
+    flex: 1,
+    paddingVertical: 15,
+    marginHorizontal: 3,
   },
-  typeText: {
-    marginTop: 5,
-    fontSize: 14,
-    color: '#A79C9C',
-  },
-  iconBackground: {
+  iconCircle: {
     width: 50,
     height: 50,
     borderRadius: 25,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  typeIcon: {
+    width: 30,
+    height: 30,
+  },
+  typeText: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
+    lineHeight: 16,
   },
   healthCardContainer: {
     alignItems: 'center',
     marginBottom: 15,
   },
-  healthCard: {
-    width: 300,
-    height: 160,
-    borderRadius: 10,
+  healthCardWrapper: {
+    width: screenWidth - 40,
+    backgroundColor: '#16858D',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  healthCardHeader: {
+    padding: 15,
+    paddingBottom: 10,
+  },
+  healthCardBadges: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  healthBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  healthBadgeText: {
+    color: '#16858D',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  sligCardBadge: {
+    backgroundColor: '#E12427',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  sligCardBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  healthCardBody: {
+    padding: 15,
+    paddingTop: 5,
+  },
+  cardHolderText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    opacity: 0.8,
+    marginBottom: 5,
+  },
+  cardHolderName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  cardLabel: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    opacity: 0.8,
+  },
+  cardValue: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  cardRightInfo: {
+    alignItems: 'flex-end',
+  },
+  validUpTo: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    opacity: 0.8,
+  },
+  expiryDate: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   navbar: {
     flexDirection: 'row',
@@ -493,7 +731,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    marginBottom: 15,
     alignItems: 'center',
     height: 70,
   },
@@ -505,26 +742,55 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: '#FFFFFF',
   },
-  plusNavItem: {
-    alignItems: 'center',
-    position: 'absolute',
-    top: -25,
-    left: '50%',
-    marginLeft: -30,
-    zIndex: 10,
-  },
-  plusIconContainer: {
-    marginTop: 12,
-    width: 50,
-    height: 50,
-    borderRadius: 30,
+  // Policy Selection Modal styles
+  policySelectionModal: {
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    maxHeight: screenHeight * 0.6,
+    paddingBottom: 20,
+  },
+  policyModalHeader: {
+    // flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E8E8',
+  },
+  policyModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  policyList: {
+    maxHeight: screenHeight * 0.4,
+  },
+  policyItem: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  selectedPolicyItem: {
+    backgroundColor: '#F0F8FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#16858D',
+  },
+  policyNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  policyPeriod: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  policyCover: {
+    fontSize: 14,
+    color: '#16858D',
+    fontWeight: '500',
   },
   // Modal styles
   overlay: {
