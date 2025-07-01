@@ -20,7 +20,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
@@ -45,24 +45,65 @@ function OTPVerificationContent() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const slideAnim = new Animated.Value(0);
 
-  // Load user data from AsyncStorage as backup
+  // Load user data from SecureStore as backup
   const loadUserData = async () => {
     try {
-      const userData = await AsyncStorage.getItem("userData");
-      if (userData) {
-        const parsedData = JSON.parse(userData);
-        console.log("Loaded user data from AsyncStorage:", parsedData);
+      // Try to get individual values first (more secure approach)
+      const storedMobile = await SecureStore.getItemAsync('user_mobile');
+      const storedNic = await SecureStore.getItemAsync('user_nic');
+      
+      if (storedMobile && storedNic) {
+        console.log("Loaded user data from SecureStore:", {
+          mobileNumber: storedMobile,
+          nicNumber: storedNic
+        });
 
-        // Use AsyncStorage data if navigation params are empty
-        if (!nicNumber && parsedData.nicNumber) {
-          setNicNumber(parsedData.nicNumber);
+        // Use SecureStore data if navigation params are empty
+        if (!nicNumber && storedNic) {
+          setNicNumber(storedNic);
         }
-        if (!mobileNumber && parsedData.mobileNumber) {
-          setMobileNumber(parsedData.mobileNumber);
+        if (!mobileNumber && storedMobile) {
+          setMobileNumber(storedMobile);
+        }
+      } else {
+        // Fallback to combined userData if individual items don't exist
+        const userData = await SecureStore.getItemAsync("userData");
+        if (userData) {
+          const parsedData = JSON.parse(userData);
+          console.log("Loaded combined user data from SecureStore:", parsedData);
+
+          // Use SecureStore data if navigation params are empty
+          if (!nicNumber && parsedData.nicNumber) {
+            setNicNumber(parsedData.nicNumber);
+          }
+          if (!mobileNumber && parsedData.mobileNumber) {
+            setMobileNumber(parsedData.mobileNumber);
+          }
         }
       }
     } catch (error) {
-      console.error("Error loading user data:", error);
+      console.error("Error loading user data from SecureStore:", error);
+    }
+  };
+
+  // Helper function to get user data (can be used elsewhere)
+  const getUserData = async () => {
+    try {
+      const mobileNumber = await SecureStore.getItemAsync('user_mobile');
+      const nicNumber = await SecureStore.getItemAsync('user_nic');
+      const timestamp = await SecureStore.getItemAsync('user_timestamp');
+      
+      if (mobileNumber && nicNumber) {
+        return {
+          mobileNumber,
+          nicNumber,
+          timestamp
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error retrieving user data:', error);
+      return null;
     }
   };
 
@@ -232,10 +273,8 @@ function OTPVerificationContent() {
 
       if (result.success) {
         if (result.nicAvailaWeb === false) {
-          // ✅ NIC not available, navigate to email page
           router.push("/email");
         } else if (result.nicAvailaWeb === true) {
-          // ✅ NIC available, navigate to home page
           router.push("/home");
         } else {
           Alert.alert("Error", "Unexpected response. Please try again.");

@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,15 +35,15 @@ function EmailVerificationContent() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const userData = await AsyncStorage.getItem("userData");
+        const userData = await SecureStore.getItemAsync("userData");
         if (userData) {
           const parsed = JSON.parse(userData);
-          console.log("Loaded user data from AsyncStorage:", parsed);
+          console.log("Loaded user data from SecureStore:", parsed);
 
           if (parsed.nicNumber) setNicNumber(parsed.nicNumber);
           if (parsed.mobileNumber) setMobileNumber(parsed.mobileNumber);
         } else {
-          console.warn("User data not found in AsyncStorage");
+          console.warn("User data not found in SecureStore");
           Alert.alert("Error", "User data not found. Please log in again.");
         }
       } catch (error) {
@@ -145,7 +145,7 @@ function EmailVerificationContent() {
       console.log("Submit API response:", result);
 
       if (result.message === "User inserted successfully") {
-        await AsyncStorage.removeItem("userData");
+        await SecureStore.deleteItemAsync("userData");
         router.push("/home");
       } else {
         Alert.alert(
@@ -191,7 +191,7 @@ function EmailVerificationContent() {
       console.log("Skip API response:", result);
 
       if (result.message === "User inserted successfully") {
-        await AsyncStorage.removeItem("userData");
+        await SecureStore.deleteItemAsync("userData");
         router.push("/home");
       } else {
         Alert.alert(
