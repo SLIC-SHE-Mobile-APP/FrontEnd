@@ -20,6 +20,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function LoginRequestOTPContent() {
   const [nic, setNIC] = useState("");
@@ -37,7 +38,7 @@ function LoginRequestOTPContent() {
         setKeyboardHeight(e.endCoordinates.height);
         setIsKeyboardVisible(true);
         Animated.timing(slideAnim, {
-          toValue: -100, // Slide up by 100 pixels
+          toValue: -100,
           duration: 250,
           useNativeDriver: true,
         }).start();
@@ -50,7 +51,7 @@ function LoginRequestOTPContent() {
         setKeyboardHeight(0);
         setIsKeyboardVisible(false);
         Animated.timing(slideAnim, {
-          toValue: 0, // Slide back to original position
+          toValue: 0,
           duration: 250,
           useNativeDriver: true,
         }).start();
@@ -63,6 +64,21 @@ function LoginRequestOTPContent() {
     };
   }, []);
 
+  // Store user data in AsyncStorage
+  const storeUserData = async (mobileNumber, nicNumber) => {
+    try {
+      const userData = {
+        mobileNumber,
+        nicNumber,
+        timestamp: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      console.log('User data stored successfully');
+    } catch (error) {
+      console.error('Error storing user data:', error);
+    }
+  };
+
   const makePhoneCall = () => {
     Linking.openURL("tel:0112252596").catch((err) => {
       console.error("Phone call error:", err);
@@ -73,72 +89,41 @@ function LoginRequestOTPContent() {
     router.push("/login");
   };
 
-  // Handle mobile number input - restrict to 9 digits
   const handleMobileChange = (text) => {
-    // Remove any non-digit characters
     const cleaned = text.replace(/\D/g, "");
-
-    // Limit to 9 digits
     if (cleaned.length <= 9) {
       setMobile(cleaned);
     }
   };
 
-  // Handle NIC input with validation
   const handleNICChange = (text) => {
-    // Remove any spaces and convert to uppercase
-    const cleaned = text.replace(/\s/g, "").toUpperCase();
-
-    // Allow only digits and V for the old format
-    const validChars = cleaned.replace(/[^0-9V]/g, "");
-
-    // Limit length based on format
+    const cleaned = text.replace(/\s/g, "");
+    const validChars = cleaned.replace(/[^0-9vVxX]/g, "");
     if (validChars.length <= 12) {
-      // If it contains V, it should be max 10 characters (9 digits + V)
-      if (validChars.includes("V")) {
-        if (
-          validChars.length <= 10 &&
-          validChars.indexOf("V") === validChars.length - 1
-        ) {
-          setNIC(validChars);
-        }
-      } else {
-        // Pure digits, allow up to 12
-        setNIC(validChars);
-      }
+      setNIC(validChars);
     }
   };
 
-  // Validate NIC format
   const validateNIC = (nicValue) => {
     if (!nicValue) {
       return false;
     }
-
-    // Check for 12-digit format (new NIC format)
     if (/^\d{12}$/.test(nicValue)) {
       return true;
     }
-
-    // Check for 10-character format with V at the end (old NIC format)
-    if (/^\d{9}V$/.test(nicValue)) {
+    if (/^\d{9}[vVxX]$/.test(nicValue)) {
       return true;
     }
-
     return false;
   };
 
-  // Mask the phone number for privacy
   const maskPhoneNumber = (number) => {
     if (!number || number.length < 9) return number;
-
-    // Keep first 2 and last 3 digits visible, mask the middle
     const firstPart = number.substring(0, 2);
     const lastPart = number.substring(number.length - 3);
     return `${firstPart}****${lastPart}`;
   };
 
-  // API call to check NIC and mobile number availability
   const checkAvailability = async (nicNumber, mobileNumber) => {
     try {
       const response = await fetch(
@@ -166,16 +151,14 @@ function LoginRequestOTPContent() {
   };
 
   const handleRequestOTP = async () => {
-    // Validate NIC first
     if (!validateNIC(nic)) {
       Alert.alert(
         "",
-        "Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)"
+        "Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)\n• 9 digits + v (e.g., 60XXXXXX3v)\n• 9 digits + X (e.g., 60XXXXXX3X)\n• 9 digits + x (e.g., 60XXXXXX3x)"
       );
       return;
     }
 
-    // Validate mobile number
     if (!mobile || mobile.length < 9) {
       Alert.alert("", "Please enter a valid 9-digit mobile number");
       return;
@@ -187,7 +170,9 @@ function LoginRequestOTPContent() {
       const result = await checkAvailability(nic, mobile);
 
       if (result.success && result.isValid && result.otpSent) {
-        // Success - OTP sent
+        // Store the mobile number and NIC number from API response
+        await storeUserData(result.mobileNumber, result.nicNumber);
+        
         const maskedNumber = maskPhoneNumber(mobile);
         Alert.alert("Success", `OTP sent to +94 ${maskedNumber}`);
 
@@ -196,19 +181,18 @@ function LoginRequestOTPContent() {
           params: {
             contactInfo: `+94${maskedNumber}`,
             contactType: "phone",
-            nicNumber: nic,
-            mobileNumber: mobile,
+            nicNumber: result.nicNumber, // Use API response data
+            mobileNumber: result.mobileNumber, // Use API response data
           },
         });
       } else {
-        // Handle different error types
         let errorMessage =
           result.message || "An error occurred. Please try again.";
 
         switch (result.errorType) {
           case "NIC_NOT_FOUND":
             errorMessage =
-              "NIC number is not registered in our system. Please contact customer service.";
+              "NIC number is not registered in our system. Please contact your company HR.";
             break;
           case "MOBILE_NUMBER_MISMATCH":
             errorMessage =
@@ -220,7 +204,7 @@ function LoginRequestOTPContent() {
               "Validation failed. Please check your details and try again.";
         }
 
-        Alert.alert("", errorMessage);
+        Alert.alert("Important", errorMessage);
       }
     } catch (error) {
       Alert.alert(
@@ -234,7 +218,6 @@ function LoginRequestOTPContent() {
 
   return (
     <View style={styles.container}>
-      {/* Top Section with Gradient and City Skyline */}
       <LinearGradient
         colors={["#CDEAED", "#6DD3D3", "#6DD3D3"]}
         style={[
@@ -242,7 +225,6 @@ function LoginRequestOTPContent() {
           isKeyboardVisible && styles.topSectionKeyboard,
         ]}
       >
-        {/* Header with SLIC Logo */}
         <View style={styles.header}>
           <Image
             source={require("@/assets/images/logo.png")}
@@ -258,7 +240,6 @@ function LoginRequestOTPContent() {
         </View>
       </LinearGradient>
 
-      {/* Bottom Section with Form */}
       <Animated.View
         style={[
           styles.bottomSection,
@@ -273,7 +254,6 @@ function LoginRequestOTPContent() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Welcome Card */}
           <View style={styles.welcomeCard}>
             <Text style={styles.welcomeText}>Welcome To</Text>
             <View style={styles.sheDigitalBadge}>
@@ -281,9 +261,7 @@ function LoginRequestOTPContent() {
             </View>
           </View>
 
-          {/* Form Section */}
           <View style={styles.formSection}>
-            {/* NIC Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputContainer}>
                 <View style={styles.iconContainer}>
@@ -304,7 +282,6 @@ function LoginRequestOTPContent() {
               </View>
             </View>
 
-            {/* Mobile Number Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputContainer}>
                 <View style={styles.iconContainer}>
@@ -329,7 +306,6 @@ function LoginRequestOTPContent() {
               </View>
             </View>
 
-            {/* Already Registered Link */}
             <TouchableOpacity
               onPress={handlePress}
               disabled={loading}
@@ -341,7 +317,6 @@ function LoginRequestOTPContent() {
               </Text>
             </TouchableOpacity>
 
-            {/* Request OTP Button */}
             <TouchableOpacity
               style={[styles.requestButton, loading && styles.buttonDisabled]}
               onPress={handleRequestOTP}
@@ -354,7 +329,6 @@ function LoginRequestOTPContent() {
               )}
             </TouchableOpacity>
 
-            {/* Footer */}
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
@@ -386,7 +360,7 @@ const styles = StyleSheet.create({
     paddingTop: 50,
   },
   topSectionKeyboard: {
-    flex: 0.3, // Reduce top section when keyboard is visible
+    flex: 0.3,
   },
   logo: {
     width: 180,
@@ -407,7 +381,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-
   slicText: {
     color: "#4ECDC4",
     fontSize: 16,
@@ -475,7 +448,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-
   logInText: {
     fontSize: 18,
     fontWeight: "bold",
