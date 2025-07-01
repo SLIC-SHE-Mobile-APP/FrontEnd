@@ -1,6 +1,6 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,30 +14,29 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+  View,
+} from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  
-  // Get contact info from navigation params
-  const contactInfo = params.contactInfo || '+9475****094';
-  const contactType = params.contactType || 'phone';
-  const nicNumber = params.nicNumber || '';
-  const mobileNumber = params.mobileNumber || '';
-  
+
+  // Get contact info from navigation params (primary method)
+  const [contactInfo, setContactInfo] = useState(params.contactInfo);
+  const [contactType, setContactType] = useState(params.contactType || "phone");
+  const [nicNumber, setNicNumber] = useState(params.nicNumber || "");
+  const [mobileNumber, setMobileNumber] = useState(params.mobileNumber || "");
+
   // References for OTP input fields
-  const inputRefs = [
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null)
-  ];
-  
+  const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
   // State management
-  const [otp, setOtp] = useState(['', '', '', '']);
+  const [otp, setOtp] = useState(["", "", "", ""]);
   const [timer, setTimer] = useState(90);
   const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -46,10 +45,45 @@ function OTPVerificationContent() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const slideAnim = new Animated.Value(0);
 
+  // Load user data from AsyncStorage as backup
+  const loadUserData = async () => {
+    try {
+      const userData = await AsyncStorage.getItem("userData");
+      if (userData) {
+        const parsedData = JSON.parse(userData);
+        console.log("Loaded user data from AsyncStorage:", parsedData);
+
+        // Use AsyncStorage data if navigation params are empty
+        if (!nicNumber && parsedData.nicNumber) {
+          setNicNumber(parsedData.nicNumber);
+        }
+        if (!mobileNumber && parsedData.mobileNumber) {
+          setMobileNumber(parsedData.mobileNumber);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  // Debug: Log the data being used
+  useEffect(() => {
+    console.log("OTP Verification Data:");
+    console.log("Contact Info:", contactInfo);
+    console.log("Contact Type:", contactType);
+    console.log("NIC Number:", nicNumber);
+    console.log("Mobile Number:", mobileNumber);
+  }, [contactInfo, contactType, nicNumber, mobileNumber]);
+
   // Keyboard handling
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
         setIsKeyboardVisible(true);
@@ -62,7 +96,7 @@ function OTPVerificationContent() {
     );
 
     const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardHeight(0);
         setIsKeyboardVisible(false);
@@ -84,7 +118,7 @@ function OTPVerificationContent() {
   useEffect(() => {
     if (timer > 0) {
       const interval = setInterval(() => {
-        setTimer(prevTimer => prevTimer - 1);
+        setTimer((prevTimer) => prevTimer - 1);
       }, 1000);
       return () => clearInterval(interval);
     } else {
@@ -96,7 +130,9 @@ function OTPVerificationContent() {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   // Handle OTP input change
@@ -104,11 +140,11 @@ function OTPVerificationContent() {
     if (text.length > 1) {
       text = text.charAt(0);
     }
-    
+
     const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
-    
+
     if (text.length === 1 && index < 3) {
       inputRefs[index + 1].current.focus();
     }
@@ -116,7 +152,7 @@ function OTPVerificationContent() {
 
   // Handle backspace
   const handleKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace' && index > 0 && otp[index] === '') {
+    if (e.nativeEvent.key === "Backspace" && index > 0 && otp[index] === "") {
       inputRefs[index - 1].current.focus();
     }
   };
@@ -124,89 +160,101 @@ function OTPVerificationContent() {
   // API call to verify OTP
   const verifyOTPAPI = async (otpCode) => {
     try {
-      const response = await fetch('http://203.115.11.229:1002/api/LoginNicMnumber/VerifyOTP', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nicNumber: nicNumber,
-          mobileNumber: mobileNumber,
-          otpCode: otpCode,
-        }),
+      console.log("Verifying OTP with:", {
+        nicNumber,
+        mobileNumber,
+        otpCode,
       });
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/LoginNicMnumber/VerifyOTP",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nicNumber: nicNumber,
+            mobileNumber: mobileNumber,
+            otpCode: otpCode,
+          }),
+        }
+      );
 
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('API Error:', error);
-      throw new Error('Network error. Please check your connection and try again.');
-    }
-  };
-
-  // API call to resend OTP
-  const resendOTPAPI = async () => {
-    try {
-      const response = await fetch('http://203.115.11.229:1002/api/LoginNicMnumber/ResendOTP', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nicNumber: nicNumber,
-          mobileNumber: mobileNumber,
-        }),
-      });
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('API Error:', error);
-      throw new Error('Network error. Please check your connection and try again.');
+      console.error("API Error:", error);
+      throw new Error(
+        "Network error. Please check your connection and try again."
+      );
     }
   };
 
   // Verify OTP
   const verifyOTP = async () => {
-    const otpCode = otp.join('');
+    const otpCode = otp.join("");
     if (otpCode.length !== 4) {
-      Alert.alert('', 'Please enter a valid 4-digit OTP');
+      Alert.alert("", "Please enter a valid 4-digit OTP");
+      return;
+    }
+
+    if (!mobileNumber) {
+      Alert.alert(
+        "Error",
+        "Missing mobile number. Please go back and try again."
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const result = await verifyOTPAPI(otpCode);
+      console.log("Validating OTP with:", {
+        mobileNumber,
+        otp: otpCode,
+      });
 
-      if (result.success && result.isValid) {
-        Alert.alert('Success', 'OTP verified successfully', [
-          {
-            text: 'OK',
-            onPress: () => router.push('/login')
-          }
-        ]);
-      } else {
-        let errorMessage = result.message || 'Invalid OTP. Please try again.';
-        
-        switch (result.errorType) {
-          case 'OTP_EXPIRED':
-            errorMessage = 'OTP has expired. Please request a new one.';
-            break;
-          case 'OTP_INVALID':
-            errorMessage = 'Invalid OTP. Please check and try again.';
-            break;
-          case 'MAX_ATTEMPTS_EXCEEDED':
-            errorMessage = 'Maximum attempts exceeded. Please request a new OTP.';
-            break;
-          default:
-            errorMessage = result.message || 'OTP verification failed. Please try again.';
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/LoginNicMnumber/ValidateOtp",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mobileNumber: mobileNumber,
+            otp: otpCode,
+          }),
         }
+      );
 
-        Alert.alert('', errorMessage);
+      const result = await response.json();
+      console.log("ValidateOtp response:", result);
+
+      if (result.success) {
+        if (result.nicAvailaWeb === false) {
+          // ✅ NIC not available, navigate to email page
+          router.push("/email");
+        } else if (result.nicAvailaWeb === true) {
+          // ✅ NIC available, navigate to home page
+          router.push("/home");
+        } else {
+          Alert.alert("Error", "Unexpected response. Please try again.");
+        }
+      } else {
+        if (result.errorType === "INVALID_OTP") {
+          Alert.alert("", "Invalid OTP. Please check and try again.");
+        } else if (result.errorType === "OTP_EXPIRED") {
+          Alert.alert("", "OTP has expired. Please request a new one.");
+        } else {
+          Alert.alert("Error", result.message || "OTP verification failed.");
+        }
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+      console.error("API Error:", error);
+      Alert.alert(
+        "Error",
+        error.message || "Something went wrong. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -216,26 +264,59 @@ function OTPVerificationContent() {
   const resendOTP = async () => {
     if (!canResend) return;
 
+    // Check if we have required data
+    if (!nicNumber || !mobileNumber) {
+      Alert.alert("Error", "Missing user data. Please go back and try again.");
+      return;
+    }
+
     setResendLoading(true);
 
     try {
-      const result = await resendOTPAPI();
+      console.log("Resending OTP via CheckAvailability with:", {
+        nicNumber,
+        mobileNumber,
+      });
 
-      if (result.success && result.otpSent) {
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/LoginNicMnumber/CheckAvailability",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nicNumber: nicNumber,
+            mobileNumber: mobileNumber,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      console.log("CheckAvailability response:", result);
+
+      if (result.success) {
         // Reset OTP fields
-        setOtp(['', '', '', '']);
+        setOtp(["", "", "", ""]);
         inputRefs[0].current.focus();
-        
+
         // Reset timer
         setTimer(90);
         setCanResend(false);
-        
-        Alert.alert('Success', `OTP resent to ${contactInfo}`);
+
+        Alert.alert("Success", `OTP resent to ${contactInfo}`);
       } else {
-        Alert.alert('Error', result.message || 'Failed to resend OTP. Please try again.');
+        Alert.alert(
+          "Error",
+          result.message || "Failed to resend OTP. Please try again."
+        );
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+      console.error("API Error:", error);
+      Alert.alert(
+        "Error",
+        error.message || "Something went wrong. Please try again."
+      );
     } finally {
       setResendLoading(false);
     }
@@ -243,51 +324,45 @@ function OTPVerificationContent() {
 
   // Phone call function
   const makePhoneCall = () => {
-    Linking.openURL('tel:0112252596').catch(err => {
-      console.error('Phone call error:', err);
+    Linking.openURL("tel:0112252596").catch((err) => {
+      console.error("Phone call error:", err);
     });
-  };
-
-  // Go back
-  const goBack = () => {
-    router.back();
   };
 
   return (
     <View style={styles.container}>
       {/* Top Section with Gradient and City Skyline */}
       <LinearGradient
-        colors={['#CDEAED', '#6DD3D3', '#6DD3D3']}
-        style={[styles.topSection, isKeyboardVisible && styles.topSectionKeyboard]}
+        colors={["#CDEAED", "#6DD3D3", "#6DD3D3"]}
+        style={[
+          styles.topSection,
+          isKeyboardVisible && styles.topSectionKeyboard,
+        ]}
       >
-        {/* Header with Back Button and Logo */}
+        {/* Header with Logo only */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={goBack} style={styles.backButton}>
-            {/* <Text style={styles.backButtonText}>←</Text> */}
-          </TouchableOpacity>
           <Image
-            source={require('../assets/images/logo.png')}
+            source={require("../assets/images/logo.png")}
             style={styles.logo}
           />
-          <View style={styles.placeholder} />
         </View>
 
         <View style={styles.skylineContainer}>
           <Image
-            source={require('../assets/images/cover.png')}
+            source={require("../assets/images/cover.png")}
             style={styles.cover}
           />
         </View>
       </LinearGradient>
 
       {/* Bottom Section with OTP Form */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.bottomSection, 
+          styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
-            marginBottom: isKeyboardVisible ? keyboardHeight - 80 : 0
-          }
+            marginBottom: isKeyboardVisible ? keyboardHeight - 80 : 0,
+          },
         ]}
       >
         <ScrollView
@@ -298,13 +373,14 @@ function OTPVerificationContent() {
           {/* OTP Verification Card */}
           <View style={styles.otpCard}>
             <Text style={styles.otpTitle}>OTP Verification</Text>
-            
+
             <Text style={styles.instructions}>
-              Enter the verification code we just sent to your {contactType === 'phone' ? 'registered number' : 'email'}:
+              Enter the verification code we just sent to your{" "}
+              {contactType === "phone" ? "registered number" : "email"}:
             </Text>
-            
+
             <Text style={styles.contactInfo}>{contactInfo}</Text>
-            
+
             {/* OTP Input Fields */}
             <View style={styles.otpContainer}>
               {otp.map((digit, index) => (
@@ -313,7 +389,7 @@ function OTPVerificationContent() {
                   ref={inputRefs[index]}
                   style={[
                     styles.otpInput,
-                    digit !== '' && styles.otpInputFilled
+                    digit !== "" && styles.otpInputFilled,
                   ]}
                   value={digit}
                   onChangeText={(text) => handleOtpChange(text, index)}
@@ -329,7 +405,9 @@ function OTPVerificationContent() {
             {/* Timer Display */}
             <View style={styles.timerContainer}>
               <Text style={styles.timerText}>
-                {canResend ? 'You can now resend OTP' : `Resend OTP in ${formatTime(timer)}`}
+                {canResend
+                  ? "You can now resend OTP"
+                  : `Resend OTP in ${formatTime(timer)}`}
               </Text>
             </View>
 
@@ -348,14 +426,22 @@ function OTPVerificationContent() {
 
             {/* Resend Button */}
             <TouchableOpacity
-              style={[styles.resendButton, (!canResend || resendLoading) && styles.resendButtonDisabled]}
+              style={[
+                styles.resendButton,
+                (!canResend || resendLoading) && styles.resendButtonDisabled,
+              ]}
               onPress={resendOTP}
               disabled={!canResend || resendLoading}
             >
               {resendLoading ? (
                 <ActivityIndicator color="#4ECDC4" size="small" />
               ) : (
-                <Text style={[styles.resendButtonText, !canResend && styles.resendButtonTextDisabled]}>
+                <Text
+                  style={[
+                    styles.resendButtonText,
+                    !canResend && styles.resendButtonTextDisabled,
+                  ]}
+                >
                   Resend OTP
                 </Text>
               )}
@@ -365,9 +451,7 @@ function OTPVerificationContent() {
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>
-                  Contact Us 011 - 2252596
-                </Text>
+                <Text style={styles.contactText}>Contact Us 011 - 2252596</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -388,7 +472,7 @@ export default function OTPVerification() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   topSection: {
     flex: 0.6,
@@ -398,9 +482,9 @@ const styles = StyleSheet.create({
     flex: 0.3,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingTop: 10,
   },
@@ -410,30 +494,30 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 28,
-    color: '#13646D',
-    fontWeight: '500',
+    color: "#13646D",
+    fontWeight: "500",
   },
   logo: {
     width: 180,
     height: 60,
-    resizeMode: 'contain',
+    resizeMode: "contain",
   },
   placeholder: {
     width: 40,
   },
   cover: {
-    width: '100%',
-    height: '100%'
+    width: "100%",
+    height: "100%",
   },
   skylineContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingBottom: 40,
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -120,
@@ -446,32 +530,44 @@ const styles = StyleSheet.create({
   },
   otpCard: {
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   otpTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#13646D',
+    fontWeight: "bold",
+    color: "#13646D",
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   instructions: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     marginBottom: 10,
     lineHeight: 22,
   },
   contactInfo: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#13646D',
+    fontWeight: "bold",
+    color: "#13646D",
     marginBottom: 30,
   },
+  debugContainer: {
+    backgroundColor: "#f0f0f0",
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 20,
+    width: "100%",
+  },
+  debugText: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+  },
   otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '80%',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "80%",
     marginBottom: 20,
   },
   otpInput: {
@@ -479,68 +575,68 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: '#f8f9fa',
+    borderColor: "#e9ecef",
+    backgroundColor: "#f8f9fa",
     fontSize: 24,
-    textAlign: 'center',
-    color: '#333',
+    textAlign: "center",
+    color: "#333",
   },
   otpInputFilled: {
-    borderColor: '#4ECDC4',
-    backgroundColor: '#fff',
+    borderColor: "#4ECDC4",
+    backgroundColor: "#fff",
   },
   timerContainer: {
     marginBottom: 20,
   },
   timerText: {
     fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
   },
   verifyButton: {
-    backgroundColor: '#4ECDC4',
+    backgroundColor: "#4ECDC4",
     borderRadius: 10,
     paddingVertical: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 10,
-    width: '100%',
+    width: "100%",
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   verifyButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   resendButton: {
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 10,
   },
   resendButtonDisabled: {
     opacity: 0.5,
   },
   resendButtonText: {
-    color: '#4ECDC4',
+    color: "#4ECDC4",
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   resendButtonTextDisabled: {
-    color: '#999',
+    color: "#999",
   },
   footerContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 30,
   },
   troubleText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginBottom: 5,
   },
   contactText: {
     fontSize: 14,
-    color: '#4ECDC4',
-    fontWeight: '500',
+    color: "#4ECDC4",
+    fontWeight: "500",
   },
 });

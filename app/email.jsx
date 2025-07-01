@@ -1,34 +1,62 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Image,
-    Keyboard,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Keyboard,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 function EmailVerificationContent() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const slideAnim = new Animated.Value(0);
   const insets = useSafeAreaInsets();
+  const [nicNumber, setNicNumber] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const userData = await AsyncStorage.getItem("userData");
+        if (userData) {
+          const parsed = JSON.parse(userData);
+          console.log("Loaded user data from AsyncStorage:", parsed);
+
+          if (parsed.nicNumber) setNicNumber(parsed.nicNumber);
+          if (parsed.mobileNumber) setMobileNumber(parsed.mobileNumber);
+        } else {
+          console.warn("User data not found in AsyncStorage");
+          Alert.alert("Error", "User data not found. Please log in again.");
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      }
+    };
+
+    loadUserData();
+  }, []);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
         setIsKeyboardVisible(true);
@@ -41,7 +69,7 @@ function EmailVerificationContent() {
     );
 
     const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardHeight(0);
         setIsKeyboardVisible(false);
@@ -60,13 +88,9 @@ function EmailVerificationContent() {
   }, []);
 
   const makePhoneCall = () => {
-    Linking.openURL('tel:0112252596').catch(err => {
-      console.error('Phone call error:', err);
+    Linking.openURL("tel:0112252596").catch((err) => {
+      console.error("Phone call error:", err);
     });
-  };
-
-  const handleAlreadyRegistered = () => {
-    router.push('/login');
   };
 
   // Validate email format
@@ -78,86 +102,145 @@ function EmailVerificationContent() {
   const handleSubmit = async () => {
     // Validate email first
     if (!email) {
-      Alert.alert('', 'Please enter your email address');
+      Alert.alert("", "Please enter your email address");
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('', 'Please enter a valid email address');
+      Alert.alert("", "Please enter a valid email address");
+      return;
+    }
+
+    if (!nicNumber || !mobileNumber) {
+      Alert.alert(
+        "Error",
+        "Missing NIC or Mobile Number. Please log in again."
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      // Add your email verification API call here
-      // For now, just showing success message
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
-      
-      Alert.alert('Success', 'Verification email sent to your email address');
-      
-      // Navigate to next screen or back to login
-      // router.push('/login');
-      
+      console.log("Calling Submit API with:", {
+        nic: nicNumber,
+        mobileNumber,
+        email,
+      });
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/LoginPageEmail/Submit",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nic: nicNumber,
+            mobileNumber: mobileNumber,
+            email: email,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      console.log("Submit API response:", result);
+
+      if (result.message === "User inserted successfully") {
+        await AsyncStorage.removeItem("userData");
+        router.push("/home");
+      } else {
+        Alert.alert(
+          "Error",
+          result.message || "Failed to send verification email."
+        );
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to send verification email. Please try again.');
+      console.error("Submit API error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSkip = () => {
-    Alert.alert(
-      'Skip Email Verification',
-      'Are you sure you want to skip email verification? You can verify your email later from settings.',
-      [
+  const handleSkip = async () => {
+    if (!nicNumber || !mobileNumber) {
+      Alert.alert(
+        "Error",
+        "Missing NIC or Mobile Number. Please log in again."
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      console.log("Calling skip API with:", { nic: nicNumber, mobileNumber });
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/LoginPageEmail/Skip",
         {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Skip',
-          onPress: () => {
-            // Navigate to next screen or main app
-            // router.push('/home');
-            console.log('Email verification skipped');
-          },
-        },
-      ]
-    );
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nic: nicNumber,
+            mobileNumber: mobileNumber,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      console.log("Skip API response:", result);
+
+      if (result.message === "User inserted successfully") {
+        await AsyncStorage.removeItem("userData");
+        router.push("/home");
+      } else {
+        Alert.alert(
+          "Error",
+          result.message || "Failed to skip email verification."
+        );
+      }
+    } catch (error) {
+      console.error("Skip API error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       {/* Top Section with Gradient and City Skyline */}
       <LinearGradient
-        colors={['#CDEAED', '#6DD3D3', '#6DD3D3']}
-        style={[styles.topSection, isKeyboardVisible && styles.topSectionKeyboard]}
+        colors={["#CDEAED", "#6DD3D3", "#6DD3D3"]}
+        style={[
+          styles.topSection,
+          isKeyboardVisible && styles.topSectionKeyboard,
+        ]}
       >
         {/* Header with SLIC Logo */}
         <View style={styles.header}>
           <Image
-            source={require('../assets/images/logo.png')}
+            source={require("../assets/images/logo.png")}
             style={styles.logo}
           />
         </View>
 
         <View style={styles.skylineContainer}>
           <Image
-            source={require('../assets/images/cover.png')}
+            source={require("../assets/images/cover.png")}
             style={styles.cover}
           />
         </View>
       </LinearGradient>
 
       {/* Bottom Section with Form */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.bottomSection, 
+          styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
-            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0
-          }
+            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0,
+          },
         ]}
       >
         <ScrollView
@@ -184,7 +267,7 @@ function EmailVerificationContent() {
               <View style={styles.inputContainer}>
                 <View style={styles.iconContainer}>
                   <Image
-                    source={require('../assets/images/emailicon.png')}
+                    source={require("../assets/images/emailicon.png")}
                     style={styles.inputIcon}
                   />
                 </View>
@@ -200,13 +283,6 @@ function EmailVerificationContent() {
                 />
               </View>
             </View>
-
-            {/* Already Registered Link */}
-            <TouchableOpacity onPress={handleAlreadyRegistered} disabled={loading} style={styles.linkContainer}>
-              <Text style={styles.alreadyRegisteredText}>
-                Already Registered? <Text style={styles.loginLinkText}>Login</Text>
-              </Text>
-            </TouchableOpacity>
 
             {/* Submit Button */}
             <TouchableOpacity
@@ -234,9 +310,7 @@ function EmailVerificationContent() {
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>
-                  Contact Us 011 - 2252596
-                </Text>
+                <Text style={styles.contactText}>Contact Us 011 - 2252596</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -257,7 +331,7 @@ export default function EmailVerification() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   topSection: {
     flex: 0.6,
@@ -269,13 +343,13 @@ const styles = StyleSheet.create({
   logo: {
     width: 180,
     height: 60,
-    resizeMode: 'contain',
-    alignSelf: 'center',
+    resizeMode: "contain",
+    alignSelf: "center",
     marginTop: 10,
   },
   cover: {
-    width: '100%',
-    height: '100%'
+    width: "100%",
+    height: "100%",
   },
   header: {
     paddingHorizontal: 20,
@@ -283,13 +357,13 @@ const styles = StyleSheet.create({
   },
   skylineContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingBottom: 40,
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -120,
@@ -302,39 +376,39 @@ const styles = StyleSheet.create({
   },
   welcomeCard: {
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   welcomeText: {
     fontSize: 25,
-    color: '#13646D',
+    color: "#13646D",
     marginBottom: 10,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   sheDigitalBadge: {
     width: 192,
     height: 44,
-    backgroundColor: '#FF4757',
+    backgroundColor: "#FF4757",
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderTopRightRadius: 15,
     borderBottomLeftRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   sheDigitalText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
   },
   formSection: {
     flex: 1,
   },
   instructionText: {
     fontSize: 16,
-    color: '#13646D',
-    textAlign: 'center',
+    color: "#13646D",
+    textAlign: "center",
     marginBottom: 30,
     lineHeight: 22,
     paddingHorizontal: 10,
@@ -343,12 +417,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: "#e9ecef",
     paddingHorizontal: 15,
     height: 50,
   },
@@ -358,64 +432,63 @@ const styles = StyleSheet.create({
   inputIcon: {
     width: 20,
     height: 20,
-    resizeMode: 'contain',
+    resizeMode: "contain",
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   linkContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 15,
   },
   alreadyRegisteredText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   loginLinkText: {
-    color: '#4ECDC4',
-    fontWeight: '500',
+    color: "#4ECDC4",
+    fontWeight: "500",
   },
   submitButton: {
-    backgroundColor: '#4ECDC4',
+    backgroundColor: "#4ECDC4",
     borderRadius: 10,
     paddingVertical: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 15,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   submitButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   skipButton: {
-    backgroundColor: 'rgba(78, 205, 196, 0.8)',
+    backgroundColor: "rgba(78, 205, 196, 0.8)",
     borderRadius: 10,
     paddingVertical: 15,
-    alignItems: 'center',
+    alignItems: "center",
     // marginBottom: 5,
   },
   skipButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   footerContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 20,
   },
   troubleText: {
     fontSize: 14,
-    color: '#666',
-    
+    color: "#666",
   },
   contactText: {
     fontSize: 14,
-    color: '#4ECDC4',
-    fontWeight: '500',
+    color: "#4ECDC4",
+    fontWeight: "500",
   },
 });
