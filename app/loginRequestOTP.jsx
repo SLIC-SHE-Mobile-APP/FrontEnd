@@ -20,7 +20,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 function LoginRequestOTPContent() {
   const [nic, setNIC] = useState("");
@@ -64,7 +64,7 @@ function LoginRequestOTPContent() {
     };
   }, []);
 
-  // Store user data in AsyncStorage
+  // Store user data in SecureStore (replaces AsyncStorage)
   const storeUserData = async (mobileNumber, nicNumber) => {
     try {
       const userData = {
@@ -72,10 +72,52 @@ function LoginRequestOTPContent() {
         nicNumber,
         timestamp: new Date().toISOString(),
       };
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      console.log('User data stored successfully');
+      
+      // Store each piece of data separately for better security
+      await SecureStore.setItemAsync('user_mobile', mobileNumber);
+      await SecureStore.setItemAsync('user_nic', nicNumber);
+      await SecureStore.setItemAsync('user_timestamp', new Date().toISOString());
+      
+      // Also store as combined JSON if needed elsewhere
+      await SecureStore.setItemAsync('userData', JSON.stringify(userData));
+      
+      console.log('User data stored securely');
     } catch (error) {
       console.error('Error storing user data:', error);
+    }
+  };
+
+  // Retrieve user data from SecureStore
+  const getUserData = async () => {
+    try {
+      const mobileNumber = await SecureStore.getItemAsync('user_mobile');
+      const nicNumber = await SecureStore.getItemAsync('user_nic');
+      const timestamp = await SecureStore.getItemAsync('user_timestamp');
+      
+      if (mobileNumber && nicNumber) {
+        return {
+          mobileNumber,
+          nicNumber,
+          timestamp
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error retrieving user data:', error);
+      return null;
+    }
+  };
+
+  // Clear user data from SecureStore (for logout)
+  const clearUserData = async () => {
+    try {
+      await SecureStore.deleteItemAsync('user_mobile');
+      await SecureStore.deleteItemAsync('user_nic');
+      await SecureStore.deleteItemAsync('user_timestamp');
+      await SecureStore.deleteItemAsync('userData');
+      console.log('User data cleared successfully');
+    } catch (error) {
+      console.error('Error clearing user data:', error);
     }
   };
 
@@ -170,7 +212,7 @@ function LoginRequestOTPContent() {
       const result = await checkAvailability(nic, mobile);
 
       if (result.success && result.isValid && result.otpSent) {
-        // Store the mobile number and NIC number from API response
+        // Store the mobile number and NIC number from API response securely
         await storeUserData(result.mobileNumber, result.nicNumber);
         
         const maskedNumber = maskPhoneNumber(mobile);
