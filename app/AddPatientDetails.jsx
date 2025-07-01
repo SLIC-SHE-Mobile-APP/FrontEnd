@@ -65,24 +65,11 @@ const AddPatientDetails = ({ onClose }) => {
       illness
     };
 
-
-    // ✅ Navigate to UploadDocuments.jsx
+    // Use only Expo Router for navigation
     router.push({
       pathname: '/UploadDocuments',
-      params: { ...patientData },
+      params: patientData
     });
-
-    try {
-      // Navigate to UploadDocuments screen
-      navigation.navigate('UploadDocuments', { patientData });
-    } catch (error) {
-      console.error('Navigation error:', error);
-      // Fallback to onNext callback if navigation fails
-      if (onNext) {
-        onNext(patientData);
-      }
-    }
-
   };
 
   const handlePatientNameChange = (text) => {
