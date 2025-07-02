@@ -428,7 +428,7 @@ function OTPVerificationContent() {
   );
 }
 
-export default function OTPVerification() {
+export default function OTPVerificationBank() {
   return (
     <SafeAreaProvider>
       <OTPVerificationContent />

@@ -1,45 +1,87 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 
-const DependentDetails = ({ onClose }) => {
-  const dependentsData = [
-    {
-      id: 1,
-      name: 'H M M K Herath',
-      dateOfBirth: '2001/02/13',
-      enrollmentDate: '2025/02/13',
-      relationship: 'Child',
-    },
-    {
-      id: 2,
-      name: 'A B C Silva',
-      dateOfBirth: '1995/05/20',
-      enrollmentDate: '2025/01/15',
-      relationship: 'Spouse',
-    },
-    {
-      id: 3,
-      name: 'D E F Fernando',
-      dateOfBirth: '2010/12/08',
-      enrollmentDate: '2025/03/01',
-      relationship: 'Child',
-    },
-    {
-      id: 4,
-      name: 'U S Fernando',
-      dateOfBirth: '2010/12/08',
-      enrollmentDate: '2025/03/01',
-      relationship: 'Child',
+const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo = '000682' }) => {
+  const [dependentsData, setDependentsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Function to format date from API response
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).replace(/\//g, '/');
+  };
+
+  // Function to fetch dependents data from API
+  const fetchDependentsData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNo}&memberNo=${memberNo}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Transform API data to match component structure
+      const transformedData = data.map((dependent, index) => ({
+        id: index + 1,
+        name: dependent.dependentName || 'N/A',
+        dateOfBirth: formatDate(dependent.depndentBirthDay),
+        enrollmentDate: formatDate(dependent.effectiveDate),
+        relationship: dependent.relationship || 'N/A',
+      }));
+
+      setDependentsData(transformedData);
+    } catch (err) {
+      console.error('Error fetching dependents data:', err);
+      setError(err.message);
+      Alert.alert(
+        'Error',
+        'Failed to load dependent details. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchDependentsData();
+  }, [policyNo, memberNo]);
+
+  // Retry function
+  const handleRetry = () => {
+    fetchDependentsData();
+  };
 
   return (
     <LinearGradient
@@ -60,30 +102,50 @@ const DependentDetails = ({ onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.centeredContainer}>
-          <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableRowHeader}>
-              <Text style={styles.tableHeaderText}>Name</Text>
-              <Text style={styles.tableHeaderText}>Date of Birth</Text>
-              <Text style={styles.tableHeaderText}>Enrollment Date</Text>
-              <Text style={styles.tableHeaderText}>Relationship</Text>
-            </View>
-
-            {/* Table Rows */}
-            {dependentsData.map((dependent) => (
-              <View key={dependent.id} style={styles.tableRow}>
-                <Text style={styles.tableCellText}>{dependent.name}</Text>
-                <Text style={styles.tableCellText}>{dependent.dateOfBirth}</Text>
-                <Text style={styles.tableCellText}>{dependent.enrollmentDate}</Text>
-                <Text style={styles.tableCellText}>{dependent.relationship}</Text>
-              </View>
-            ))}
-          </View>
+      {/* Content */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#13646D" />
+          <Text style={styles.loadingText}>Loading dependent details...</Text>
         </View>
-      </ScrollView>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
+          <Text style={styles.errorText}>Failed to load data</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : dependentsData.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="people-outline" size={48} color="#13646D" />
+          <Text style={styles.emptyText}>No dependents found</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.centeredContainer}>
+            <View style={styles.tableContainer}>
+              {/* Table Header */}
+              <View style={styles.tableRowHeader}>
+                <Text style={styles.tableHeaderText}>Name</Text>
+                <Text style={styles.tableHeaderText}>Date of Birth</Text>
+                <Text style={styles.tableHeaderText}>Enrollment Date</Text>
+                <Text style={styles.tableHeaderText}>Relationship</Text>
+              </View>
+
+              {/* Table Rows */}
+              {dependentsData.map((dependent) => (
+                <View key={dependent.id} style={styles.tableRow}>
+                  <Text style={styles.tableCellText}>{dependent.name}</Text>
+                  <Text style={styles.tableCellText}>{dependent.dateOfBirth}</Text>
+                  <Text style={styles.tableCellText}>{dependent.enrollmentDate}</Text>
+                  <Text style={styles.tableCellText}>{dependent.relationship}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      )}
     </LinearGradient>
   );
 };
@@ -121,8 +183,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     width: '100%',
     maxHeight: '100%',
-    marginTop:10,
-    marginBottom:5
+    marginTop: 10,
+    marginBottom: 5
   },
   tableRowHeader: {
     flexDirection: 'row',
@@ -150,6 +212,54 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 13,
     color: '#333',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#13646D',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    marginTop: 15,
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#FF6B6B',
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#13646D',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#13646D',
+    textAlign: 'center',
   },
 });
 

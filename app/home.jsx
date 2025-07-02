@@ -1,6 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { BackHandler } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import {
   Animated,
@@ -221,6 +222,21 @@ export default function PolicyHome() {
     console.log('Illness Next pressed');
     setShowIllnessPopup(false);
   };
+
+  useEffect(() => {
+  const backAction = () => {
+    BackHandler.exitApp();
+    return true; // prevent navigating back to OTP/Login
+  };
+
+  const backHandler = BackHandler.addEventListener(
+    "hardwareBackPress",
+    backAction
+  );
+
+  return () => backHandler.remove();
+}, []);
+
 
   const handleMemberSelect = (member) => {
     setSelectedMember(member);
