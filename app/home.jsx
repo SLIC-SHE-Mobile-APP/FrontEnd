@@ -12,6 +12,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import IllnessPopup from './IllnessPopup';
@@ -37,57 +38,46 @@ export default function PolicyHome() {
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
 
   // Available policies
-  const [availablePolicies] = useState([
+  const [availablePolicies, setAvailablePolicies] = useState([
     {
       id: 1,
       policyNumber: 'G/010/SHE/16666/25',
       policyPeriod: '2020-02-13 - 2025-02-13',
-      insuranceCover: 'Rs. 500,000.00',
+      policyID: '1161',
       type: 'GENERAL'
     },
     {
       id: 2,
       policyNumber: 'G/010/SHE/16667/25',
       policyPeriod: '2021-03-15 - 2026-03-15',
-      insuranceCover: 'Rs. 750,000.00',
+      policyID: '1162',
       type: 'GENERAL'
     },
     {
       id: 3,
       policyNumber: 'G/010/SHE/16668/25',
       policyPeriod: '2022-01-10 - 2027-01-10',
-      insuranceCover: 'Rs. 1,000,000.00',
+      policyID: '1163',
       type: 'GENERAL'
     },
     {
       id: 4,
       policyNumber: 'G/010/SHE/16669/25',
       policyPeriod: '2023-06-20 - 2028-06-20',
-      insuranceCover: 'Rs. 300,000.00',
+      policyID: '1164',
       type: 'GENERAL'
     },
     {
       id: 5,
       policyNumber: 'G/010/SHE/16670/25',
       policyPeriod: '2024-04-12 - 2029-04-12',
-      insuranceCover: 'Rs. 800,000.00',
+      policyID: '1165',
       type: 'GENERAL'
     }
   ]);
 
+  // Initialize members and show policy selection modal on first load
   useEffect(() => {
-    // Show policy selection modal on first load
-    if (isFirstTime) {
-      setTimeout(() => {
-        setShowPolicySelection(true);
-        Animated.timing(policySelectSlideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      }, 500);
-    }
-
     const membersList = [
       { id: 1, name: 'H.M.Menaka Herath', relationship: 'Self' },
       { id: 2, name: 'Kamal Perera', relationship: 'Spouse' },
@@ -97,12 +87,26 @@ export default function PolicyHome() {
     ];
     setMembers(membersList);
     setSelectedMember(membersList[0]);
-  }, []);
+
+    // Show policy selection modal only on first load and when no policy is selected
+    if (isFirstTime && !selectedPolicyNumber) {
+      const timer = setTimeout(() => {
+        setShowPolicySelection(true);
+        Animated.timing(policySelectSlideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isFirstTime, selectedPolicyNumber, policySelectSlideAnim]);
 
   const handlePolicySelection = (policy) => {
     setSelectedPolicyNumber(policy.policyNumber);
     setPolicyDetails({
-      insuranceCover: policy.insuranceCover,
+      policyID: policy.policyID,
       policyNumber: policy.policyNumber,
       policyPeriod: policy.policyPeriod,
       type: policy.type
@@ -119,6 +123,40 @@ export default function PolicyHome() {
     });
   };
 
+  const handleDeletePolicy = (policyId, policyNumber) => {
+    Alert.alert(
+      'Delete Policy',
+      `Are you sure you want to delete policy ${policyNumber} ?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // Remove policy from the list
+            const updatedPolicies = availablePolicies.filter(policy => policy.id !== policyId);
+            setAvailablePolicies(updatedPolicies);
+            
+            // If the deleted policy was selected, reset selection
+            if (selectedPolicyNumber === policyNumber) {
+              setSelectedPolicyNumber(null);
+              setPolicyDetails(null);
+              setIsFirstTime(true);
+            }
+            
+            // If no policies left, close modal
+            if (updatedPolicies.length === 0) {
+              handleClosePolicySelection();
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleNavigation = (label) => {
     if (label === 'Policy Details') {
       navigation.navigate('HealthPolicyDetails');
@@ -130,7 +168,7 @@ export default function PolicyHome() {
   };
 
   const handleMoreDetails = () => {
-    navigation.navigate('PolicyMemberDetails');
+    router.push('/PolicyMemberDetails');
   };
 
   const handleAddUser = () => {
@@ -161,7 +199,7 @@ export default function PolicyHome() {
   };
 
   const handleClosePolicySelection = () => {
-    if (!selectedPolicyNumber) {
+    if (!selectedPolicyNumber && availablePolicies.length > 0) {
       // If no policy selected, select the first one by default
       handlePolicySelection(availablePolicies[0]);
     } else {
@@ -356,22 +394,31 @@ export default function PolicyHome() {
           <Animated.View style={[styles.policySelectionModal, { transform: [{ translateY: policySelectSlideAnim }] }]}>
             <View style={styles.policyModalHeader}>
               <Text style={styles.policyModalTitle}>Select Your Policy</Text>
-
             </View>
             <ScrollView style={styles.policyList}>
               {availablePolicies.map((policy) => (
-                <TouchableOpacity
-                  key={policy.id}
-                  style={[
-                    styles.policyItem,
-                    selectedPolicyNumber === policy.policyNumber && styles.selectedPolicyItem
-                  ]}
-                  onPress={() => handlePolicySelection(policy)}
-                >
-                  <Text style={styles.policyNumber}>{policy.policyNumber}</Text>
-                  <Text style={styles.policyPeriod}>{policy.policyPeriod}</Text>
-                  <Text style={styles.policyCover}>{policy.insuranceCover}</Text>
-                </TouchableOpacity>
+                <View key={policy.id} style={styles.policyItemContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.policyItem,
+                      selectedPolicyNumber === policy.policyNumber && styles.selectedPolicyItem
+                    ]}
+                    onPress={() => handlePolicySelection(policy)}
+                  >
+                    <View style={styles.policyContent}>
+                      <Text style={styles.policyNumber}>{policy.policyNumber}</Text>
+                      <Text style={styles.policyID}>{policy.policyID}</Text>
+                      <Text style={styles.policyPeriod}>{policy.policyPeriod}</Text>
+                      
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeletePolicy(policy.id, policy.policyNumber)}
+                  >
+                    <Icon name="trash" size={25} color="#E12427" />
+                  </TouchableOpacity>
+                </View>
               ))}
             </ScrollView>
           </Animated.View>
@@ -379,7 +426,7 @@ export default function PolicyHome() {
       </Modal>
 
       {/* Existing Modal for Claims */}
-      <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleCloseModal}>
+      {/* <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleCloseModal}>
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleCloseModal} />
           <Animated.View style={[styles.animatedModal, { transform: [{ translateY: slideAnim }] }]}>
@@ -388,7 +435,7 @@ export default function PolicyHome() {
         </View>
       </Modal>
 
-      <IllnessPopup visible={showIllnessPopup} onClose={handleCloseIllnessPopup} onNext={handleIllnessNext} />
+      <IllnessPopup visible={showIllnessPopup} onClose={handleCloseIllnessPopup} onNext={handleIllnessNext} /> */}
     </LinearGradient>
   );
 }
@@ -442,9 +489,11 @@ const styles = StyleSheet.create({
   },
   userSection: {
     display:'flex',
-    alignItems:'center',justifyContent:'center',
+    alignItems:'center',
+    justifyContent:'left',
     flexDirection: 'row',
     alignItems: 'center',
+    
   },
   userAvatar: {
     width: 30,
@@ -455,7 +504,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     color: '#333',
-    marginRight: 8,
+    marginRight: 120,
   },
   body: {
     padding: 15,
@@ -473,7 +522,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.5,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -566,8 +615,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   healthCard: {
-    width: 300,
-    height: 160,
+    width: 350,
+    height: 200,
     borderRadius: 10,
   },
   policyHeader: {
@@ -729,7 +778,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
     alignItems: 'center',
     height: 70,
@@ -751,7 +800,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   policyModalHeader: {
-    // flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
@@ -766,15 +814,23 @@ const styles = StyleSheet.create({
   policyList: {
     maxHeight: screenHeight * 0.4,
   },
-  policyItem: {
-    padding: 20,
+  policyItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+  },
+  policyItem: {
+    flex: 1,
+    padding: 20,
   },
   selectedPolicyItem: {
     backgroundColor: '#F0F8FF',
     borderLeftWidth: 4,
     borderLeftColor: '#16858D',
+  },
+  policyContent: {
+    flex: 1,
   },
   policyNumber: {
     fontSize: 16,
@@ -787,10 +843,17 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 2,
   },
-  policyCover: {
+  policyID: {
     fontSize: 14,
-    color: '#16858D',
+    // color: '#16858D',
     fontWeight: '500',
+  },
+  deleteButton: {
+    padding: 15,
+    paddingLeft: 10,
+    paddingRight: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Modal styles
   overlay: {

@@ -35,7 +35,7 @@ export default function PolicyMemberDetails() {
   }, []);
 
   const handleBackPress = () => {
-    router.push('/home'); // ✅ This navigates to app/home.jsx
+    router.back(); 
   };
 
   if (!memberDetails) {
