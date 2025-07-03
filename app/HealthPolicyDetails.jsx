@@ -1,10 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Animated, Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
 // Import your separate page components
@@ -144,10 +143,10 @@ const HealthPolicyDetails = () => {
       console.error('Invalid button label:', buttonLabel);
       return;
     }
-    
+
     setCurrentPage(buttonLabel);
     setModalVisible(true);
-    
+
     // Animate slide in from bottom
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -173,7 +172,7 @@ const HealthPolicyDetails = () => {
       return null;
     }
 
-    const commonProps = { 
+    const commonProps = {
       onClose: handleCloseModal,
       availableHeight: getPageHeight(currentPage) - 100
     };
@@ -215,11 +214,11 @@ const HealthPolicyDetails = () => {
     if (!iconName || !label || typeof label !== 'string') {
       return null;
     }
-    
+
     return (
-      <TouchableOpacity 
-        style={styles.navItem} 
-        onPress={() => onPress(label)} 
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => onPress(label)}
         key={label}
         accessible={true}
         accessibilityLabel={label}
@@ -252,121 +251,96 @@ const HealthPolicyDetails = () => {
   ], []);
 
   return (
-    <LinearGradient
-      colors={['#FFFFFF', '#6DD3D3']}
-      style={styles.container}
-    >
-      {/* Fixed Header Section */}
-      <View style={styles.headerContainer}>
-        {/* Back Icon + Title */}
-        <View style={styles.headerRow}>
-          
-          <Text style={styles.headerTitle}>
-            Health Policy Details
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Policy Info Card */}
-        <View style={styles.policyCard}>
-          {policyInfo.map((item, idx) => (
-            <Text key={idx} style={styles.policyText}>
-              {item}
-            </Text>
-          ))}
-        </View>
-      </View>
-
-      {/* Scrollable Buttons Section */}
-      <View style={styles.buttonsContainer}>
-        <View style={styles.buttonsWrapper}>
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {buttons.map((label, index) => (
-              <TouchableOpacity
-                key={`button-${index}`}
-                style={styles.button}
-                onPress={() => handleButtonPress(label)}
-                accessible={true}
-                accessibilityLabel={label}
-              >
-                <Text style={styles.buttonText}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-
-      {/* Bottom Navigation Bar */}
-      <View style={styles.navbar}>
-        {renderNavItem('home', 'Home', handleNavigation)}
-        {renderNavItem('bell', 'Notification', handleNavigation)}
-        {renderNavItem('file-text', 'Policy Details', handleNavigation)}
-        {renderNavItem('user', 'Profile', handleNavigation)}
-      </View>
-
-      {/* Modal for displaying pages */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="none"
-        onRequestClose={handleCloseModal}
+    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
+      <LinearGradient
+        colors={['#FFFFFF', '#6DD3D3']}
+        style={styles.container}
       >
-        <View style={styles.overlay}>
-          <TouchableOpacity 
-            style={styles.overlayTouchable} 
-            activeOpacity={1} 
-            onPress={handleCloseModal}
-          />
-          
-          <Animated.View
-            style={[
-              styles.animatedModal,
-              {
-                height: getPageHeight(currentPage),
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            {renderModalContent()}
-          </Animated.View>
+        {/* Fixed Header Section */}
+        <View style={styles.headerContainer}>
+          {/* Back Icon + Title */}
+          <View style={styles.headerRow}>
+
+            <Text style={styles.headerTitle}>
+              Health Policy Details
+            </Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          {/* Policy Info Card */}
+          <View style={styles.policyCard}>
+            {policyInfo.map((item, idx) => (
+              <Text key={idx} style={styles.policyText}>
+                {item}
+              </Text>
+            ))}
+          </View>
         </View>
-      </Modal>
-    </LinearGradient>
+
+        {/* Scrollable Buttons Section */}
+        <View style={styles.buttonsContainer}>
+          <View style={styles.buttonsWrapper}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {buttons.map((label, index) => (
+                <TouchableOpacity
+                  key={`button-${index}`}
+                  style={styles.button}
+                  onPress={() => handleButtonPress(label)}
+                  accessible={true}
+                  accessibilityLabel={label}
+                >
+                  <Text style={styles.buttonText}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Bottom Navigation Bar */}
+        <View style={styles.navbar}>
+          {renderNavItem('home', 'Home', handleNavigation)}
+          {renderNavItem('bell', 'Notification', handleNavigation)}
+          {renderNavItem('file-text', 'Policy Details', handleNavigation)}
+          {renderNavItem('user', 'Profile', handleNavigation)}
+        </View>
+
+        {/* Modal for displaying pages */}
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="none"
+          onRequestClose={handleCloseModal}
+        >
+          <View style={styles.overlay}>
+            <TouchableOpacity
+              style={styles.overlayTouchable}
+              activeOpacity={1}
+              onPress={handleCloseModal}
+            />
+
+            <Animated.View
+              style={[
+                styles.animatedModal,
+                {
+                  height: getPageHeight(currentPage),
+                  transform: [{ translateY: slideAnim }]
+                }
+              ]}
+            >
+              {renderModalContent()}
+            </Animated.View>
+          </View>
+        </Modal>
+      </LinearGradient>
+    </SafeAreaView>
   );
 };
 
-// Enhanced Placeholder component with responsive design
-const PlaceholderPage = ({ title, onClose }) => (
-  <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.modalContent}>
-    <View style={styles.modalContainer}>
-      <View style={styles.modalHeader}>
-        <TouchableOpacity onPress={onClose}>
-          <Ionicons name="arrow-back" size={26} color="#13646D" />
-        </TouchableOpacity>
-        <Text style={styles.modalHeaderTitle}>{title || 'Loading...'}</Text>
-        <View style={styles.modalHeaderSpacer} />
-      </View>
-      
-      <ScrollView 
-        style={styles.placeholderScrollContainer}
-        contentContainerStyle={styles.placeholderContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.placeholderText}>
-          {title ? `${title} content will be displayed here` : 'Loading content...'}
-        </Text>
-        <Text style={styles.placeholderSubText}>
-          This modal is now responsive and will adjust to different screen sizes automatically.
-        </Text>
-      </ScrollView>
-    </View>
-  </LinearGradient>
-);
 
 const styles = StyleSheet.create({
   container: {
@@ -392,7 +366,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     flex: 1,
     textAlign: 'center',
-    marginLeft:50
+    marginLeft: 50
   },
   headerSpacer: {
     width: 35
@@ -417,7 +391,7 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     flex: 1,
     marginTop: 35,
-    marginBottom: 85
+    marginBottom: 55
   },
   buttonsWrapper: {
     borderRadius: 30,
@@ -519,7 +493,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     alignItems: 'center',
-    height: 70,
+    height: 40,
   },
   navItem: {
     alignItems: 'center',
