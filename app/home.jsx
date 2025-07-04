@@ -54,8 +54,6 @@ export default function PolicyHome() {
         return;
       }
 
-      console.log("Fetching members for:", { policyNumber, memberNumber });
-
       const response = await fetch(
         `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
         {
