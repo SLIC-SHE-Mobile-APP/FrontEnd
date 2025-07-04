@@ -1,27 +1,31 @@
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { BackHandler } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
+  Alert, BackHandler, Dimensions,
   Animated,
-  Dimensions,
   Image,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Alert,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ClaimTypeSelection from './ClaimTypeSelection';
+import PendingIntimations from './PendingIntimations';
 import * as SecureStore from "expo-secure-store";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
 export default function PolicyHome() {
   const navigation = useNavigation();
+  const [showIllnessPopup, setShowIllnessPopup] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const [policyDetails, setPolicyDetails] = useState(null);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
 
@@ -34,7 +38,8 @@ export default function PolicyHome() {
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
-
+  const [showPendingIntimations, setShowPendingIntimations] = useState(false);
+  const [pendingIntimationsSlideAnim] = useState(new Animated.Value(screenHeight));
   // Available policies - now loaded from API
   const [availablePolicies, setAvailablePolicies] = useState([]);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
@@ -146,6 +151,22 @@ export default function PolicyHome() {
         console.error("Response text that failed to parse:", responseText);
         throw new Error("Invalid JSON response from server");
       }
+
+      // Close modal
+      Animated.timing(policySelectSlideAnim, {
+        toValue: screenHeight,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowPolicySelection(false);
+      });
+
+      const handleMoreDetails = () => {
+        router.push('/PolicyMemberDetails');
+      };
+
+
+
 
       if (result.success && result.data) {
         // Transform API data to match the expected format
@@ -362,16 +383,60 @@ export default function PolicyHome() {
   };
 
   const handleTypePress = (type) => {
-    if (type === "New Claim") {
+
+    // Remove newline characters and normalize the type string
+    const normalizedType = type.replace(/\n/g, ' ').trim();
+
+    console.log('Button pressed:', type);
+    console.log('Normalized type:', normalizedType);
+
+    if (normalizedType === 'New Claim') {
+      console.log('Opening New Claim modal');
+
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
+    } else if (normalizedType === 'Saved Claims') {
+      console.log('Saved Claims pressed');
+      setShowPendingIntimations(true);
+      Animated.timing(pendingIntimationsSlideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else if (normalizedType === 'Claim History') {
+      console.log('Claim History pressed');
+      // Add your navigation logic here
+    } else if (normalizedType === 'Pending Requirement') {
+      console.log('Pending Requirement pressed');
+      // Add your navigation logic here
+
     } else {
       console.log(`${type} pressed`);
     }
+  };
+
+  const handleClosePendingIntimations = () => {
+    Animated.timing(pendingIntimationsSlideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPendingIntimations(false);
+    });
+  };
+
+  const handleCloseModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+    });
   };
 
   const handleClosePolicySelection = () => {
@@ -449,233 +514,249 @@ export default function PolicyHome() {
   );
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-      <View style={styles.headerContent}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logoRow}>
-            <Image
-              source={require("../assets/images/logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.userSection}>
-            <Image
-              source={require("../assets/images/userhome.png")}
-              style={styles.userAvatar}
-              resizeMode="contain"
-            />
-            <Text style={styles.userName}>Kumuduni Rajapakshe</Text>
-            <TouchableOpacity onPress={showPolicySelectionModal}>
-              <Icon name="chevron-down" size={16} color="#666" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
-        <View style={styles.cardOutline}>
-          <View style={styles.insuranceCard}>
-            <View style={styles.policyHeader}>
-              <View style={styles.policyInfo}>
-                <Text style={styles.insuranceText}>
-                  Policy Number :{" "}
-                  <Text style={styles.boldText}>
-                    {policyDetails?.policyNumber || "Loading..."}
-                  </Text>
-                </Text>
-                <Text style={styles.insuranceText}>
-                  Policy Period :{" "}
-                  <Text style={styles.boldText}>
-                    {policyDetails?.policyPeriod || "Loading..."}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.moreButton}
-              onPress={handleMoreDetails}
-            >
-              <Text style={styles.moreText}>More Details</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>MEMBER</Text>
-        <View style={styles.memberCard}>
-          <TouchableOpacity
-            style={styles.memberRow}
-            onPress={toggleMemberDropdown}
-          >
-            <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>
-                {selectedMember ? selectedMember.name : "Select Member"}
-              </Text>
-              {selectedMember && (
-                <Text style={styles.memberRelationship}>
-                  {selectedMember.relationship}
-                </Text>
-              )}
-            </View>
-            <View style={styles.memberActions}>
-              <View style={styles.totalBadge}>
-                <Text style={styles.totalText}>Total </Text>
-                <Text style={styles.totalNumber}>
-                  {members.length.toString().padStart(2, "0")}
-                </Text>
-              </View>
-              <Icon
-                name={showMemberDropdown ? "chevron-up" : "chevron-down"}
-                size={16}
-                color="#666"
-                style={styles.dropdownIcon}
+    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoRow}>
+              <Image
+                source={require("../assets/images/logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
               />
             </View>
-          </TouchableOpacity>
-
-          {showMemberDropdown && (
-            <View style={styles.dropdownContainer}>
-              {members.map((member) => (
-                <TouchableOpacity
-                  key={member.id}
-                  style={[
-                    styles.dropdownItem,
-                    selectedMember?.id === member.id &&
-                      styles.selectedDropdownItem,
-                  ]}
-                  onPress={() => handleMemberSelect(member)}
-                >
-                  <View style={styles.dropdownMemberInfo}>
-                    <Text style={styles.dropdownMemberName}>{member.name}</Text>
-                    <Text style={styles.dropdownMemberRelationship}>
-                      {member.relationship}
-                    </Text>
-                  </View>
-                  {selectedMember?.id === member.id && (
-                    <Icon name="check" size={16} color="#16858D" />
-                  )}
-                </TouchableOpacity>
-              ))}
+            <View style={styles.userSection}>
+              <Image
+                source={require("../assets/images/userhome.png")}
+                style={styles.userAvatar}
+                resizeMode="contain"
+              />
+              <Text style={styles.userName}>Kumuduni Rajapakshe</Text>
+              <TouchableOpacity onPress={showPolicySelectionModal}>
+                <Icon name="chevron-down" size={16} color="#666" />
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
 
-        <Text style={styles.sectionTitle}>TYPE</Text>
-        <View style={styles.typeContainer}>
-          {renderType(
-            "New\nClaim",
-            require("../assets/images/newclaimicon.png"),
-            handleTypePress
-          )}
-          {renderType(
-            "Saved\nClaims",
-            require("../assets/images/savedclaimicon.png"),
-            handleTypePress
-          )}
-          {renderType(
-            "Claim\nHistory",
-            require("../assets/images/claimhistoryicon.png"),
-            handleTypePress
-          )}
-          {renderType(
-            "Pending\nRequirement",
-            require("../assets/images/pendingicon.png"),
-            handleTypePress
-          )}
+          </View>
         </View>
-
-        <Text style={styles.sectionTitle}>HEALTH CARD</Text>
-        <View style={styles.healthCardContainer}>
-          <Image
-            source={require("../assets/images/healthcard.png")}
-            style={styles.healthCard}
-            resizeMode="contain"
-          />
-        </View>
-      </ScrollView>
-
-      <View style={styles.navbar}>
-        {renderNavItem("home", "Home", handleNavigation)}
-        {renderNavItem("bell", "Notification", handleNavigation)}
-        {renderNavItem("file-text", "Policy Details", handleNavigation)}
-        {renderNavItem("user", "Profile", handleNavigation)}
       </View>
 
-      {/* Policy Selection Modal */}
-      <Modal
-        visible={showPolicySelection}
-        transparent
-        animationType="none"
-        onRequestClose={() => {
-          // Prevent closing modal with back button if no policy selected
-          if (selectedPolicyNumber) {
-            handleClosePolicySelection();
-          }
-        }}
-      >
-        <View style={styles.overlay}>
-          {/* Remove the TouchableOpacity that was allowing outside clicks */}
-          <Animated.View
-            style={[
-              styles.policySelectionModal,
-              { transform: [{ translateY: policySelectSlideAnim }] },
-            ]}
-          >
-            <View style={styles.policyModalHeader}>
-              <Text style={styles.policyModalTitle}>Select Your Policy</Text>
-              <Text style={styles.policyModalSubtitle}>
-                Please select a policy to continue
-              </Text>
+        <ScrollView contentContainerStyle={styles.body}>
+          <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
+          <View style={styles.cardOutline}>
+            <View style={styles.insuranceCard}>
+              <View style={styles.policyHeader}>
+                <View style={styles.policyInfo}>
+                  <Text style={styles.insuranceText}>
+                    Policy Number :{" "}
+                    <Text style={styles.boldText}>
+                      {policyDetails?.policyNumber || "Loading..."}
+                    </Text>
+                  </Text>
+                  <Text style={styles.insuranceText}>
+                    Policy Period :{" "}
+                    <Text style={styles.boldText}>
+                      {policyDetails?.policyPeriod || "Loading..."}
+                    </Text>
+
+                  </Text>
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.moreButton}
+                onPress={handleMoreDetails}
+              >
+                <Text style={styles.moreText}>More Details</Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView style={styles.policyList}>
-              {isLoadingPolicies ? (
-                <View style={styles.loadingContainer}>
-                  <Text style={styles.loadingText}>Loading policies...</Text>
-                </View>
-              ) : availablePolicies.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No policies found</Text>
-                </View>
-              ) : (
-                availablePolicies.map((policy) => (
-                  <View key={policy.id} style={styles.policyItemContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.policyItem,
-                        selectedPolicyNumber === policy.policyNumber &&
-                          styles.selectedPolicyItem,
-                      ]}
-                      onPress={() => handlePolicySelection(policy)}
-                    >
-                      <View style={styles.policyContent}>
-                        <Text style={styles.policyNumber}>
-                          {policy.policyNumber}
-                        </Text>
-                        <Text style={styles.policyID}>
-                          Member: {policy.policyID}
-                        </Text>
-                        <Text style={styles.policyPeriod}>
-                          {policy.policyPeriod}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() =>
-                        handleDeletePolicy(policy.id, policy.policyNumber)
-                      }
-                    >
-                      <Icon name="trash" size={25} color="#E12427" />
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </Animated.View>
+          </View>
         </View>
-      </Modal>
-    </LinearGradient>
+
+          <Text style={styles.sectionTitle}>MEMBER</Text>
+          <View style={styles.memberCard}>
+            <TouchableOpacity
+              style={styles.memberRow}
+              onPress={toggleMemberDropdown}
+            >
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>
+                  {selectedMember ? selectedMember.name : "Select Member"}
+
+                </Text>
+              </View>
+              <View style={styles.memberActions}>
+                <View style={styles.totalBadge}>
+                  <Text style={styles.totalText}>Total </Text>
+                  <Text style={styles.totalNumber}>
+                    {members.length.toString().padStart(2, "0")}
+                  </Text>
+                </View>
+                <Icon
+                  name={showMemberDropdown ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color="#666"
+                  style={styles.dropdownIcon}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {showMemberDropdown && (
+              <View style={styles.dropdownContainer}>
+                {members.map((member) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.dropdownItem,
+                      selectedMember?.id === member.id &&
+                      styles.selectedDropdownItem,
+                    ]}
+                    onPress={() => handleMemberSelect(member)}
+                  >
+                    <View style={styles.dropdownMemberInfo}>
+                      <Text style={styles.dropdownMemberName}>{member.name}</Text>
+                      <Text style={styles.dropdownMemberRelationship}>
+                        {member.relationship}
+                      </Text>
+                    </View>
+                    {selectedMember?.id === member.id && (
+                      <Icon name="check" size={16} color="#16858D" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.sectionTitle}>TYPE</Text>
+          <View style={styles.typeContainer}>
+            {renderType(
+              "New\nClaim",
+              require("../assets/images/newclaimicon.png"),
+              handleTypePress
+            )}
+            {renderType(
+              "Saved\nClaims",
+              require("../assets/images/savedclaimicon.png"),
+              handleTypePress
+            )}
+            {renderType(
+              "Claim\nHistory",
+              require("../assets/images/claimhistoryicon.png"),
+              handleTypePress
+            )}
+            {renderType(
+              "Pending\nRequirement",
+              require("../assets/images/pendingicon.png"),
+              handleTypePress
+            )}
+          </View>
+
+          <Text style={styles.sectionTitle}>HEALTH CARD</Text>
+          <View style={styles.healthCardContainer}>
+            <Image
+              source={require("../assets/images/healthcard.png")}
+              style={styles.healthCard}
+              resizeMode="contain"
+            />
+          </View>
+        </ScrollView>
+
+        <View style={styles.navbar}>
+          {renderNavItem("home", "Home", handleNavigation)}
+          {renderNavItem("bell", "Notification", handleNavigation)}
+          {renderNavItem("file-text", "Policy Details", handleNavigation)}
+          {renderNavItem("user", "Profile", handleNavigation)}
+        </View>
+        {/* Policy Selection Modal */}
+        <Modal
+          visible={showPolicySelection}
+          transparent
+          animationType="none"
+          onRequestClose={() => {
+            // Prevent closing modal with back button if no policy selected
+            if (selectedPolicyNumber) {
+              handleClosePolicySelection();
+            }
+          }}
+        >
+          <View style={styles.overlay}>
+            {/* Remove the TouchableOpacity that was allowing outside clicks */}
+            <Animated.View
+              style={[
+                styles.policySelectionModal,
+                { transform: [{ translateY: policySelectSlideAnim }] },
+              ]}
+            >
+              <View style={styles.policyModalHeader}>
+                <Text style={styles.policyModalTitle}>Select Your Policy</Text>
+                <Text style={styles.policyModalSubtitle}>
+                  Please select a policy to continue
+                </Text>
+              </View>
+              <ScrollView style={styles.policyList}>
+                {isLoadingPolicies ? (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading policies...</Text>
+                  </View>
+                ) : availablePolicies.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No policies found</Text>
+                  </View>
+                ) : (
+                  availablePolicies.map((policy) => (
+                    <View key={policy.id} style={styles.policyItemContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.policyItem,
+                          selectedPolicyNumber === policy.policyNumber &&
+                          styles.selectedPolicyItem,
+                        ]}
+                        onPress={() => handlePolicySelection(policy)}
+                      >
+                        <View style={styles.policyContent}>
+                          <Text style={styles.policyNumber}>
+                            {policy.policyNumber}
+                          </Text>
+                          <Text style={styles.policyID}>
+                            Member: {policy.policyID}
+                          </Text>
+                          <Text style={styles.policyPeriod}>
+                            {policy.policyPeriod}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() =>
+                          handleDeletePolicy(policy.id, policy.policyNumber)
+                        }
+                      >
+                        <Icon name="trash" size={25} color="#E12427" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </Animated.View>
+          </View>
+        </Modal>
+        {/* Claim Type Selection Modal */}
+        <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleCloseModal}>
+
+          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleCloseModal} />
+          <Animated.View style={[styles.animatedModal, { transform: [{ translateY: slideAnim }] }]}>
+            <ClaimTypeSelection onClose={handleCloseModal} />
+          </Animated.View>
+        </Modal>
+        {/* PendingIntimations Modal */}
+        <Modal visible={showPendingIntimations} transparent animationType="none" onRequestClose={handleClosePendingIntimations}  >
+          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePendingIntimations} />
+          <Animated.View style={[styles.animatedModal, { transform: [{ translateY: pendingIntimationsSlideAnim }] }]}>
+            <PendingIntimations onClose={handleClosePendingIntimations} />
+          </Animated.View>
+        </Modal>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
