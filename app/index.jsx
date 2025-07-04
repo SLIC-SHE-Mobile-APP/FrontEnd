@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import Home from './home.jsx';
+import Home from './loginRequestOTP.jsx';
 import LoginRequestOTP from './loginRequestOTP.jsx';
 import OTPVerificationBank from './OTPVerificationBank.jsx';
 
