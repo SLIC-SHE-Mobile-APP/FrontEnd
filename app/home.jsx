@@ -4,7 +4,17 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import {Alert, Animated, BackHandler, Dimensions,Image,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from "react-native";
+import {
+  Alert, Animated, BackHandler, Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+
 import Icon from "react-native-vector-icons/FontAwesome";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClaimTypeSelection from './ClaimTypeSelection';
