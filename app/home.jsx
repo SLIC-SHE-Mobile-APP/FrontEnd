@@ -271,7 +271,7 @@ export default function PolicyHome() {
   );
 
   return (
-    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
+    <SafeAreaView style={{ backgroundColor: "#000000", flex: 1 }}>
       <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
