@@ -1,15 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 
-const BankDetailsSum = ({ onClose }) => {
+const BankDetailsSum = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo  = '000000682' }) => {
+  const [bankDetails, setBankDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showMasked, setShowMasked] = useState(true);
+
   // Utility to mask string with only first 2 and last 2 characters visible
   const maskValue = (value) => {
     if (!value || value.length <= 4) return value;
@@ -18,11 +25,119 @@ const BankDetailsSum = ({ onClose }) => {
     return `${first}${'*'.repeat(value.length - 4)}${last}`;
   };
 
-  const bankDetails = {
-    bankName: 'Bank Of Ceylon',
-    branchName: 'Kurunegala',
-    accountNumber: '1234567890420',
-    mobileNumber: '0712345678',
+  // Fetch bank details from API
+  const fetchBankDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/BankDetails?policyNo=${policyNo}&memberNo=${memberNo}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const bankInfo = data[0];
+        setBankDetails({
+          bankName: bankInfo.bankname,
+          branchName: bankInfo.bankbranch,
+          accountNumber: bankInfo.accountno,
+          mobileNumber: bankInfo.mobileno,
+          bankCode: bankInfo.bankcode,
+          branchCode: bankInfo.branchcode,
+        });
+      } else {
+        setError('No bank details found');
+      }
+    } catch (err) {
+      console.error('Error fetching bank details:', err);
+      setError('Failed to load bank details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (policyNo && memberNo) {
+      fetchBankDetails();
+    } else {
+      setError('Policy number and member number are required');
+      setLoading(false);
+    }
+  }, [policyNo, memberNo]);
+
+  const handleViewDetails = () => {
+    setShowMasked(!showMasked);
+  };
+
+  const handleRetry = () => {
+    fetchBankDetails();
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color="#13646D" />
+          <Text style={styles.loadingText}>Loading bank details...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContent}>
+          <Ionicons name="alert-circle-outline" size={50} color="#FF6B6B" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (!bankDetails) {
+      return (
+        <View style={styles.centerContent}>
+          <Text style={styles.errorText}>No bank details available</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.leftColumn}>
+          <Text style={styles.label}>Bank Name</Text>
+          <Text style={styles.label}>Branch Name</Text>
+          <Text style={styles.label}>Account Number</Text>
+          <Text style={styles.label}>Mobile Number</Text>
+        </View>
+        <View style={styles.rightColumn}>
+          <Text style={styles.value}>
+            {showMasked ? maskValue(bankDetails.bankName) : bankDetails.bankName}
+          </Text>
+          <Text style={styles.value}>
+            {showMasked ? maskValue(bankDetails.branchName) : bankDetails.branchName}
+          </Text>
+          <Text style={styles.value}>
+            {showMasked ? maskValue(bankDetails.accountNumber) : bankDetails.accountNumber}
+          </Text>
+          <Text style={styles.value}>
+            {showMasked ? maskValue(bankDetails.mobileNumber) : bankDetails.mobileNumber}
+          </Text>
+          <TouchableOpacity onPress={handleViewDetails}>
+            <Text style={styles.viewDetailsText}>
+              {showMasked ? 'View Details' : 'Hide Details'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -47,23 +162,7 @@ const BankDetailsSum = ({ onClose }) => {
       {/* Scrollable Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.centeredContainer}>
-          <View style={styles.card}>
-            <View style={styles.leftColumn}>
-              <Text style={styles.label}>Bank Name</Text>
-              <Text style={styles.label}>Branch Name</Text>
-              <Text style={styles.label}>Account Number</Text>
-              <Text style={styles.label}>Mobile Number</Text>
-            </View>
-            <View style={styles.rightColumn}>
-              <Text style={styles.value}>{maskValue(bankDetails.bankName)}</Text>
-              <Text style={styles.value}>{maskValue(bankDetails.branchName)}</Text>
-              <Text style={styles.value}>{maskValue(bankDetails.accountNumber)}</Text>
-              <Text style={styles.value}>{maskValue(bankDetails.mobileNumber)}</Text>
-              <TouchableOpacity>
-                <Text style={styles.viewDetailsText}>View Details</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          {renderContent()}
         </View>
       </ScrollView>
     </LinearGradient>
@@ -124,6 +223,33 @@ const styles = StyleSheet.create({
     color: '#13646D',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  centerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#13646D',
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#FF6B6B',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 15,
+    backgroundColor: '#13646D',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

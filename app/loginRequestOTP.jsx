@@ -87,40 +87,6 @@ function LoginRequestOTPContent() {
     }
   };
 
-  // Retrieve user data from SecureStore
-  const getUserData = async () => {
-    try {
-      const mobileNumber = await SecureStore.getItemAsync('user_mobile');
-      const nicNumber = await SecureStore.getItemAsync('user_nic');
-      const timestamp = await SecureStore.getItemAsync('user_timestamp');
-      
-      if (mobileNumber && nicNumber) {
-        return {
-          mobileNumber,
-          nicNumber,
-          timestamp
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error('Error retrieving user data:', error);
-      return null;
-    }
-  };
-
-  // Clear user data from SecureStore (for logout)
-  const clearUserData = async () => {
-    try {
-      await SecureStore.deleteItemAsync('user_mobile');
-      await SecureStore.deleteItemAsync('user_nic');
-      await SecureStore.deleteItemAsync('user_timestamp');
-      await SecureStore.deleteItemAsync('userData');
-      console.log('User data cleared successfully');
-    } catch (error) {
-      console.error('Error clearing user data:', error);
-    }
-  };
-
   const makePhoneCall = () => {
     Linking.openURL("tel:0112252596").catch((err) => {
       console.error("Phone call error:", err);
