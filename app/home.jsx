@@ -744,12 +744,14 @@ export default function PolicyHome() {
           </Animated.View>
         </Modal>
         {/* PendingIntimations Modal */}
-        <Modal visible={showPendingIntimations} transparent animationType="none" onRequestClose={handleClosePendingIntimations}  >
-          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePendingIntimations} />
-          <Animated.View style={[styles.animatedModal, { transform: [{ translateY: pendingIntimationsSlideAnim }] }]}>
-            <PendingIntimations onClose={handleClosePendingIntimations} />
-          </Animated.View>
-        </Modal>
+        <View style={{ backgroundColor: "" }} >
+          <Modal visible={showPendingIntimations} style={{ minHeight: 200 }} transparent animationType="none" onRequestClose={handleClosePendingIntimations}  >
+            <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePendingIntimations} />
+            <Animated.View style={[styles.animatedModal, { transform: [{ translateY: pendingIntimationsSlideAnim }] }]}>
+              <PendingIntimations onClose={handleClosePendingIntimations} />
+            </Animated.View>
+          </Modal>
+        </View>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1185,7 +1187,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animatedModal: {
-    height: 375,
+    height: '85%',
     backgroundColor: "transparent",
   },
 });
