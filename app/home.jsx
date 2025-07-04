@@ -4,8 +4,7 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
-  Alert, BackHandler, Dimensions,
-  Animated,
+  Alert, Animated, BackHandler, Dimensions,
   Image,
   Modal,
   ScrollView,
@@ -18,7 +17,6 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClaimTypeSelection from './ClaimTypeSelection';
 import PendingIntimations from './PendingIntimations';
-import * as SecureStore from "expo-secure-store";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -383,7 +381,6 @@ export default function PolicyHome() {
   };
 
   const handleTypePress = (type) => {
-
     // Remove newline characters and normalize the type string
     const normalizedType = type.replace(/\n/g, ' ').trim();
 
@@ -392,7 +389,6 @@ export default function PolicyHome() {
 
     if (normalizedType === 'New Claim') {
       console.log('Opening New Claim modal');
-
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -413,9 +409,8 @@ export default function PolicyHome() {
     } else if (normalizedType === 'Pending Requirement') {
       console.log('Pending Requirement pressed');
       // Add your navigation logic here
-
     } else {
-      console.log(`${type} pressed`);
+      console.log(`${normalizedType} pressed`);
     }
   };
 
@@ -536,10 +531,8 @@ export default function PolicyHome() {
                 <Icon name="chevron-down" size={16} color="#666" />
               </TouchableOpacity>
             </View>
-
           </View>
         </View>
-      </View>
 
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
@@ -558,9 +551,8 @@ export default function PolicyHome() {
                     <Text style={styles.boldText}>
                       {policyDetails?.policyPeriod || "Loading..."}
                     </Text>
-
                   </Text>
-                </Text>
+                </View>
               </View>
               <TouchableOpacity
                 style={styles.moreButton}
@@ -570,7 +562,6 @@ export default function PolicyHome() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
 
           <Text style={styles.sectionTitle}>MEMBER</Text>
           <View style={styles.memberCard}>
@@ -581,8 +572,12 @@ export default function PolicyHome() {
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>
                   {selectedMember ? selectedMember.name : "Select Member"}
-
                 </Text>
+                {selectedMember && (
+                  <Text style={styles.memberRelationship}>
+                    {selectedMember.relationship}
+                  </Text>
+                )}
               </View>
               <View style={styles.memberActions}>
                 <View style={styles.totalBadge}>
