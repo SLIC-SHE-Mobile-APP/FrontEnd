@@ -5,6 +5,7 @@ import {ActivityIndicator,Alert,Animated,Image,Keyboard,Linking,Platform,ScrollV
 import {SafeAreaProvider,useSafeAreaInsets,} from "react-native-safe-area-context";
 import * as SecureStore from 'expo-secure-store';
 
+
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
