@@ -1,24 +1,14 @@
+
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import {
-  Alert, BackHandler, Dimensions,
-  Animated,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import {Alert, Animated, BackHandler, Dimensions,Image,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ClaimTypeSelection from './ClaimTypeSelection';
 import PendingIntimations from './PendingIntimations';
-import * as SecureStore from "expo-secure-store";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -40,9 +30,123 @@ export default function PolicyHome() {
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [showPendingIntimations, setShowPendingIntimations] = useState(false);
   const [pendingIntimationsSlideAnim] = useState(new Animated.Value(screenHeight));
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  
   // Available policies - now loaded from API
   const [availablePolicies, setAvailablePolicies] = useState([]);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
+
+  // Employee info state
+  const [employeeInfo, setEmployeeInfo] = useState(null);
+  const [isLoadingEmployeeInfo, setIsLoadingEmployeeInfo] = useState(false);
+
+  // Function to fetch dependents/members from API
+  const fetchMembers = async () => {
+    try {
+      setIsLoadingMembers(true);
+      
+      // Get policy number and member number from SecureStore
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+
+      if (!policyNumber || !memberNumber) {
+        console.log("Policy number or member number not found in SecureStore");
+        return;
+      }
+
+      console.log("Fetching members for:", { policyNumber, memberNumber });
+
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const membersData = await response.json();
+      
+      // Transform API data to match the expected format
+      const transformedMembers = membersData.map((member, index) => ({
+        id: index + 1,
+        name: member.dependentName,
+        relationship: member.relationship,
+        birthDay: member.depndentBirthDay,
+        effectiveDate: member.effectiveDate,
+        memberCode: member.memberCode,
+      }));
+
+      setMembers(transformedMembers);
+      
+      // Set the first member (Employee) as selected by default
+      if (transformedMembers.length > 0) {
+        setSelectedMember(transformedMembers[0]);
+      }
+
+    } catch (error) {
+      console.error("Error fetching members:", error);
+      Alert.alert("Error", "Failed to load members. Please try again.");
+      // Set empty members array on error
+      setMembers([]);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  // Function to fetch employee information
+  const fetchEmployeeInfo = async () => {
+    try {
+      setIsLoadingEmployeeInfo(true);
+
+      // Get policy number and member number from SecureStore
+      const storedNic = await SecureStore.getItemAsync('user_nic');
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+
+      if (!policyNumber || !memberNumber) {
+        console.log("Policy number or member number not found in SecureStore");
+        return;
+      }
+
+      console.log("Fetching employee info for:", { policyNumber, memberNumber , storedNic});
+
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (response.status === 500) {
+        setEmployeeInfo(null);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const employeeData = await response.json();
+      setEmployeeInfo(employeeData);
+
+    } catch (error) {
+      console.error("Error fetching employee info:", error);
+      setEmployeeInfo(null);
+    } finally {
+      setIsLoadingEmployeeInfo(false);
+    }
+  };
 
   // Function to format policy period from start and end dates
   const formatPolicyPeriod = (startDate, endDate) => {
@@ -113,8 +217,6 @@ export default function PolicyHome() {
         throw new Error("NIC number not found in SecureStore.");
       }
 
-      console.log("Fetching policies for NIC:", nicNumber);
-
       const response = await fetch(
         `http://203.115.11.229:1002/api/HomePagePoliciesLoad/GetPoliciesByNic?nicNumber=${nicNumber}`,
         {
@@ -151,22 +253,6 @@ export default function PolicyHome() {
         console.error("Response text that failed to parse:", responseText);
         throw new Error("Invalid JSON response from server");
       }
-
-      // Close modal
-      Animated.timing(policySelectSlideAnim, {
-        toValue: screenHeight,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowPolicySelection(false);
-      });
-
-      const handleMoreDetails = () => {
-        router.push('/PolicyMemberDetails');
-      };
-
-
-
 
       if (result.success && result.data) {
         // Transform API data to match the expected format
@@ -217,18 +303,8 @@ export default function PolicyHome() {
     }
   };
 
-  // Initialize members and fetch policies
+  // Initialize and fetch data
   useEffect(() => {
-    const membersList = [
-      { id: 1, name: "H.M.Menaka Herath", relationship: "Self" },
-      { id: 2, name: "Kamal Perera", relationship: "Spouse" },
-      { id: 3, name: "Saman Herath", relationship: "Child" },
-      { id: 4, name: "Nimal Silva", relationship: "Child" },
-      { id: 5, name: "Kamala Herath", relationship: "Parent" },
-    ];
-    setMembers(membersList);
-    setSelectedMember(membersList[0]);
-
     // Load stored policy data and fetch policies
     const initializePolicyData = async () => {
       try {
@@ -236,7 +312,6 @@ export default function PolicyHome() {
         const storedPolicyData = await getStoredPolicyData();
 
         if (storedPolicyData) {
-          console.log("Loaded stored policy data:", storedPolicyData);
           setSelectedPolicyNumber(storedPolicyData.policyNumber);
 
           if (storedPolicyData.fullPolicyData) {
@@ -249,6 +324,10 @@ export default function PolicyHome() {
           }
 
           setIsFirstTime(false);
+          
+          // Fetch employee info and members after loading policy data
+          await fetchEmployeeInfo();
+          await fetchMembers();
         }
 
         // Then fetch fresh policies from API
@@ -263,7 +342,7 @@ export default function PolicyHome() {
     initializePolicyData();
   }, []);
 
-  // Updated handlePolicySelection to store data in SecureStore
+  // Updated handlePolicySelection to store data in SecureStore including NIC
   const handlePolicySelection = async (policy) => {
     try {
       // Store policy number and member number in SecureStore
@@ -275,6 +354,11 @@ export default function PolicyHome() {
         "selected_member_number",
         policy.memNumber.toString()
       );
+
+      // Store NIC number in SecureStore
+      if (policy.nicNumber) {
+        await SecureStore.setItemAsync("user_nic", policy.nicNumber);
+      }
 
       // Optional: Store additional policy data if needed
       await SecureStore.setItemAsync(
@@ -296,6 +380,7 @@ export default function PolicyHome() {
       console.log("Policy data stored successfully:", {
         policyNumber: policy.policyNumber,
         memberNumber: policy.memNumber,
+        nicNumber: policy.nicNumber,
       });
 
       // Update state as before
@@ -316,6 +401,10 @@ export default function PolicyHome() {
       }).start(() => {
         setShowPolicySelection(false);
       });
+
+      // Fetch employee info and members after policy selection
+      await fetchEmployeeInfo();
+      await fetchMembers();
     } catch (error) {
       console.error("Error storing policy data:", error);
       Alert.alert("Error", "Failed to save policy data. Please try again.");
@@ -348,6 +437,9 @@ export default function PolicyHome() {
                 setSelectedPolicyNumber(null);
                 setPolicyDetails(null);
                 setIsFirstTime(true);
+                setEmployeeInfo(null); // Clear employee info
+                setMembers([]); // Clear members
+                setSelectedMember(null); // Clear selected member
 
                 // Clear stored policy data
                 await clearStoredPolicyData();
@@ -383,7 +475,6 @@ export default function PolicyHome() {
   };
 
   const handleTypePress = (type) => {
-
     // Remove newline characters and normalize the type string
     const normalizedType = type.replace(/\n/g, ' ').trim();
 
@@ -392,7 +483,6 @@ export default function PolicyHome() {
 
     if (normalizedType === 'New Claim') {
       console.log('Opening New Claim modal');
-
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -413,9 +503,8 @@ export default function PolicyHome() {
     } else if (normalizedType === 'Pending Requirement') {
       console.log('Pending Requirement pressed');
       // Add your navigation logic here
-
     } else {
-      console.log(`${type} pressed`);
+      console.log(`${normalizedType} pressed`);
     }
   };
 
@@ -513,6 +602,17 @@ export default function PolicyHome() {
     </TouchableOpacity>
   );
 
+  // Function to display member name or "No data found"
+  const displayMemberName = () => {
+    if (isLoadingEmployeeInfo) {
+      return "Loading...";
+    }
+    if (employeeInfo && employeeInfo.memberName) {
+      return employeeInfo.memberName;
+    }
+    return "No User";
+  };
+
   return (
     <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
@@ -531,15 +631,13 @@ export default function PolicyHome() {
                 style={styles.userAvatar}
                 resizeMode="contain"
               />
-              <Text style={styles.userName}>Kumuduni Rajapakshe</Text>
+              <Text style={styles.userName}>{displayMemberName()}</Text>
               <TouchableOpacity onPress={showPolicySelectionModal}>
                 <Icon name="chevron-down" size={16} color="#666" />
               </TouchableOpacity>
             </View>
-
           </View>
         </View>
-      </View>
 
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
@@ -558,9 +656,8 @@ export default function PolicyHome() {
                     <Text style={styles.boldText}>
                       {policyDetails?.policyPeriod || "Loading..."}
                     </Text>
-
                   </Text>
-                </Text>
+                </View>
               </View>
               <TouchableOpacity
                 style={styles.moreButton}
@@ -570,7 +667,6 @@ export default function PolicyHome() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
 
           <Text style={styles.sectionTitle}>MEMBER</Text>
           <View style={styles.memberCard}>
@@ -581,8 +677,12 @@ export default function PolicyHome() {
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>
                   {selectedMember ? selectedMember.name : "Select Member"}
-
                 </Text>
+                {selectedMember && (
+                  <Text style={styles.memberRelationship}>
+                    {selectedMember.relationship}
+                  </Text>
+                )}
               </View>
               <View style={styles.memberActions}>
                 <View style={styles.totalBadge}>
@@ -749,12 +849,14 @@ export default function PolicyHome() {
           </Animated.View>
         </Modal>
         {/* PendingIntimations Modal */}
-        <Modal visible={showPendingIntimations} transparent animationType="none" onRequestClose={handleClosePendingIntimations}  >
-          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePendingIntimations} />
-          <Animated.View style={[styles.animatedModal, { transform: [{ translateY: pendingIntimationsSlideAnim }] }]}>
-            <PendingIntimations onClose={handleClosePendingIntimations} />
-          </Animated.View>
-        </Modal>
+        <View style={{ backgroundColor: "" }} >
+          <Modal visible={showPendingIntimations} style={{ minHeight: 200 }} transparent animationType="none" onRequestClose={handleClosePendingIntimations}  >
+            <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePendingIntimations} />
+            <Animated.View style={[styles.animatedModal, { transform: [{ translateY: pendingIntimationsSlideAnim }] }]}>
+              <PendingIntimations onClose={handleClosePendingIntimations} />
+            </Animated.View>
+          </Modal>
+        </View>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1190,7 +1292,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animatedModal: {
-    height: 375,
+    height: '85%',
     backgroundColor: "transparent",
   },
 });
