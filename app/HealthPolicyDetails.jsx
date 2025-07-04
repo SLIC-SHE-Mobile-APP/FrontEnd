@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     alignItems: 'center',
-    height: 40,
+    height: 60,
   },
   navItem: {
     alignItems: 'center',
