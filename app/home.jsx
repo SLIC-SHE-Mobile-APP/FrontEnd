@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { BackHandler } from "react-native";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -13,9 +14,10 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert,
-} from "react-native";
-import Icon from "react-native-vector-icons/FontAwesome";
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/FontAwesome';
+import ClaimTypeSelection from './ClaimTypeSelection';
 import * as SecureStore from "expo-secure-store";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
@@ -299,6 +301,25 @@ export default function PolicyHome() {
       console.error("Error storing policy data:", error);
       Alert.alert("Error", "Failed to save policy data. Please try again.");
     }
+  }, [isFirstTime, selectedPolicyNumber, policySelectSlideAnim]);
+
+  const handlePolicySelection = (policy) => {
+    setSelectedPolicyNumber(policy.policyNumber);
+    setPolicyDetails({
+      policyID: policy.policyID,
+      policyNumber: policy.policyNumber,
+      policyPeriod: policy.policyPeriod,
+      type: policy.type
+    });
+    setIsFirstTime(false);
+
+    Animated.timing(policySelectSlideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPolicySelection(false);
+    });
   };
 
   // Updated handleDeletePolicy to also remove from SecureStore
@@ -358,20 +379,43 @@ export default function PolicyHome() {
   };
 
   const handleMoreDetails = () => {
-    router.push("/PolicyMemberDetails");
+    router.push('/PolicyMemberDetails');
   };
 
   const handleTypePress = (type) => {
-    if (type === "New Claim") {
+    // Remove newline characters and normalize the type string
+    const normalizedType = type.replace(/\n/g, ' ').trim();
+
+    if (normalizedType === 'New Claim') {
+
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
+    } else if (normalizedType === 'Saved Claims') {
+      console.log('Saved Claims pressed');
+      // Add your navigation logic here
+    } else if (normalizedType === 'Claim History') {
+      console.log('Claim History pressed');
+      // Add your navigation logic here
+    } else if (normalizedType === 'Pending Requirement') {
+      console.log('Pending Requirement pressed');
+      // Add your navigation logic here
     } else {
-      console.log(`${type} pressed`);
+      console.log(`${normalizedType} pressed`);
     }
+  };
+
+  const handleCloseModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+    });
   };
 
   const handleClosePolicySelection = () => {
@@ -449,49 +493,48 @@ export default function PolicyHome() {
   );
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-      <View style={styles.headerContent}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logoRow}>
-            <Image
-              source={require("../assets/images/logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.userSection}>
-            <Image
-              source={require("../assets/images/userhome.png")}
-              style={styles.userAvatar}
-              resizeMode="contain"
-            />
-            <Text style={styles.userName}>Kumuduni Rajapakshe</Text>
-            <TouchableOpacity onPress={showPolicySelectionModal}>
-              <Icon name="chevron-down" size={16} color="#666" />
-            </TouchableOpacity>
+    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
+      <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoRow}>
+              <Image
+                source={require('../assets/images/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.userSection}>
+              <Image
+                source={require('../assets/images/userhome.png')}
+                style={styles.userAvatar}
+                resizeMode="contain"
+              />
+              <Text style={styles.userName}>Kumuduni Rajapakshe</Text>
+              <TouchableOpacity onPress={showPolicySelectionModal}>
+                <Icon name="chevron-down" size={16} color="#666" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
-        <View style={styles.cardOutline}>
-          <View style={styles.insuranceCard}>
-            <View style={styles.policyHeader}>
-              <View style={styles.policyInfo}>
-                <Text style={styles.insuranceText}>
-                  Policy Number :{" "}
-                  <Text style={styles.boldText}>
-                    {policyDetails?.policyNumber || "Loading..."}
+        <ScrollView contentContainerStyle={styles.body}>
+          <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
+          <View style={styles.cardOutline}>
+            <View style={styles.insuranceCard}>
+              <View style={styles.policyHeader}>
+                <View style={styles.policyInfo}>
+                  <Text style={styles.insuranceText}>
+                    Policy Number : <Text style={styles.boldText}>{policyDetails?.policyNumber}</Text>
                   </Text>
-                </Text>
-                <Text style={styles.insuranceText}>
-                  Policy Period :{" "}
-                  <Text style={styles.boldText}>
-                    {policyDetails?.policyPeriod || "Loading..."}
+                  <Text style={styles.insuranceText}>
+                    Policy Period : <Text style={styles.boldText}>{policyDetails?.policyPeriod}</Text>
                   </Text>
-                </Text>
+                </View>
               </View>
+              <TouchableOpacity style={styles.moreButton} onPress={handleMoreDetails}>
+                <Text style={styles.moreText}>More Details</Text>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity
               style={styles.moreButton}
@@ -500,17 +543,13 @@ export default function PolicyHome() {
               <Text style={styles.moreText}>More Details</Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        <Text style={styles.sectionTitle}>MEMBER</Text>
-        <View style={styles.memberCard}>
-          <TouchableOpacity
-            style={styles.memberRow}
-            onPress={toggleMemberDropdown}
-          >
-            <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>
-                {selectedMember ? selectedMember.name : "Select Member"}
+          <Text style={styles.sectionTitle}>MEMBER</Text>
+          <View style={styles.memberCard}>
+            <TouchableOpacity style={styles.memberRow} onPress={toggleMemberDropdown}>
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>
+                  {selectedMember ? selectedMember.name : 'Select Member'}
               </Text>
               {selectedMember && (
                 <Text style={styles.memberRelationship}>
@@ -524,6 +563,11 @@ export default function PolicyHome() {
                 <Text style={styles.totalNumber}>
                   {members.length.toString().padStart(2, "0")}
                 </Text>
+                {selectedMember && (
+                  <Text style={styles.memberRelationship}>
+                    {selectedMember.relationship}
+                  </Text>
+                )}
               </View>
               <Icon
                 name={showMemberDropdown ? "chevron-up" : "chevron-down"}
@@ -691,13 +735,14 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 12,
     paddingBottom: 20,
   },
   logoContainer: {
     marginLeft: 10,
   },
   logoRow: {
+
     alignItems: "center",
     marginBottom: 15,
     display: "flex",
@@ -733,6 +778,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   userSection: {
+
     display: "flex",
     alignItems: "center",
     justifyContent: "left",
@@ -1014,18 +1060,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   navbar: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     paddingVertical: 10,
     backgroundColor: "#6DD3D3",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    alignItems: "center",
-    height: 70,
+    alignItems: 'center',
+    height: 60,
+
   },
   navItem: {
     alignItems: "center",

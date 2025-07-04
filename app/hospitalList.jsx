@@ -9,7 +9,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,SafeAreaView
 } from 'react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -145,6 +145,7 @@ const HospitalList = ({ onClose }) => {
   };
 
   return (
+    
     <LinearGradient
       colors={['#FFFFFF', '#6DD3D3']}
       style={styles.container}
@@ -210,6 +211,7 @@ const HospitalList = ({ onClose }) => {
         </View>
       </View>
     </LinearGradient>
+   
   );
 };
 
@@ -219,6 +221,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     overflow: 'hidden',
+    
   },
   header: {
     flexDirection: 'row',
@@ -240,6 +243,7 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     flexDirection: 'row',
+    
   },
   sidebar: {
     width: 100,
@@ -272,6 +276,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   activeSidebarItem: {
+
     backgroundColor: '#00ADBB',
     shadowColor: '#000',
     shadowOffset: {

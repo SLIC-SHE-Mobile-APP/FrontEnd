@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Animated, Dimensions, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
+import {  SafeAreaView } from 'react-native-safe-area-context';
 const { width, height } = Dimensions.get('window');
 
 export default function ViewProfile() {
@@ -37,66 +38,67 @@ export default function ViewProfile() {
   };
 
   return (
-    <LinearGradient
-      colors={['#FFFFFF', '#6DD3D3']}
-      style={styles.container}
-    >
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => router.back()} 
-            style={styles.backButton}
-            activeOpacity={0.7}
-          >
-            <View style={styles.backButtonContainer}>
-              <Ionicons name="arrow-back" size={20} color="#075349" />
-            </View>
-          </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>View Profile</ThemedText>
-        </View>
-
-        {/* Profile Image Section */}
-        <View style={styles.profileImageSection}>
-          <View style={styles.avatarContainer}>
-            <Image
-              source={require('@/assets/images/default-avatar.png')}
-              style={styles.avatar}
-            />
-          </View>
-          <ThemedText style={styles.profileName}>Mr. Sanjeewa De Silva</ThemedText>
-        </View>
-
-        {/* Form Fields */}
-        <View style={styles.formContainer}>
-          {[
-            { label: 'Name', field: 'name', keyboard: 'default' },
-            { label: 'Email', field: 'email', keyboard: 'email-address' },
-            { label: 'Address', field: 'address', multiline: true },
-            { label: 'Date Of Birth', field: 'dateOfBirth' },
-            { label: 'NIC No', field: 'nicNo' },
-            { label: 'Gender', field: 'gender' }
-          ].map(({ label, field, keyboard, multiline }, index) => (
-            <View style={styles.fieldContainer} key={index}>
-              <ThemedText style={styles.fieldLabel}>{label}</ThemedText>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={[styles.textInput, !isEditing && styles.disabledInput]}
-                  value={profileData[field]}
-                  onChangeText={(text) => handleInputChange(field, text)}
-                  editable={isEditing}
-                  keyboardType={keyboard}
-                  placeholder={`Enter your ${label.toLowerCase()}`}
-                  placeholderTextColor="#A0A0A0"
-                  multiline={multiline}
-                  numberOfLines={multiline ? 2 : 1}
-                />
+    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
+      <LinearGradient
+        colors={['#FFFFFF', '#6DD3D3']}
+        style={styles.container}
+      >
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              activeOpacity={0.7}
+            >
+              <View style={styles.backButtonContainer}>
+                <Ionicons name="arrow-back" size={20} color="#075349" />
               </View>
+            </TouchableOpacity>
+            <ThemedText style={styles.headerTitle}>View Profile</ThemedText>
+          </View>
+
+          {/* Profile Image Section */}
+          <View style={styles.profileImageSection}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={require('@/assets/images/default-avatar.png')}
+                style={styles.avatar}
+              />
             </View>
-          ))}
-        </View>
-      </Animated.View>
-    </LinearGradient>
+            <ThemedText style={styles.profileName}>Mr. Sanjeewa De Silva</ThemedText>
+          </View>
+
+          {/* Form Fields */}
+          <View style={styles.formContainer}>
+            {[
+              { label: 'Name', field: 'name', keyboard: 'default' },
+              { label: 'Email', field: 'email', keyboard: 'email-address' },
+              { label: 'Address', field: 'address', multiline: true },
+              { label: 'Date Of Birth', field: 'dateOfBirth' },
+              { label: 'NIC No', field: 'nicNo' },
+              { label: 'Gender', field: 'gender' }
+            ].map(({ label, field, keyboard, multiline }, index) => (
+              <View style={styles.fieldContainer} key={index}>
+                <ThemedText style={styles.fieldLabel}>{label}</ThemedText>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={[styles.textInput, !isEditing && styles.disabledInput]}
+                    value={profileData[field]}
+                    onChangeText={(text) => handleInputChange(field, text)}
+                    editable={isEditing}
+                    keyboardType={keyboard}
+                    placeholder={`Enter your ${label.toLowerCase()}`}
+                    placeholderTextColor="#A0A0A0"
+                    multiline={multiline}
+                    numberOfLines={multiline ? 2 : 1}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </LinearGradient></SafeAreaView>
   );
 }
 
