@@ -17,7 +17,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import Icon from "react-native-vector-icons/FontAwesome";
 import ClaimTypeSelection from "./ClaimTypeSelection";
 import PendingIntimations from "./PendingIntimations";
@@ -595,6 +594,38 @@ export default function PolicyHome() {
           style: "destructive",
           onPress: async () => {
             try {
+              // Call the API to delete the policy
+              const response = await fetch(
+                "http://203.115.11.229:1002/api/DeletePoliciesHome/RemovePolicy",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                  },
+                  body: JSON.stringify({
+                    policyNumber: policyNumber,
+                  }),
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+
+              // Check if the response has content before parsing
+              const responseText = await response.text();
+              let result = null;
+
+              if (responseText && responseText.trim() !== "") {
+                try {
+                  result = JSON.parse(responseText);
+                } catch (parseError) {
+                  console.log("Response is not JSON, treating as successful");
+                }
+              }
+
+              // If API call was successful, proceed with local cleanup
               // Remove policy from the list
               const updatedPolicies = availablePolicies.filter(
                 (policy) => policy.id !== policyId
@@ -619,9 +650,15 @@ export default function PolicyHome() {
               if (updatedPolicies.length === 0) {
                 handleClosePolicySelection();
               }
+
+              // Show success message
+              Alert.alert("Success", "Policy deleted successfully.");
             } catch (error) {
-              console.error("Error deleting policy data:", error);
-              Alert.alert("Error", "Failed to delete policy data completely.");
+              console.error("Error deleting policy:", error);
+              Alert.alert(
+                "Error",
+                "Failed to delete policy. Please check your connection and try again."
+              );
             }
           },
         },
