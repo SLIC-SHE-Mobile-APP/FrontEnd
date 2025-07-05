@@ -733,7 +733,7 @@ export default function PolicyHome() {
       setModalVisible(false);
     });
   };
-
+  
   const handleClosePolicySelection = () => {
     // Only close if a policy has been selected
     if (selectedPolicyNumber) {
