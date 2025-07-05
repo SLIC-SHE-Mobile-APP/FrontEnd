@@ -1,53 +1,108 @@
-
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import {Alert, Animated, BackHandler, Dimensions,Image,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from "react-native";
+import {
+  Alert,
+  Animated,
+  BackHandler,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { SafeAreaView } from 'react-native-safe-area-context';
-import ClaimTypeSelection from './ClaimTypeSelection';
-import PendingIntimations from './PendingIntimations';
+import ClaimTypeSelection from "./ClaimTypeSelection";
+import PendingIntimations from "./PendingIntimations";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
 export default function PolicyHome() {
   const navigation = useNavigation();
-  const [showIllnessPopup, setShowIllnessPopup] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [policyDetails, setPolicyDetails] = useState(null);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
-
-  // Policy selection modal state
   const [showPolicySelection, setShowPolicySelection] = useState(false);
   const [policySelectSlideAnim] = useState(new Animated.Value(screenHeight));
   const [selectedPolicyNumber, setSelectedPolicyNumber] = useState(null);
   const [isFirstTime, setIsFirstTime] = useState(true);
-
+  const [dependents, setDependents] = useState([]);
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [showPendingIntimations, setShowPendingIntimations] = useState(false);
-  const [pendingIntimationsSlideAnim] = useState(new Animated.Value(screenHeight));
+  const [pendingIntimationsSlideAnim] = useState(
+    new Animated.Value(screenHeight)
+  );
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  
-  // Available policies - now loaded from API
   const [availablePolicies, setAvailablePolicies] = useState([]);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
-
-  // Employee info state
   const [employeeInfo, setEmployeeInfo] = useState(null);
   const [isLoadingEmployeeInfo, setIsLoadingEmployeeInfo] = useState(false);
+  const [membersCount, setMembersCount] = useState(0);
+  const [policyInfo, setPolicyInfo] = useState(null);
+  const [isLoadingPolicyInfo, setIsLoadingPolicyInfo] = useState(false);
 
-  // Function to fetch dependents/members from API
+  const fetchPolicyInfo = async () => {
+    try {
+      setIsLoadingPolicyInfo(true);
+
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+
+      if (!policyNumber) {
+        console.log("Policy number not found in SecureStore");
+        return;
+      }
+
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const policyInfoData = await response.json();
+
+      if (policyInfoData && policyInfoData.length > 0) {
+        setPolicyInfo(policyInfoData[0]); // Take the first item from the array
+      } else {
+        setPolicyInfo(null);
+      }
+    } catch (error) {
+      console.error("Error fetching policy info:", error);
+      setPolicyInfo(null);
+    } finally {
+      setIsLoadingPolicyInfo(false);
+    }
+  };
+
   const fetchMembers = async () => {
     try {
       setIsLoadingMembers(true);
-      
+
       // Get policy number and member number from SecureStore
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
 
       if (!policyNumber || !memberNumber) {
         console.log("Policy number or member number not found in SecureStore");
@@ -70,7 +125,7 @@ export default function PolicyHome() {
       }
 
       const membersData = await response.json();
-      
+
       // Transform API data to match the expected format
       const transformedMembers = membersData.map((member, index) => ({
         id: index + 1,
@@ -82,12 +137,19 @@ export default function PolicyHome() {
       }));
 
       setMembers(transformedMembers);
-      
-      // Set the first member (Employee) as selected by default
-      if (transformedMembers.length > 0) {
-        setSelectedMember(transformedMembers[0]);
-      }
 
+      // Check if there's a stored member name and restore selection
+      const storedMemberName = await SecureStore.getItemAsync(
+        "selected_member_name"
+      );
+      if (storedMemberName && transformedMembers.length > 0) {
+        const memberToSelect = transformedMembers.find(
+          (member) => member.name === storedMemberName
+        );
+        if (memberToSelect) {
+          setSelectedMember(memberToSelect);
+        }
+      }
     } catch (error) {
       console.error("Error fetching members:", error);
       Alert.alert("Error", "Failed to load members. Please try again.");
@@ -98,22 +160,67 @@ export default function PolicyHome() {
     }
   };
 
+  const fetchDependentsWithoutEmployee = async () => {
+    try {
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
+
+      if (!policyNumber || !memberNumber) {
+        console.log("Policy number or member number not found in SecureStore");
+        return [];
+      }
+
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/Dependents/WithoutEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const dependentsData = await response.json();
+      return dependentsData;
+    } catch (error) {
+      console.error("Error fetching dependents:", error);
+      return [];
+    }
+  };
+
   // Function to fetch employee information
   const fetchEmployeeInfo = async () => {
     try {
       setIsLoadingEmployeeInfo(true);
 
       // Get policy number and member number from SecureStore
-      const storedNic = await SecureStore.getItemAsync('user_nic');
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
 
       if (!policyNumber || !memberNumber) {
         console.log("Policy number or member number not found in SecureStore");
         return;
       }
 
-      console.log("Fetching employee info for:", { policyNumber, memberNumber , storedNic});
+      console.log("Fetching employee info for:", {
+        policyNumber,
+        memberNumber,
+        storedNic,
+      });
 
       const response = await fetch(
         `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`,
@@ -137,7 +244,6 @@ export default function PolicyHome() {
 
       const employeeData = await response.json();
       setEmployeeInfo(employeeData);
-
     } catch (error) {
       console.error("Error fetching employee info:", error);
       setEmployeeInfo(null);
@@ -204,11 +310,20 @@ export default function PolicyHome() {
     }
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   // Function to fetch policies from API
   const fetchPolicies = async () => {
     try {
       setIsLoadingPolicies(true);
-      console.log("Fetching NIC number from SecureStore...");
       const nicNumber = await SecureStore.getItemAsync("user_nic");
 
       if (!nicNumber) {
@@ -267,6 +382,7 @@ export default function PolicyHome() {
           memNumber: policy.memNumber,
           policyStartDate: policy.policyStartDate,
           policyEndDate: policy.policyEndDate,
+          endDate: policy.policyEndDate,
         }));
 
         setAvailablePolicies(transformedPolicies);
@@ -301,38 +417,47 @@ export default function PolicyHome() {
     }
   };
 
-  // Initialize and fetch data
   useEffect(() => {
-    // Load stored policy data and fetch policies
     const initializePolicyData = async () => {
       try {
-        // First, try to load stored policy data
         const storedPolicyData = await getStoredPolicyData();
 
         if (storedPolicyData) {
-          setSelectedPolicyNumber(storedPolicyData.policyNumber);
-
           if (storedPolicyData.fullPolicyData) {
             setPolicyDetails({
               policyID: storedPolicyData.fullPolicyData.policyID,
               policyNumber: storedPolicyData.fullPolicyData.policyNumber,
               policyPeriod: storedPolicyData.fullPolicyData.policyPeriod,
               type: storedPolicyData.fullPolicyData.type,
+              endDate: storedPolicyData.fullPolicyData.endDate, // This should already be formatted if stored properly
             });
           }
 
           setIsFirstTime(false);
-          
-          // Fetch employee info and members after loading policy data
+
+          // Fetch employee info
           await fetchEmployeeInfo();
-          await fetchMembers();
+          await fetchPolicyInfo();
+          const count = await fetchMembersCount();
+          setMembersCount(count);
+
+          // Only check for stored member name, don't auto-fetch all members
+          const storedMemberName = await SecureStore.getItemAsync(
+            "selected_member_name"
+          );
+          if (storedMemberName) {
+            // If there's a stored member name, fetch members to restore selection
+            await fetchMembers();
+          }
+
+          // Fetch dependents for health card display
+          const dependentsData = await fetchDependentsWithoutEmployee();
+          setDependents(dependentsData);
         }
 
-        // Then fetch fresh policies from API
         await fetchPolicies();
       } catch (error) {
         console.error("Error initializing policy data:", error);
-        // Still fetch policies even if stored data retrieval fails
         await fetchPolicies();
       }
     };
@@ -340,7 +465,6 @@ export default function PolicyHome() {
     initializePolicyData();
   }, []);
 
-  // Updated handlePolicySelection to store data in SecureStore including NIC
   const handlePolicySelection = async (policy) => {
     try {
       // Store policy number and member number in SecureStore
@@ -375,12 +499,6 @@ export default function PolicyHome() {
         JSON.stringify(policy)
       );
 
-      console.log("Policy data stored successfully:", {
-        policyNumber: policy.policyNumber,
-        memberNumber: policy.memNumber,
-        nicNumber: policy.nicNumber,
-      });
-
       // Update state as before
       setSelectedPolicyNumber(policy.policyNumber);
       setPolicyDetails({
@@ -388,10 +506,14 @@ export default function PolicyHome() {
         policyNumber: policy.policyNumber,
         policyPeriod: policy.policyPeriod,
         type: policy.type,
+        endDate: formatDate(policy.endDate),
       });
       setIsFirstTime(false);
 
-      // Close modal
+      // Clear member selection when policy changes
+      await clearMemberSelection();
+      setMembers([]);
+
       Animated.timing(policySelectSlideAnim, {
         toValue: screenHeight,
         duration: 300,
@@ -400,16 +522,64 @@ export default function PolicyHome() {
         setShowPolicySelection(false);
       });
 
-      // Fetch employee info and members after policy selection
       await fetchEmployeeInfo();
-      await fetchMembers();
+      await fetchPolicyInfo();
+      const count = await fetchMembersCount();
+      setMembersCount(count);
+
+      const dependentsData = await fetchDependentsWithoutEmployee();
+      setDependents(dependentsData);
     } catch (error) {
       console.error("Error storing policy data:", error);
       Alert.alert("Error", "Failed to save policy data. Please try again.");
     }
   };
 
-  // Updated handleDeletePolicy to also remove from SecureStore
+  const fetchMembersCount = async () => {
+    try {
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
+
+      if (!policyNumber || !memberNumber) {
+        return 0;
+      }
+
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        return 0;
+      }
+
+      const membersData = await response.json();
+      return membersData.length;
+    } catch (error) {
+      console.error("Error fetching members count:", error);
+      return 0;
+    }
+  };
+
+  const clearMemberSelection = async () => {
+    try {
+      await SecureStore.deleteItemAsync("selected_member_complete");
+      setSelectedMember(null);
+    } catch (error) {
+      console.error("Error clearing member selection:", error);
+    }
+  };
+
   const handleDeletePolicy = async (policyId, policyNumber) => {
     Alert.alert(
       "Delete Policy",
@@ -474,32 +644,32 @@ export default function PolicyHome() {
 
   const handleTypePress = (type) => {
     // Remove newline characters and normalize the type string
-    const normalizedType = type.replace(/\n/g, ' ').trim();
+    const normalizedType = type.replace(/\n/g, " ").trim();
 
-    console.log('Button pressed:', type);
-    console.log('Normalized type:', normalizedType);
+    console.log("Button pressed:", type);
+    console.log("Normalized type:", normalizedType);
 
-    if (normalizedType === 'New Claim') {
-      console.log('Opening New Claim modal');
+    if (normalizedType === "New Claim") {
+      console.log("Opening New Claim modal");
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
-    } else if (normalizedType === 'Saved Claims') {
-      console.log('Saved Claims pressed');
+    } else if (normalizedType === "Saved Claims") {
+      console.log("Saved Claims pressed");
       setShowPendingIntimations(true);
       Animated.timing(pendingIntimationsSlideAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
-    } else if (normalizedType === 'Claim History') {
-      console.log('Claim History pressed');
+    } else if (normalizedType === "Claim History") {
+      console.log("Claim History pressed");
       // Add your navigation logic here
-    } else if (normalizedType === 'Pending Requirement') {
-      console.log('Pending Requirement pressed');
+    } else if (normalizedType === "Pending Requirement") {
+      console.log("Pending Requirement pressed");
       // Add your navigation logic here
     } else {
       console.log(`${normalizedType} pressed`);
@@ -537,13 +707,12 @@ export default function PolicyHome() {
         setShowPolicySelection(false);
       });
     }
-    // If no policy selected, do nothing - force user to select a policy
   };
 
   useEffect(() => {
     const backAction = () => {
       BackHandler.exitApp();
-      return true; // prevent navigating back to OTP/Login
+      return true;
     };
 
     const backHandler = BackHandler.addEventListener(
@@ -554,12 +723,51 @@ export default function PolicyHome() {
     return () => backHandler.remove();
   }, []);
 
-  const handleMemberSelect = (member) => {
+  const handleMemberSelect = async (member) => {
     setSelectedMember(member);
     setShowMemberDropdown(false);
+
+    try {
+      // Get existing policy data
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+
+      // Create combined data object
+      const combinedMemberData = {
+        memberNumber: memberNumber,
+        policyNumber: policyNumber,
+        storedNic: storedNic,
+        memberName: member.name,
+      };
+
+      // Store combined data in SecureStore
+      await SecureStore.setItemAsync(
+        "selected_member_complete",
+        JSON.stringify(combinedMemberData)
+      );
+
+      // Also store just the member name for backward compatibility
+      await SecureStore.setItemAsync("selected_member_name", member.name);
+
+      console.log("Stored data:", combinedMemberData);
+      console.log("Complete member data stored successfully");
+    } catch (error) {
+      console.error("Error storing member data:", error);
+    }
   };
 
-  const toggleMemberDropdown = () => {
+  const toggleMemberDropdown = async () => {
+    if (!showMemberDropdown) {
+      // Only fetch members when opening the dropdown for the first time
+      if (members.length === 0) {
+        await fetchMembers();
+      }
+    }
     setShowMemberDropdown(!showMemberDropdown);
   };
 
@@ -674,7 +882,7 @@ export default function PolicyHome() {
             >
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>
-                  {selectedMember ? selectedMember.name : "Select Member"}
+                  {selectedMember ? selectedMember.name : "Select a Member"}
                 </Text>
                 {selectedMember && (
                   <Text style={styles.memberRelationship}>
@@ -686,7 +894,7 @@ export default function PolicyHome() {
                 <View style={styles.totalBadge}>
                   <Text style={styles.totalText}>Total </Text>
                   <Text style={styles.totalNumber}>
-                    {members.length.toString().padStart(2, "0")}
+                    {membersCount.toString().padStart(2, "0")}
                   </Text>
                 </View>
                 <Icon
@@ -700,27 +908,39 @@ export default function PolicyHome() {
 
             {showMemberDropdown && (
               <View style={styles.dropdownContainer}>
-                {members.map((member) => (
-                  <TouchableOpacity
-                    key={member.id}
-                    style={[
-                      styles.dropdownItem,
-                      selectedMember?.id === member.id &&
-                      styles.selectedDropdownItem,
-                    ]}
-                    onPress={() => handleMemberSelect(member)}
-                  >
-                    <View style={styles.dropdownMemberInfo}>
-                      <Text style={styles.dropdownMemberName}>{member.name}</Text>
-                      <Text style={styles.dropdownMemberRelationship}>
-                        {member.relationship}
-                      </Text>
-                    </View>
-                    {selectedMember?.id === member.id && (
-                      <Icon name="check" size={16} color="#16858D" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {isLoadingMembers ? (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading members...</Text>
+                  </View>
+                ) : members.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No members found</Text>
+                  </View>
+                ) : (
+                  members.map((member) => (
+                    <TouchableOpacity
+                      key={member.id}
+                      style={[
+                        styles.dropdownItem,
+                        selectedMember?.id === member.id &&
+                          styles.selectedDropdownItem,
+                      ]}
+                      onPress={() => handleMemberSelect(member)}
+                    >
+                      <View style={styles.dropdownMemberInfo}>
+                        <Text style={styles.dropdownMemberName}>
+                          {member.name}
+                        </Text>
+                        <Text style={styles.dropdownMemberRelationship}>
+                          {member.relationship}
+                        </Text>
+                      </View>
+                      {selectedMember?.id === member.id && (
+                        <Icon name="check" size={16} color="#16858D" />
+                      )}
+                    </TouchableOpacity>
+                  ))
+                )}
               </View>
             )}
           </View>
@@ -756,6 +976,39 @@ export default function PolicyHome() {
               style={styles.healthCard}
               resizeMode="contain"
             />
+            {/* Company Name Overlay - Add this new overlay */}
+            <View style={styles.companyNameOverlay}>
+              <Text style={styles.companyNameOnCard}>
+                {isLoadingPolicyInfo ? "Loading..." : policyInfo?.name || "N/A"}
+              </Text>
+            </View>
+            {/* Employee Name Overlay - First Position */}
+            <View style={styles.employeeNameOverlay}>
+              <Text style={styles.memberNameOnCard}>{displayMemberName()}</Text>
+            </View>
+            {/* Dependent Names Overlay - Second Position */}
+            <View style={styles.dependentNamesOverlay}>
+              {dependents.map((dependent, index) => (
+                <Text key={index} style={styles.dependentNameOnCard}>
+                  {dependent.dependentName}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.memberNumberOverlay}>
+              <Text style={styles.cardDataText}>
+                {employeeInfo?.memberNumber || policyDetails?.policyID || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.policyNumberOverlay}>
+              <Text style={styles.cardDataText}>
+                {policyDetails?.policyNumber || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.endDateOverlay}>
+              <Text style={styles.cardDataText}>
+                {policyDetails?.endDate || "N/A"}
+              </Text>
+            </View>
           </View>
         </ScrollView>
 
@@ -807,7 +1060,7 @@ export default function PolicyHome() {
                         style={[
                           styles.policyItem,
                           selectedPolicyNumber === policy.policyNumber &&
-                          styles.selectedPolicyItem,
+                            styles.selectedPolicyItem,
                         ]}
                         onPress={() => handlePolicySelection(policy)}
                       >
@@ -839,18 +1092,46 @@ export default function PolicyHome() {
           </View>
         </Modal>
         {/* Claim Type Selection Modal */}
-        <Modal visible={modalVisible} transparent animationType="none" onRequestClose={handleCloseModal}>
-
-          <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleCloseModal} />
-          <Animated.View style={[styles.animatedModal, { transform: [{ translateY: slideAnim }] }]}>
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="none"
+          onRequestClose={handleCloseModal}
+        >
+          <TouchableOpacity
+            style={styles.overlayTouchable}
+            activeOpacity={1}
+            onPress={handleCloseModal}
+          />
+          <Animated.View
+            style={[
+              styles.animatedModal,
+              { transform: [{ translateY: slideAnim }] },
+            ]}
+          >
             <ClaimTypeSelection onClose={handleCloseModal} />
           </Animated.View>
         </Modal>
         {/* PendingIntimations Modal */}
-        <View style={{ backgroundColor: "" }} >
-          <Modal visible={showPendingIntimations} style={{ minHeight: 200 }} transparent animationType="none" onRequestClose={handleClosePendingIntimations}  >
-            <TouchableOpacity style={styles.overlayTouchable} activeOpacity={1} onPress={handleClosePendingIntimations} />
-            <Animated.View style={[styles.animatedModal, { transform: [{ translateY: pendingIntimationsSlideAnim }] }]}>
+        <View style={{ backgroundColor: "" }}>
+          <Modal
+            visible={showPendingIntimations}
+            style={{ minHeight: 200 }}
+            transparent
+            animationType="none"
+            onRequestClose={handleClosePendingIntimations}
+          >
+            <TouchableOpacity
+              style={styles.overlayTouchable}
+              activeOpacity={1}
+              onPress={handleClosePendingIntimations}
+            />
+            <Animated.View
+              style={[
+                styles.animatedModal,
+                { transform: [{ translateY: pendingIntimationsSlideAnim }] },
+              ]}
+            >
               <PendingIntimations onClose={handleClosePendingIntimations} />
             </Animated.View>
           </Modal>
@@ -1036,13 +1317,74 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   healthCardContainer: {
+    position: "relative",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 20,
+  },
+  employeeNameOverlay: {
+    position: "absolute",
+    top: "29.5%",
+    left: "31%",
+    right: "20%",
+    alignItems: "flex-start",
+  },
+
+  dependentNamesOverlay: {
+    position: "absolute",
+    top: "42.5%",
+    left: "11%",
+    right: "15%",
+    alignItems: "flex-start",
+  },
+  companyNameOverlay: {
+    position: "absolute",
+    top: "91%",
+    left: "23%",
+  },
+  companyNameOnCard: {
+    fontSize: 9,
+    color: "#000",
+    textAlign: "center",
+  },
+
+  memberNameOnCard: {
+    color: "#000",
+    fontSize: 9,
+    marginBottom: 4,
+  },
+
+  dependentNameOnCard: {
+    color: "#000",
+    fontSize: 9,
+    marginBottom: 0,
+  },
+  memberNumberOverlay: {
+    position: "absolute",
+    top: "75.5%",
+    left: "25.5%",
+    alignItems: "flex-start",
+  },
+  policyNumberOverlay: {
+    position: "absolute",
+    top: "83.5%",
+    left: "23%",
+    alignItems: "flex-start",
+  },
+  endDateOverlay: {
+    position: "absolute",
+    top: "75.5%",
+    left: "71%",
+    alignItems: "flex-start",
+  },
+
+  cardDataText: {
+    color: "#000",
+    fontSize: 9,
+    fontWeight: "500",
   },
   healthCard: {
-    width: 350,
+    width: screenWidth * 0.9,
     height: 200,
-    borderRadius: 10,
   },
   policyHeader: {
     flexDirection: "row",
@@ -1290,7 +1632,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animatedModal: {
-    height: '85%',
+    height: "85%",
     backgroundColor: "transparent",
   },
 });

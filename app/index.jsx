@@ -7,7 +7,7 @@ import OTPVerificationBank from './OTPVerificationBank.jsx';
 
 export default function HomeScreen() {
   return (
-    <Home/>
+    <LoginRequestOTP/>
   );
 }
 
