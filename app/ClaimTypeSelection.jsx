@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    Modal,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Modal,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -21,7 +20,7 @@ const ClaimTypeSelection = ({ visible, onClose, onNext }) => {
   const [showPatientDetails, setShowPatientDetails] = useState(false);
 
   const claimTypes = [
-    { id: 'outdoor', label: 'Outdoor', icon: '🏃‍♂️' },
+    { id: 'outdoor', label: 'Outdoor', icon: '🩺' },
     { id: 'indoor', label: 'Indoor', icon: '🏠' },
     { id: 'dental', label: 'Dental', icon: '🦷' },
     { id: 'spectacles', label: 'Spectacles', icon: '👓' },
@@ -48,12 +47,13 @@ const ClaimTypeSelection = ({ visible, onClose, onNext }) => {
   };
 
   const handleClose = () => {
-    setSelectedClaimType('');
-    setPatientName('');
-    setIllness('');
-    setShowPatientDetails(false);
-    onClose();
-    router.back(); // Added router.back() to close the modal
+    Animated.timing(slideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+    });
   };
 
   const renderClaimTypeModal = () => (
