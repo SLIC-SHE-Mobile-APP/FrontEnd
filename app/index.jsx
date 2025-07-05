@@ -5,7 +5,7 @@ import Home from './home.jsx';
 
 export default function HomeScreen() {
   return (
-    <Home/>
+    <LoginRequestOTP/>
   );
 }
 

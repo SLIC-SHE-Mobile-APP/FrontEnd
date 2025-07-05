@@ -1,10 +1,26 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import {ActivityIndicator,Alert,Animated,Image,Keyboard,Linking,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
-import {SafeAreaProvider,useSafeAreaInsets,} from "react-native-safe-area-context";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Keyboard,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import * as SecureStore from 'expo-secure-store';
-
 
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
@@ -28,6 +44,57 @@ function OTPVerificationContent() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const slideAnim = new Animated.Value(0);
+
+  // Function to clear all stored data
+  const clearAllStoredData = async () => {
+    try {
+      console.log("Clearing all stored data...");
+      
+      // Clear policy-related data
+      await SecureStore.deleteItemAsync("selected_policy_number");
+      await SecureStore.deleteItemAsync("selected_member_number");
+      await SecureStore.deleteItemAsync("selected_policy_id");
+      await SecureStore.deleteItemAsync("selected_policy_period");
+      await SecureStore.deleteItemAsync("selected_policy_type");
+      await SecureStore.deleteItemAsync("selected_policy_data");
+      
+      // Clear member-related data
+      await SecureStore.deleteItemAsync("selected_member_complete");
+      await SecureStore.deleteItemAsync("selected_member_name");
+      
+      // Clear user data (optional - you might want to keep this for login)
+      await SecureStore.deleteItemAsync("userData");
+      await SecureStore.deleteItemAsync("user_mobile");
+      await SecureStore.deleteItemAsync("user_nic");
+      
+      console.log("All stored data cleared successfully");
+    } catch (error) {
+      console.error("Error clearing stored data:", error);
+    }
+  };
+
+  // Alternative function to clear only policy and member data (keeping user login data)
+  const clearPolicyAndMemberData = async () => {
+    try {
+      console.log("Clearing policy and member data...");
+      
+      // Clear policy-related data
+      await SecureStore.deleteItemAsync("selected_policy_number");
+      await SecureStore.deleteItemAsync("selected_member_number");
+      await SecureStore.deleteItemAsync("selected_policy_id");
+      await SecureStore.deleteItemAsync("selected_policy_period");
+      await SecureStore.deleteItemAsync("selected_policy_type");
+      await SecureStore.deleteItemAsync("selected_policy_data");
+      
+      // Clear member-related data
+      await SecureStore.deleteItemAsync("selected_member_complete");
+      await SecureStore.deleteItemAsync("selected_member_name");
+      
+      console.log("Policy and member data cleared successfully");
+    } catch (error) {
+      console.error("Error clearing policy and member data:", error);
+    }
+  };
 
   // Load user data from SecureStore as backup
   const loadUserData = async () => {
@@ -161,7 +228,7 @@ function OTPVerificationContent() {
     }
   };
 
-  // Verify OTP
+  // Updated verifyOTP function with data clearing
   const verifyOTP = async () => {
     const otpCode = otp.join("");
     if (otpCode.length !== 4) {
@@ -201,6 +268,9 @@ function OTPVerificationContent() {
       console.log("ValidateOtp response:", result);
 
       if (result.success) {
+        // Clear all stored data before navigation
+        await clearPolicyAndMemberData(); // or use clearAllStoredData() if you want to clear everything including user data
+        
         if (result.nicAvailaWeb === false) {
           router.push("/email");
         } else if (result.nicAvailaWeb === true) {
