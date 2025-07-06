@@ -1,6 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
+import React, { useState, useEffect } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -9,22 +10,64 @@ import {
   View,
   ActivityIndicator,
   Alert,
-} from 'react-native';
+} from "react-native";
 
-const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo = '000682' }) => {
+const DependentDetails = ({ onClose }) => {
   const [dependentsData, setDependentsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [storedData, setStoredData] = useState({
+    policyNumber: null,
+    memberNumber: null,
+    memberName: null,
+    userNic: null,
+  });
+
+  // Function to load data from SecureStore
+  const loadStoredData = async () => {
+    try {
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
+      const memberName = await SecureStore.getItemAsync("selected_member_name");
+      const userNic = await SecureStore.getItemAsync("user_nic");
+
+      const data = {
+        policyNumber,
+        memberNumber,
+        memberName,
+        userNic,
+      };
+
+      setStoredData(data);
+
+      // Check if required data is available
+      if (!policyNumber || !memberNumber) {
+        throw new Error("Required policy or member data not found in storage");
+      }
+
+      return data;
+    } catch (err) {
+      console.error("Error loading stored data:", err);
+      setError(err.message);
+      return null;
+    }
+  };
 
   // Function to format date from API response
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).replace(/\//g, '/');
+    return date
+      .toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+      .replace(/\//g, "/");
   };
 
   // Function to fetch dependents data from API
@@ -32,14 +75,29 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
     try {
       setLoading(true);
       setError(null);
-      
+
+      // Load stored data first
+      const data = await loadStoredData();
+      if (!data || !data.policyNumber || !data.memberNumber) {
+        throw new Error(
+          "Missing required data. Please select a policy and member first."
+        );
+      }
+
+      console.log("Fetching dependents with:", {
+        policyNo: data.policyNumber,
+        memberNo: data.memberNumber,
+        memberName: data.memberName,
+        userNic: data.userNic,
+      });
+
       const response = await fetch(
-        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNo}&memberNo=${memberNo}`,
+        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${data.policyNumber}&memberNo=${data.memberNumber}`,
         {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            Accept: "application/json",
+            "Content-Type": "application/json",
           },
         }
       );
@@ -48,25 +106,25 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      
+      const apiData = await response.json();
+
       // Transform API data to match component structure
-      const transformedData = data.map((dependent, index) => ({
+      const transformedData = apiData.map((dependent, index) => ({
         id: index + 1,
-        name: dependent.dependentName || 'N/A',
+        name: dependent.dependentName || "N/A",
         dateOfBirth: formatDate(dependent.depndentBirthDay),
         enrollmentDate: formatDate(dependent.effectiveDate),
-        relationship: dependent.relationship || 'N/A',
+        relationship: dependent.relationship || "N/A",
       }));
 
       setDependentsData(transformedData);
     } catch (err) {
-      console.error('Error fetching dependents data:', err);
+      console.error("Error fetching dependents data:", err);
       setError(err.message);
       Alert.alert(
-        'Error',
-        'Failed to load dependent details. Please try again.',
-        [{ text: 'OK' }]
+        "Error",
+        "Failed to load dependent details. Please try again.",
+        [{ text: "OK" }]
       );
     } finally {
       setLoading(false);
@@ -76,7 +134,7 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
   // Fetch data when component mounts
   useEffect(() => {
     fetchDependentsData();
-  }, [policyNo, memberNo]);
+  }, []);
 
   // Retry function
   const handleRetry = () => {
@@ -85,12 +143,12 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
 
   return (
     <LinearGradient
-      colors={['#FFFFFF', '#6DD3D3']}
+      colors={["#FFFFFF", "#6DD3D3"]}
       style={{
         flex: 1,
         borderTopLeftRadius: 25,
         borderTopRightRadius: 25,
-        overflow: 'hidden',
+        overflow: "hidden",
       }}
     >
       {/* Fixed Header */}
@@ -98,7 +156,12 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
         <View style={{ width: 26 }} />
         <Text style={styles.headerTitle}>Dependent Details</Text>
         <TouchableOpacity onPress={onClose}>
-          <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
+          <Ionicons
+            name="close"
+            size={26}
+            color="#13646D"
+            style={{ marginRight: 15 }}
+          />
         </TouchableOpacity>
       </View>
 
@@ -112,6 +175,7 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
           <Text style={styles.errorText}>Failed to load data</Text>
+          <Text style={styles.errorDetailText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -120,9 +184,15 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
         <View style={styles.emptyContainer}>
           <Ionicons name="people-outline" size={48} color="#13646D" />
           <Text style={styles.emptyText}>No dependents found</Text>
+          <Text style={styles.emptyDetailText}>
+            No dependents are registered under this policy.
+          </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.centeredContainer}>
             <View style={styles.tableContainer}>
               {/* Table Header */}
@@ -137,9 +207,15 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
               {dependentsData.map((dependent) => (
                 <View key={dependent.id} style={styles.tableRow}>
                   <Text style={styles.tableCellText}>{dependent.name}</Text>
-                  <Text style={styles.tableCellText}>{dependent.dateOfBirth}</Text>
-                  <Text style={styles.tableCellText}>{dependent.enrollmentDate}</Text>
-                  <Text style={styles.tableCellText}>{dependent.relationship}</Text>
+                  <Text style={styles.tableCellText}>
+                    {dependent.dateOfBirth}
+                  </Text>
+                  <Text style={styles.tableCellText}>
+                    {dependent.enrollmentDate}
+                  </Text>
+                  <Text style={styles.tableCellText}>
+                    {dependent.relationship}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -152,19 +228,34 @@ const DependentDetails = ({ onClose, policyNo = 'G/010/SHE/17087/22', memberNo =
 
 const styles = StyleSheet.create({
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingTop: 15,
     paddingBottom: 10,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     zIndex: 1,
   },
   headerTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#13646D',
-    textAlign: 'left',
+    fontWeight: "bold",
+    color: "#13646D",
+    textAlign: "left",
     flex: 1,
+  },
+  policyInfoContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#2EC6C6",
+  },
+  policyInfoText: {
+    fontSize: 14,
+    color: "#13646D",
+    fontWeight: "600",
+    marginBottom: 2,
   },
   scrollContainer: {
     paddingBottom: 20,
@@ -172,94 +263,108 @@ const styles = StyleSheet.create({
   },
   centeredContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   tableContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 10,
-    overflow: 'hidden',
-    borderColor: '#2EC6C6',
+    overflow: "hidden",
+    borderColor: "#2EC6C6",
     borderWidth: 2,
-    width: '100%',
-    maxHeight: '100%',
+    width: "100%",
+    maxHeight: "100%",
     marginTop: 10,
-    marginBottom: 5
+    marginBottom: 5,
   },
   tableRowHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#2EC6C6',
+    flexDirection: "row",
+    backgroundColor: "#2EC6C6",
     paddingVertical: 10,
     paddingHorizontal: 5,
   },
   tableHeaderText: {
     flex: 1,
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
+    color: "#fff",
+    fontWeight: "bold",
+    textAlign: "center",
     fontSize: 14,
   },
   tableRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingVertical: 10,
     paddingHorizontal: 5,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: "#F9F9F9",
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
   },
   tableCellText: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 13,
-    color: '#333',
+    color: "#333",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 20,
   },
   loadingText: {
     marginTop: 15,
     fontSize: 16,
-    color: '#13646D',
-    textAlign: 'center',
+    color: "#13646D",
+    textAlign: "center",
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 20,
   },
   errorText: {
     marginTop: 15,
-    marginBottom: 20,
+    marginBottom: 10,
     fontSize: 16,
-    color: '#FF6B6B',
-    textAlign: 'center',
+    color: "#FF6B6B",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  errorDetailText: {
+    marginBottom: 20,
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
   },
   retryButton: {
-    backgroundColor: '#13646D',
+    backgroundColor: "#13646D",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 20,
   },
   emptyText: {
     marginTop: 15,
+    marginBottom: 8,
     fontSize: 16,
-    color: '#13646D',
-    textAlign: 'center',
+    color: "#13646D",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  emptyDetailText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
   },
 });
 
