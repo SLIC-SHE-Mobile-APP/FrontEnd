@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ClaimHistory1 from './ClaimHistory1'; // Import the detail view
 
 const ClaimHistory = ({ onClose, availableHeight }) => {
+  const [showDetailView, setShowDetailView] = useState(false);
+  const [selectedClaim, setSelectedClaim] = useState(null);
+
   // Sample claim data - replace with actual data from your API
   const claimData = [
     {
@@ -48,6 +52,16 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
       return '#FF9800';
     }
     return '#17ABB7';
+  };
+
+  const handleMorePress = (claim) => {
+    setSelectedClaim(claim);
+    setShowDetailView(true);
+  };
+
+  const handleBackFromDetail = () => {
+    setShowDetailView(false);
+    setSelectedClaim(null);
   };
 
   const renderClaimCard = (claim) => (
@@ -115,11 +129,24 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
       </View>
 
       {/* More button */}
-      <TouchableOpacity style={styles.moreButton}>
+      <TouchableOpacity 
+        style={styles.moreButton}
+        onPress={() => handleMorePress(claim)}
+      >
         <Text style={styles.moreButtonText}>More</Text>
       </TouchableOpacity>
     </View>
   );
+
+  // Show detail view if requested
+  if (showDetailView) {
+    return (
+      <ClaimHistory1 
+        onClose={handleBackFromDetail}
+        claimData={selectedClaim}
+      />
+    );
+  }
 
   return (
     <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>

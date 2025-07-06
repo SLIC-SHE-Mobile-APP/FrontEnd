@@ -1187,7 +1187,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 30,
     paddingBottom: 20,
   },
   logoContainer: {
@@ -1197,12 +1197,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
     display: "flex",
-    alignItems: "left",
     justifyContent: "center",
   },
   logo: {
-    width: 130,
-    height: 30,
+    width: 150,
+    height: 50,
   },
 
   sligBadge: {
