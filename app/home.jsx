@@ -97,12 +97,8 @@ export default function PolicyHome() {
       setIsLoadingMembers(true);
 
       // Get policy number and member number from SecureStore
-      const policyNumber = await SecureStore.getItemAsync(
-        "selected_policy_number"
-      );
-      const memberNumber = await SecureStore.getItemAsync(
-        "selected_member_number"
-      );
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
 
       if (!policyNumber || !memberNumber) {
         console.log("Policy number or member number not found in SecureStore");
