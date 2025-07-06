@@ -31,12 +31,14 @@ export default function PolicyMemberDetails() {
       );
       const memberName = await SecureStore.getItemAsync("selected_member_name");
       const userNic = await SecureStore.getItemAsync("user_nic");
+      const userMobile = await SecureStore.getItemAsync("user_mobile");
 
       const data = {
         policyNumber,
         memberNumber,
         memberName,
         userNic,
+        userMobile,
       };
 
       setStoredData(data);
@@ -50,6 +52,45 @@ export default function PolicyMemberDetails() {
     } catch (err) {
       console.error("Error loading stored data:", err);
       setError(err.message);
+      return null;
+    }
+  };
+
+  // Function to fetch policy info from the new API
+  const fetchPolicyInfo = async (policyNumber) => {
+    try {
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        throw new Error("Empty response from policy info server");
+      }
+
+      const result = JSON.parse(responseText);
+
+      // Return the first item if it's an array, or the result if it's an object
+      if (Array.isArray(result) && result.length > 0) {
+        return result[0];
+      } else if (result && typeof result === "object") {
+        return result;
+      }
+
+      return null;
+    } catch (err) {
+      console.error("Error fetching policy info:", err);
       return null;
     }
   };
@@ -182,6 +223,9 @@ export default function PolicyMemberDetails() {
           return;
         }
 
+        // Fetch policy info for company name
+        const policyInfo = await fetchPolicyInfo(stored.policyNumber);
+
         // Fetch policy dates
         const policyDatesData = await fetchPolicyDates(
           stored.policyNumber,
@@ -207,8 +251,8 @@ export default function PolicyMemberDetails() {
         const transformedData = {
           policyNumber: stored.policyNumber,
           memberName: apiData.memberName,
-          contactNo: "N/A", // Not provided in API
-          company: "N/A", // Not provided in API
+          contactNo: stored.userMobile || "N/A", // Use stored mobile number
+          company: policyInfo?.name || "N/A", // Use company name from policy info API
           memberNo: apiData.employeeNumber,
           empCategory: apiData.employeeCategory,
           dateOfBirth: formatDate(apiData.dateOfBirth),
@@ -279,6 +323,7 @@ export default function PolicyMemberDetails() {
                     return;
                   }
 
+                  const policyInfo = await fetchPolicyInfo(stored.policyNumber);
                   const policyDatesData = await fetchPolicyDates(
                     stored.policyNumber,
                     stored.userNic
@@ -300,8 +345,8 @@ export default function PolicyMemberDetails() {
                   const transformedData = {
                     policyNumber: stored.policyNumber,
                     memberName: apiData.memberName,
-                    contactNo: "N/A",
-                    company: "N/A",
+                    contactNo: stored.userMobile || "N/A",
+                    company: policyInfo?.name || "N/A",
                     memberNo: apiData.employeeNumber,
                     empCategory: apiData.employeeCategory,
                     dateOfBirth: formatDate(apiData.dateOfBirth),
@@ -378,8 +423,8 @@ export default function PolicyMemberDetails() {
               ["Member Number", memberDetails.memberNo],
               ["Member Name", memberDetails.memberName],
               ["Emp. Category", memberDetails.empCategory],
-              ["Company", ],
-              ["Contact No", ],
+              ["Company", memberDetails.company],
+              ["Contact No", memberDetails.contactNo],
               ["Date of Birth", memberDetails.dateOfBirth],
               ["Effective Date", memberDetails.effectiveDate],
             ].map(([label, value], index) => (

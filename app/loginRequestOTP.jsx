@@ -64,7 +64,7 @@ function LoginRequestOTPContent() {
     };
   }, []);
 
-  // Store user data in SecureStore (replaces AsyncStorage)
+  // Store user data in SecureStore 
   const storeUserData = async (mobileNumber, nicNumber) => {
     try {
       const userData = {
