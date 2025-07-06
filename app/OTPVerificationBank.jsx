@@ -1,9 +1,27 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import {ActivityIndicator,Alert,Animated,Image,Keyboard,Linking,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
-import {SafeAreaProvider,useSafeAreaInsets,} from "react-native-safe-area-context";
-import * as SecureStore from 'expo-secure-store';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Keyboard,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import * as SecureStore from "expo-secure-store";
+import { Ionicons } from "@expo/vector-icons";
 
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
@@ -14,6 +32,9 @@ function OTPVerificationContent() {
   const [contactType, setContactType] = useState(params.contactType || "phone");
   const [nicNumber, setNicNumber] = useState(params.nicNumber || "");
   const [mobileNumber, setMobileNumber] = useState(params.mobileNumber || "");
+  const [fromBankDetails, setFromBankDetails] = useState(
+    params.fromBankDetails === "true"
+  );
 
   // References for OTP input fields
   const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -28,17 +49,51 @@ function OTPVerificationContent() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const slideAnim = new Animated.Value(0);
 
+  // Function to mask contact information
+  const maskContactInfo = (contact, type) => {
+    if (!contact) return "";
+
+    if (type === "phone") {
+      // For phone numbers: format as +94XX******XXX
+      if (contact.length >= 9) {
+        // Remove any existing country code or leading zeros
+        let cleanNumber = contact.replace(/^\+94|^0/, "");
+
+        // Take first 2 digits and last 3 digits
+        const start = cleanNumber.substring(0, 2);
+        const end = cleanNumber.substring(cleanNumber.length - 3);
+        const middle = "*".repeat(6); // Always 6 asterisks
+
+        return `+94${start}${middle}${end}`;
+      }
+      return contact;
+    } else if (type === "email") {
+      // For email: show first 2 characters and domain
+      // Example: john@example.com becomes jo***@example.com
+      const atIndex = contact.indexOf("@");
+      if (atIndex > 2) {
+        const start = contact.substring(0, 2);
+        const domain = contact.substring(atIndex);
+        const middle = "*".repeat(atIndex - 2);
+        return `${start}${middle}${domain}`;
+      }
+      return contact;
+    }
+
+    return contact;
+  };
+
   // Load user data from SecureStore as backup
   const loadUserData = async () => {
     try {
       // Try to get individual values first (more secure approach)
-      const storedMobile = await SecureStore.getItemAsync('user_mobile');
-      const storedNic = await SecureStore.getItemAsync('user_nic');
-      
+      const storedMobile = await SecureStore.getItemAsync("user_mobile");
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+
       if (storedMobile && storedNic) {
         console.log("Loaded user data from SecureStore:", {
           mobileNumber: storedMobile,
-          nicNumber: storedNic
+          nicNumber: storedNic,
         });
 
         // Use SecureStore data if navigation params are empty
@@ -53,7 +108,10 @@ function OTPVerificationContent() {
         const userData = await SecureStore.getItemAsync("userData");
         if (userData) {
           const parsedData = JSON.parse(userData);
-          console.log("Loaded combined user data from SecureStore:", parsedData);
+          console.log(
+            "Loaded combined user data from SecureStore:",
+            parsedData
+          );
 
           // Use SecureStore data if navigation params are empty
           if (!nicNumber && parsedData.nicNumber) {
@@ -81,7 +139,8 @@ function OTPVerificationContent() {
     console.log("Contact Type:", contactType);
     console.log("NIC Number:", nicNumber);
     console.log("Mobile Number:", mobileNumber);
-  }, [contactInfo, contactType, nicNumber, mobileNumber]);
+    console.log("From Bank Details:", fromBankDetails);
+  }, [contactInfo, contactType, nicNumber, mobileNumber, fromBankDetails]);
 
   // Keyboard handling
   useEffect(() => {
@@ -160,6 +219,15 @@ function OTPVerificationContent() {
     }
   };
 
+  // Handle back button
+  const handleBack = () => {
+    if (fromBankDetails) {
+      router.back();
+    } else {
+      router.back();
+    }
+  };
+
   // Verify OTP
   const verifyOTP = async () => {
     const otpCode = otp.join("");
@@ -200,12 +268,28 @@ function OTPVerificationContent() {
       console.log("ValidateOtp response:", result);
 
       if (result.success) {
-        if (result.nicAvailaWeb === false) {
-          router.push("/email");
-        } else if (result.nicAvailaWeb === true) {
-          router.push("/home");
+        if (fromBankDetails) {
+          // Set a flag to indicate OTP was verified successfully for bank details
+          await SecureStore.setItemAsync("otp_verified_bank", "true");
+
+          // Show success message
+          Alert.alert("Success", "OTP verified successfully!", [
+            {
+              text: "OK",
+              onPress: () => {
+                router.back(); // Navigate back to bank details
+              },
+            },
+          ]);
         } else {
-          Alert.alert("Error", "Unexpected response. Please try again.");
+          // Original flow for login
+          if (result.nicAvailaWeb === false) {
+            router.push("/email");
+          } else if (result.nicAvailaWeb === true) {
+            router.push("/home");
+          } else {
+            Alert.alert("Error", "Unexpected response. Please try again.");
+          }
         }
       } else {
         if (result.errorType === "INVALID_OTP") {
@@ -271,7 +355,10 @@ function OTPVerificationContent() {
         setTimer(90);
         setCanResend(false);
 
-        Alert.alert("Success", `OTP resent to ${contactInfo}`);
+        Alert.alert(
+          "Success",
+          `OTP resent to ${maskContactInfo(contactInfo, contactType)}`
+        );
       } else {
         Alert.alert(
           "Error",
@@ -306,12 +393,17 @@ function OTPVerificationContent() {
           isKeyboardVisible && styles.topSectionKeyboard,
         ]}
       >
-        {/* Header with Logo only */}
+        {/* Header with Logo and Back Button */}
         <View style={styles.header}>
+          {fromBankDetails && (
+            <TouchableOpacity style={styles.backButton}>
+            </TouchableOpacity>
+          )}
           <Image
             source={require("../assets/images/logo.png")}
             style={styles.logo}
           />
+          <View style={styles.placeholder} />
         </View>
 
         <View style={styles.skylineContainer}>
@@ -339,14 +431,18 @@ function OTPVerificationContent() {
         >
           {/* OTP Verification Card */}
           <View style={styles.otpCard}>
-            <Text style={styles.otpTitle}>OTP Verification</Text>
+            <Text style={styles.otpTitle}>
+              {fromBankDetails ? "Verify to View Details" : "OTP Verification"}
+            </Text>
 
             <Text style={styles.instructions}>
               Enter the verification code we just sent to your{" "}
               {contactType === "phone" ? "registered number" : "email"}:
             </Text>
 
-            <Text style={styles.contactInfo}>{contactInfo}</Text>
+            <Text style={styles.contactInfo}>
+              {maskContactInfo(contactInfo, contactType)}
+            </Text>
 
             {/* OTP Input Fields */}
             <View style={styles.otpContainer}>
@@ -387,7 +483,9 @@ function OTPVerificationContent() {
               {loading ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.verifyButtonText}>Verify OTP</Text>
+                <Text style={styles.verifyButtonText}>
+                  {fromBankDetails ? "Verify" : "Verify OTP"}
+                </Text>
               )}
             </TouchableOpacity>
 
