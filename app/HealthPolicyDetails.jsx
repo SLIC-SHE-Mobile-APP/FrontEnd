@@ -681,9 +681,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#48bfc8",
     borderRadius: 15,
     padding: 20,
-    marginTop: 30,
+    marginTop: 20,
     marginHorizontal: 13,
-    minHeight: 130,
+    minHeight: 110,
     justifyContent: "space-between",
   },
   policyText: {
@@ -697,8 +697,8 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flex: 1,
-    marginTop: 35,
-    marginBottom: 55,
+    marginTop: 20,
+    marginBottom: 65,
   },
   buttonsWrapper: {
     borderRadius: 30,
