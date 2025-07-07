@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Platform,
   StyleSheet,
@@ -10,18 +10,65 @@ import {
   View,
   Alert,
   KeyboardAvoidingView,
-  ScrollView
+  ScrollView,
+  Image,
+  Animated,
+  Keyboard,
+  ActivityIndicator,
+  Linking
 } from 'react-native';
 import { router } from 'expo-router';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-export default function ForgotPassword() {
+function ForgotPasswordContent() {
   const [contactMethod, setContactMethod] = useState('email'); // 'email' or 'phone'
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const slideAnim = new Animated.Value(0);
+  const insets = useSafeAreaInsets();
 
   const navigation = useNavigation();
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setIsKeyboardVisible(true);
+        Animated.timing(slideAnim, {
+          toValue: -50,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   // Email validation
   const validateEmail = (email) => {
@@ -34,215 +81,488 @@ export default function ForgotPassword() {
     return /^\d{9}$/.test(phone);
   };
 
-  const handleSendOTP = () => {
+  const handlePhoneChange = (text) => {
+    const cleaned = text.replace(/\D/g, "");
+    if (cleaned.length <= 9) {
+      setPhoneNumber(cleaned);
+      if (phoneError) setPhoneError('');
+    }
+  };
+
+  const makePhoneCall = () => {
+    Linking.openURL("tel:0112252596").catch((err) => {
+      console.error("Phone call error:", err);
+    });
+  };
+
+  const handleSendOTP = async () => {
     if (contactMethod === 'email') {
       if (!validateEmail(email)) {
         setEmailError('Please enter a valid email address');
         return;
       }
       setEmailError('');
-      Alert.alert('Success', `OTP sent to ${email}`);
-      router.push({
-        pathname: '/OTPVerification',
-        params: { contactInfo: email, contactType: 'email' }
-      });
     } else {
       if (!validatePhone(phoneNumber)) {
         setPhoneError('Please enter a valid 9-digit Sri Lankan phone number');
         return;
       }
       setPhoneError('');
-      Alert.alert('Success', `OTP sent to +94 ${phoneNumber}`);
-      router.push({
-        pathname: '/OTPVerification',
-        params: { contactInfo: `+94${phoneNumber}`, contactType: 'phone' }
-      });
     }
+
+    setLoading(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setLoading(false);
+      
+      if (contactMethod === 'email') {
+        Alert.alert('Success', `OTP sent to ${email}`);
+        router.push({
+          pathname: '/OTPVerification',
+          params: { contactInfo: email, contactType: 'email' }
+        });
+      } else {
+        Alert.alert('Success', `OTP sent to +94 ${phoneNumber}`);
+        router.push({
+          pathname: '/OTPVerification',
+          params: { contactInfo: `+94${phoneNumber}`, contactType: 'phone' }
+        });
+      }
+    }, 1500);
   };
 
   return (
-    <LinearGradient colors={['#6DD3D3', '#FAFAFA']} style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+    <View style={styles.container}>
+      <LinearGradient
+        colors={["#CDEAED", "#6DD3D3", "#6DD3D3"]}
+        style={[
+          styles.topSection,
+          isKeyboardVisible && styles.topSectionKeyboard,
+        ]}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Text style={styles.title}>Account Recovery</Text>
+        <View style={styles.header}>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+          />
+        </View>
 
-          <View style={styles.toggleContainer}>
-            <TouchableOpacity 
-              style={[styles.toggleButton, contactMethod === 'email' && styles.activeToggle]}
-              onPress={() => setContactMethod('email')}
-            >
-              <Text style={[styles.toggleText, contactMethod === 'email' && styles.activeToggleText]}>Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.toggleButton, contactMethod === 'phone' && styles.activeToggle]}
-              onPress={() => setContactMethod('phone')}
-            >
-              <Text style={[styles.toggleText, contactMethod === 'phone' && styles.activeToggleText]}>Phone</Text>
-            </TouchableOpacity>
+        <View style={styles.skylineContainer}>
+          <Image
+            source={require("../assets/images/cover.png")}
+            style={styles.cover}
+          />
+        </View>
+      </LinearGradient>
+
+      <Animated.View
+        style={[
+          styles.bottomSection,
+          {
+            transform: [{ translateY: slideAnim }],
+            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0,
+          },
+        ]}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.welcomeCard}>
+            <Text style={styles.welcomeText}>Account Recovery</Text>
+            <View style={styles.sheDigitalBadge}>
+              <Text style={styles.sheDigitalText}>Reset Password</Text>
+            </View>
           </View>
 
-          {contactMethod === 'email' ? (
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                placeholderTextColor="#666"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (emailError) setEmailError('');
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-            </View>
-          ) : (
-            <View style={styles.inputContainer}>
-              <View style={styles.phoneInputContainer}>
-                <View style={styles.countryPickerButton}>
-                  <Text style={styles.countryCodeText}>+94</Text>
+          <View style={styles.formSection}>
+            {/* Toggle Buttons */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity 
+                style={[styles.toggleButton, contactMethod === 'email' && styles.activeToggle]}
+                onPress={() => setContactMethod('email')}
+                disabled={loading}
+              >
+                <View style={styles.toggleContent}>
+                  {/* <Image
+                    source={require("../assets/images/email-icon.png")}
+                    style={styles.toggleIcon}
+                  /> */}
+                  <Text style={[styles.toggleText, contactMethod === 'email' && styles.activeToggleText]}>
+                    Email
+                  </Text>
                 </View>
-                <TextInput
-                  style={styles.phoneInput}
-                  placeholder="Enter phone number"
-                  placeholderTextColor="#666"
-                  value={phoneNumber}
-                  onChangeText={(text) => {
-                    setPhoneNumber(text);
-                    if (phoneError) setPhoneError('');
-                  }}
-                  keyboardType="phone-pad"
-                  maxLength={9}
-                />
-              </View>
-              {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.toggleButton, contactMethod === 'phone' && styles.activeToggle]}
+                onPress={() => setContactMethod('phone')}
+                disabled={loading}
+              >
+                <View style={styles.toggleContent}>
+                  {/* <Image
+                    source={require("../assets/images/phoneicon.png")}
+                    style={styles.toggleIcon}
+                  /> */}
+                  <Text style={[styles.toggleText, contactMethod === 'phone' && styles.activeToggleText]}>
+                    Phone
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
-          )}
 
-          <TouchableOpacity style={styles.button} onPress={handleSendOTP}>
-            <Text style={styles.buttonText}>Send OTP</Text>
-          </TouchableOpacity>
+            {/* Input Fields */}
+            {contactMethod === 'email' ? (
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <View style={styles.iconContainer}>
+                    <Image
+                      source={require("../assets/images/emailicon.png")}
+                      style={styles.inputIcon}
+                    />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your email address"
+                    placeholderTextColor="#999"
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      if (emailError) setEmailError('');
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!loading}
+                  />
+                </View>
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+              </View>
+            ) : (
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <View style={styles.iconContainer}>
+                    <Image
+                      source={require("../assets/images/phoneicon.png")}
+                      style={styles.inputIcon}
+                    />
+                  </View>
+                  <View style={styles.countryCodeContainer}>
+                    <Text style={styles.countryCodeText}>+94</Text>
+                  </View>
+                  <TextInput
+                    style={styles.phoneInput}
+                    placeholder="000 000 000"
+                    placeholderTextColor="#999"
+                    value={phoneNumber}
+                    onChangeText={handlePhoneChange}
+                    keyboardType="phone-pad"
+                    maxLength={9}
+                    editable={!loading}
+                  />
+                </View>
+                {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+              </View>
+            )}
 
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>Back to Login</Text>
-          </TouchableOpacity>
+            {/* Info Text */}
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>
+                {contactMethod === 'email' 
+                  ? "We'll send you an OTP to reset your password via email"
+                  : "We'll send you an OTP to reset your password via SMS"
+                }
+              </Text>
+            </View>
+
+            {/* Send OTP Button */}
+            <TouchableOpacity
+              style={[styles.sendButton, loading && styles.buttonDisabled]}
+              onPress={handleSendOTP}
+              disabled={loading}
+            >
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={[styles.sendButtonText, { marginLeft: 10 }]}>
+                    Sending OTP...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.sendButtonText}>Send OTP</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Back to Login */}
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()}
+              disabled={loading}
+              style={styles.backContainer}
+            >
+              <Text style={styles.backText}>Back to Login</Text>
+            </TouchableOpacity>
+
+            {/* Footer */}
+            <View style={styles.footerContainer}>
+              <Text style={styles.troubleText}>Having Trouble?</Text>
+              <TouchableOpacity onPress={makePhoneCall}>
+                <Text style={styles.contactText}>Contact Us 0112 - 252596</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+      </Animated.View>
+    </View>
+  );
+}
+
+export default function ForgotPassword() {
+  return (
+    <SafeAreaProvider>
+      <ForgotPasswordContent />
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#fff",
+  },
+  topSection: {
+    flex: 0.6,
+    paddingTop: 50,
+  },
+  topSectionKeyboard: {
+    flex: 0.25,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  logo: {
+    width: 180,
+    height: 60,
+    resizeMode: "contain",
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  skylineContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingBottom: 40,
+  },
+  cover: {
+    width: "100%",
+    height: "100%",
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: "white",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -120,
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
-  title: {
-    fontSize: 32,
-    color: 'rgba(19,100,109,1)',
-    fontWeight: 'bold',
+  welcomeCard: {
+    padding: 20,
+    alignItems: "center",
     marginBottom: 20,
-    fontFamily: Platform.OS === 'ios' ? 'Arial' : 'Abhaya Libre ExtraBold',
+  },
+  welcomeText: {
+    fontSize: 25,
+    color: "#13646D",
+    marginBottom: 10,
+    fontWeight: "500",
+  },
+  sheDigitalBadge: {
+    width: 192,
+    height: 44,
+    backgroundColor: "#FF4757",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderTopRightRadius: 15,
+    borderBottomLeftRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sheDigitalText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  formSection: {
+    flex: 1,
   },
   toggleContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 10,
+    marginBottom: 25,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 15,
+    padding: 4,
     borderWidth: 1,
-    borderColor: '#6DD3D3',
-    overflow: 'hidden',
+    borderColor: '#e9ecef',
   },
   toggleButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    backgroundColor: '#fff',
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeToggle: {
-    backgroundColor: 'rgba(23,171,183,1)',
+    backgroundColor: '#4ECDC4',
+    shadowColor: '#4ECDC4',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  toggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  toggleIcon: {
+    width: 18,
+    height: 18,
+    marginRight: 8,
+    tintColor: '#666',
   },
   toggleText: {
     color: '#666',
     fontWeight: '500',
+    fontSize: 16,
   },
   activeToggleText: {
     color: '#fff',
+    fontWeight: '600',
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   inputContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    paddingHorizontal: 15,
+    height: 55,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  iconContainer: {
+    marginRight: 12,
+  },
+  inputIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: "contain",
   },
   input: {
-    width: 300,
-    height: 48,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    borderColor: '#6DD3D3',
-    borderWidth: 1,
-    paddingHorizontal: 15,
-    marginBottom: 5,
+    flex: 1,
     fontSize: 16,
+    color: "#333",
   },
-  phoneInputContainer: {
-    width: 300,
-    height: 48,
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    borderColor: '#6DD3D3',
-    borderWidth: 1,
-    marginBottom: 5,
-  },
-  countryPickerButton: {
-    height: '100%',
-    paddingHorizontal: 10,
-    justifyContent: 'center',
+  countryCodeContainer: {
+    marginRight: 12,
+    paddingRight: 12,
     borderRightWidth: 1,
-    borderRightColor: '#6DD3D3',
+    borderRightColor: "#e9ecef",
   },
   countryCodeText: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
+    fontWeight: "500",
   },
   phoneInput: {
     flex: 1,
-    height: '100%',
-    paddingHorizontal: 15,
     fontSize: 16,
+    color: "#333",
   },
   errorText: {
-    color: 'red',
+    color: '#FF4757',
     fontSize: 12,
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-    marginLeft: 10,
+    marginTop: 5,
+    marginLeft: 15,
   },
-  button: {
-    backgroundColor: 'rgba(23,171,183,1)',
-    paddingVertical: 14,
+  infoContainer: {
+    marginBottom: 25,
+    paddingHorizontal: 10,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  sendButton: {
+    backgroundColor: "#4ECDC4",
     borderRadius: 15,
-    width: 300,
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 10,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginVertical: 10,
+    shadowColor: "#4ECDC4",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
-  buttonText: {
-    color: '#fff',
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sendButtonText: {
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "bold",
+  },
+  backContainer: {
+    alignItems: "center",
+    marginVertical: 15,
   },
   backText: {
+    fontSize: 16,
+    color: "#4ECDC4",
+    fontWeight: "500",
+  },
+  footerContainer: {
+    alignItems: "center",
+    marginTop: 30,
+  },
+  troubleText: {
     fontSize: 14,
-    color: 'rgba(19,100,109,1)',
-    // textDecorationLine: 'underline',
+    color: "#666",
+    marginBottom: 5,
+  },
+  contactText: {
+    fontSize: 14,
+    color: "#4ECDC4",
+    fontWeight: "500",
   },
 });

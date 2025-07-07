@@ -3,16 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
-const PendingIntimations = ({ onClose }) => {
+const PendingIntimations = ({ onClose, onEditClaim }) => {
+  const navigation = useNavigation();
+  
   const [pendingClaims, setPendingClaims] = useState([
     {
       id: '1',
@@ -43,30 +44,29 @@ const PendingIntimations = ({ onClose }) => {
     },
   ]);
 
-  const [selectedClaim, setSelectedClaim] = useState(null);
-  const [isEditModalVisible, setEditModalVisible] = useState(false);
-  const [editedName, setEditedName] = useState('');
-
-  //  Open Edit Modal
   const handleEdit = (claim) => {
-    setSelectedClaim(claim);
-    setEditedName(claim.enteredBy);
-    setEditModalVisible(true);
+    try {
+      if (onEditClaim) {
+        onEditClaim(claim);
+      }
+      
+      navigation.navigate('EditClaimIntimation', { 
+        claimData: claim,
+        onUpdate: (updatedClaim) => {
+          setPendingClaims(prev => 
+            prev.map(item => 
+              item.id === updatedClaim.id ? updatedClaim : item
+            )
+          );
+        }
+      });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      Alert.alert('Error', 'Could not navigate to edit page');
+    }
   };
 
-  //  Save Changes
-  const handleSaveEdit = () => {
-    setPendingClaims((prev) =>
-      prev.map((item) =>
-        item.id === selectedClaim.id
-          ? { ...item, enteredBy: editedName }
-          : item
-      )
-    );
-    setEditModalVisible(false);
-  };
-
-  //  Delete
+  // Handle Delete
   const handleDelete = (id) => {
     Alert.alert(
       'Confirm Delete',
@@ -119,7 +119,8 @@ const PendingIntimations = ({ onClose }) => {
               <View style={styles.claimRow}>
                 <Text style={styles.claimLabel}>Created on :</Text>
                 <Text style={styles.claimValue}>{claim.createdOn}</Text>
-              </View><View style={styles.claimRow}>
+              </View>
+              <View style={styles.claimRow}>
                 <Text style={styles.claimLabel}>Status :</Text>
                 <Text style={styles.claimValue}>{claim.status}</Text>
               </View>
@@ -142,34 +143,6 @@ const PendingIntimations = ({ onClose }) => {
           </View>
         ))}
       </ScrollView>
-
-      {/* Edit Modal */}
-      <Modal
-        visible={isEditModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Patient Name</Text>
-            <TextInput
-              value={editedName}
-              onChangeText={setEditedName}
-              style={styles.input}
-              placeholder="Enter new name"
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.cancelBtn}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSaveEdit} style={styles.saveBtn}>
-                <Text style={styles.saveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </LinearGradient>
   );
 };
@@ -199,7 +172,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-    marginTop:20
+    marginTop: 20
   },
   claimCard: {
     position: 'relative',
@@ -249,55 +222,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
     height: 40,
-  },
-
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '85%',
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 20,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  cancelBtn: {
-    marginRight: 10,
-  },
-  cancelText: {
-    color: '#888',
-    fontWeight: '500',
-  },
-  saveBtn: {
-    backgroundColor: '#2E7D7D',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-  },
-  saveText: {
-    color: '#fff',
-    fontWeight: '500',
   },
 });
 
