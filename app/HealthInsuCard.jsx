@@ -332,8 +332,7 @@ const styles = StyleSheet.create({
   memberNameOverlay: {
     position: "absolute",
     top: "30%",
-    left: "15%",
-    right: "40%",
+    left: "29%",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 5,
@@ -346,8 +345,7 @@ const styles = StyleSheet.create({
   companyNameOverlay: {
     position: "absolute",
     top: "85%",
-    left: "16%",
-    right: "50%",
+    left: "29%",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 5,
@@ -374,8 +372,7 @@ const styles = StyleSheet.create({
   policyNumberOverlay: {
     position: "absolute",
     top: "77.5%",
-    left: "13%",
-    right: "50%",
+    left: "29%",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 5,
@@ -388,8 +385,7 @@ const styles = StyleSheet.create({
   memberNumberOverlay: {
     position: "absolute",
     top: "71%",
-    left: "13%",
-    right: "60%",
+    left: "29%",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 5,
@@ -401,9 +397,8 @@ const styles = StyleSheet.create({
   },
   dependentsOverlay: {
     position: "absolute",
-    top: "42%",
-    left: "6%",
-    right: "70%",
+    top: "38%",
+    left: "29%",
     paddingVertical: 5,
   },
   dependentNameText: {

@@ -97,8 +97,12 @@ export default function PolicyHome() {
       setIsLoadingMembers(true);
 
       // Get policy number and member number from SecureStore
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
 
       if (!policyNumber || !memberNumber) {
         console.log("Policy number or member number not found in SecureStore");
@@ -729,7 +733,7 @@ export default function PolicyHome() {
       setModalVisible(false);
     });
   };
-  
+
   const handleClosePolicySelection = () => {
     // Only close if a policy has been selected
     if (selectedPolicyNumber) {
@@ -1358,21 +1362,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: "29.5%",
     left: "31%",
-    right: "20%",
     alignItems: "flex-start",
   },
 
   dependentNamesOverlay: {
     position: "absolute",
-    top: "42.5%",
-    left: "11%",
-    right: "15%",
+    top: "38%",
+    left: "31%",
     alignItems: "flex-start",
   },
   companyNameOverlay: {
     position: "absolute",
     top: "91%",
-    left: "23%",
+    left: "31%",
   },
   companyNameOnCard: {
     fontSize: 9,
@@ -1394,13 +1396,13 @@ const styles = StyleSheet.create({
   memberNumberOverlay: {
     position: "absolute",
     top: "75.5%",
-    left: "25.5%",
+    left: "31%",
     alignItems: "flex-start",
   },
   policyNumberOverlay: {
     position: "absolute",
     top: "83.5%",
-    left: "23%",
+    left: "31%",
     alignItems: "flex-start",
   },
   endDateOverlay: {
