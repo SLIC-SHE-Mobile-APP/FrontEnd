@@ -136,15 +136,16 @@ const PendingRequirement1 = () => {
         <Text style={styles.documentCellText}>{index + 1}</Text>
       </View>
       <View style={styles.documentCell}>
-        <TouchableOpacity onPress={() => handleDeleteDocument(document.id)}>
-          <Ionicons name="trash" size={20} color="#D32F2F" />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.documentCell}>
         <Text style={styles.documentCellText} numberOfLines={1}>
           {document.name}
         </Text>
       </View>
+      <View style={styles.documentCell}>
+        <TouchableOpacity onPress={() => handleDeleteDocument(document.id)}>
+          <Ionicons name="trash" size={20} color="#D32F2F" />
+        </TouchableOpacity>
+      </View>
+      
     </View>
   );
 
@@ -164,8 +165,8 @@ const PendingRequirement1 = () => {
         </View>
 
         {/* ScrollView with content */}
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer} 
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
           {/* Claim Info */}
@@ -208,9 +209,6 @@ const PendingRequirement1 = () => {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.addDocumentButton} onPress={handleBrowseFiles}>
-              <Text style={styles.addDocumentButtonText}>Add Document</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Uploaded Documents Table */}
@@ -218,9 +216,9 @@ const PendingRequirement1 = () => {
             <Text style={styles.uploadedTitle}>Uploaded Documents</Text>
             <View style={styles.documentsTable}>
               <View style={styles.tableHeader}>
-                <View style={styles.headerCell}><Text style={styles.headerCellText}>Seq No</Text></View>
+                <View style={styles.headerCell}><Text style={styles.headerCellText}>No</Text></View>
+                <View style={styles.headerCell}><Text style={styles.headerCellText}>Image</Text></View>  
                 <View style={styles.headerCell}><Text style={styles.headerCellText}>Delete</Text></View>
-                <View style={styles.headerCell}><Text style={styles.headerCellText}>Image</Text></View>
               </View>
 
               {uploadedDocuments.length > 0 ? (
