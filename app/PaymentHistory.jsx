@@ -1,48 +1,74 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
+import axios from 'axios';
 
 const PaymentHistory = ({ onClose }) => {
-  const paymentData = [
-    {
-      claimNumber: 'G/010/SHE/22200',
-      receivedOn: '12/05/2025',
-      transactionNo: '1234',
-      treatmentDate: '12/05/2025',
-      claimAmount: 'Member',
-      paidAmount: 'Rs.1000.00',
-      payeeName: 'Nipuni',
-      patientName: 'Udhantha',
-      referenceNo: '9034',
-      bhtNo: '',
-      claimStatus: 'Accept',
-      chequeNo: '123412345',
-      paidDate: '12/05/2025'
-    },
-    {
-      claimNumber: 'G/010/SHE/22200',
-      receivedOn: '12/05/2025',
-      transactionNo: '1234',
-      treatmentDate: '12/05/2025',
-      claimAmount: 'Member',
-      paidAmount: 'Rs.1000.00',
-      payeeName: 'Nipuni',
-      patientName: 'Udhantha',
-      referenceNo: '9034',
-      bhtNo: '',
-      claimStatus: 'Reject',
-      chequeNo: '123412345',
-      paidDate: '12/05/2025',
-      note: 'Pending Requirement'
-    }
-  ];
+  const [paymentData, setPaymentData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const policyNo = 'G/010/SHE/19520/24';
+  const memberNo = '10289640';
+  const fromDate = '01-JAN-24';
+  const toDate = '01-JUN-24';
+
+  useEffect(() => {
+    const fetchPaymentHistory = async () => {
+      try {
+        const response = await axios.get(
+          `http://203.115.11.229:1002/api/ClaimHistory/GetHistory`,
+          {
+            params: {
+              policyNo,
+              memberNo,
+              fromDate,
+              toDate,
+            },
+          }
+        );
+        const data = Array.isArray(response.data) ? response.data : [response.data];
+
+        const formatted = data.map(item => ({
+          claimNumber: item.claiM_NO,
+          receivedOn: formatDate(item.receiveD_ON),
+          transactionNo: item.transactioN_NUMBER,
+          treatmentDate: formatDate(item.datE_OF_TREATMENT),
+          claimAmount: `Rs.${item.claiM_AMOUNT?.toFixed(2)}`,
+          paidAmount: `Rs.${item.paiD_AMOUNT?.toFixed(2)}`,
+          payeeName: '-', // Optional: If not in API
+          patientName: item.patienT_NAME,
+          referenceNo: item.referencE_NUMBER,
+          bhtNo: item.bhT_NUMBER || '-',
+          claimStatus: item.paiD_AMOUNT > 0 ? 'Accept' : 'Reject',
+          chequeNo: '-', // Optional: If not in API
+          paidDate: formatDate(item.paiD_DATE),
+        }));
+
+        setPaymentData(formatted);
+      } catch (error) {
+        console.error('Error fetching payment history:', error);
+        setPaymentData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPaymentHistory();
+  }, []);
+
+  const formatDate = (isoString) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-GB');
+  };
 
   return (
     <LinearGradient
@@ -54,7 +80,6 @@ const PaymentHistory = ({ onClose }) => {
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
       <View style={styles.header}>
         <View style={{ width: 26 }} />
         <Text style={styles.headerTitle}>Payment History</Text>
@@ -63,112 +88,109 @@ const PaymentHistory = ({ onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Policy Info Card */}
         <View style={styles.policyCard}>
           <Text style={styles.policyTitle}>Payment History For :</Text>
-          <Text style={styles.policyNumber}>G/010/SHE/19400/24</Text>
+          <Text style={styles.policyNumber}>{policyNo}</Text>
         </View>
 
-        {/* Payment Cards */}
-        {paymentData.map((payment, index) => (
-          <View key={index} style={styles.paymentCard}>
-            <View style={styles.paymentGrid}>
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Claim Number :</Text>
-                  <Text style={styles.value}>{payment.claimNumber}</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#13646D" style={{ marginTop: 20 }} />
+        ) : paymentData.length === 0 ? (
+          <Text style={{ textAlign: 'center', marginTop: 20, color: '#13646D' }}>No payment records found.</Text>
+        ) : (
+          paymentData.map((payment, index) => (
+            <View key={index} style={styles.paymentCard}>
+              <View style={styles.paymentGrid}>
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Claim Number :</Text>
+                    <Text style={styles.value}>{payment.claimNumber}</Text>
+                  </View>
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.label}>Patient Name :</Text>
+                    <Text style={styles.value}>{payment.patientName}</Text>
+                  </View>
                 </View>
-                <View style={styles.rightColumn}>
-                  <Text style={styles.label}>Patient Name :</Text>
-                  <Text style={styles.value}>{payment.patientName}</Text>
+
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Received On :</Text>
+                    <Text style={styles.value}>{payment.receivedOn}</Text>
+                  </View>
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.label}>Reference No :</Text>
+                    <Text style={styles.value}>{payment.referenceNo}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Transaction No :</Text>
+                    <Text style={styles.value}>{payment.transactionNo}</Text>
+                  </View>
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.label}>B.H.T. No :</Text>
+                    <Text style={styles.value}>{payment.bhtNo}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Treatment Date :</Text>
+                    <Text style={styles.value}>{payment.treatmentDate}</Text>
+                  </View>
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.label}>Claim Status :</Text>
+                    <Text style={[
+                      styles.value,
+                      payment.claimStatus === 'Accept' ? styles.acceptStatus : styles.rejectStatus
+                    ]}>
+                      {payment.claimStatus}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Claim Amount :</Text>
+                    <Text style={styles.value}>{payment.claimAmount}</Text>
+                  </View>
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.label}>Cheque No :</Text>
+                    <Text style={styles.value}>{payment.chequeNo}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Paid Amount :</Text>
+                    <Text style={styles.value}>{payment.paidAmount}</Text>
+                  </View>
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.label}>Paid Date :</Text>
+                    <Text style={styles.value}>{payment.paidDate}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.leftColumn}>
+                    <Text style={styles.label}>Payee Name :</Text>
+                    <Text style={styles.value}>{payment.payeeName}</Text>
+                  </View>
+                  <View style={styles.rightColumn} />
                 </View>
               </View>
-
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Received On :</Text>
-                  <Text style={styles.value}>{payment.receivedOn}</Text>
-                </View>
-                <View style={styles.rightColumn}>
-                  <Text style={styles.label}>Reference No :</Text>
-                  <Text style={styles.value}>{payment.referenceNo}</Text>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Transaction No :</Text>
-                  <Text style={styles.value}>{payment.transactionNo}</Text>
-                </View>
-                <View style={styles.rightColumn}>
-                  <Text style={styles.label}>B.H.T. No :</Text>
-                  <Text style={styles.value}>{payment.bhtNo || '-'}</Text>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Treatment Date :</Text>
-                  <Text style={styles.value}>{payment.treatmentDate}</Text>
-                </View>
-                <View style={styles.rightColumn}>
-                  <Text style={styles.label}>Claim Status :</Text>
-                  <Text style={[
-                    styles.value,
-                    payment.claimStatus === 'Accept' ? styles.acceptStatus : styles.rejectStatus
-                  ]}>
-                    {payment.claimStatus}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Claim amount :</Text>
-                  <Text style={styles.value}>{payment.claimAmount}</Text>
-                </View>
-                <View style={styles.rightColumn}>
-                  <Text style={styles.label}>Cheque No :</Text>
-                  <Text style={styles.value}>{payment.chequeNo}</Text>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Paid Amount :</Text>
-                  <Text style={styles.value}>{payment.paidAmount}</Text>
-                </View>
-                <View style={styles.rightColumn}>
-                  <Text style={styles.label}>Paid Date :</Text>
-                  <Text style={styles.value}>{payment.paidDate}</Text>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.leftColumn}>
-                  <Text style={styles.label}>Payee Name :</Text>
-                  <Text style={styles.value}>{payment.payeeName}</Text>
-                </View>
-                <View style={styles.rightColumn} />
-              </View>
-
-              {payment.note && (
-                <View style={styles.noteContainer}>
-                  <Text style={styles.noteLabel}>Note : </Text>
-                  <Text style={styles.noteValue}>{payment.note}</Text>
-                </View>
-              )}
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
+  // Keep your existing styles unchanged
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,24 +268,6 @@ const styles = StyleSheet.create({
   },
   rejectStatus: {
     color: '#D32F2F',
-  },
-  noteContainer: {
-    flexDirection: 'row',
-    marginTop: 5,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(19, 100, 109, 0.2)',
-  },
-  noteLabel: {
-    fontSize: 14,
-    color: '#13646D',
-    fontWeight: '500',
-  },
-  noteValue: {
-    fontSize: 14,
-    color: '#D32F2F',
-    fontWeight: '600',
-    flex: 1,
   },
 });
 
