@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
     Alert,
     Modal,
@@ -12,7 +13,8 @@ import {
     View,
 } from 'react-native';
 
-const EditClaimIntimation = ({ route, navigation }) => {
+const EditClaimIntimation = ({ route}) => {
+    const navigation = useNavigation();
     const { claim } = route?.params || {};
 
     // Claim details (read-only display)
@@ -188,7 +190,7 @@ const EditClaimIntimation = ({ route, navigation }) => {
         <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation?.goBack()}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>SHE Claim Intimation</Text>

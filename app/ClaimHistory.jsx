@@ -149,8 +149,15 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
   }
 
   return (
-    <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
-      <View style={[styles.modalContainer]}>
+    <LinearGradient
+          colors={["#FFFFFF", "#6DD3D3"]}
+          style={{
+            flex: 1,
+            borderTopLeftRadius: 25,
+            borderTopRightRadius: 25,
+            overflow: "hidden",
+          }}
+        >
         {/* Header */}
         <View style={styles.header}>
           <View style={{ width: 26 }} />
@@ -168,7 +175,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         >
           {claimData.map(renderClaimCard)}
         </ScrollView>
-      </View>
+   
     </LinearGradient>
   );
 };
