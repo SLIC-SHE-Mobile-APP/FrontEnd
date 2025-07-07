@@ -81,31 +81,36 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
   );
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-      <View style={styles.modalContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ width: 26 }} />
-          <Text style={styles.headerTitle}>Claim History</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons
-              name="close"
-              size={26}
-              color="#13646D"
-              style={{ marginRight: 15 }}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Documents List */}
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {documents.map(renderDocumentCard)}
-        </ScrollView>
+    <LinearGradient
+      colors={["#FFFFFF", "#6DD3D3"]}
+      style={{
+        flex: 1,
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        overflow: "hidden",
+      }}
+    >
+      <View style={styles.header}>
+        <View style={{ width: 26 }} />
+        <Text style={styles.headerTitle}>Claim History</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons
+            name="close"
+            size={26}
+            color="#13646D"
+            style={{ marginRight: 15 }}
+          />
+        </TouchableOpacity>
       </View>
+
+      {/* Documents List */}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {documents.map(renderDocumentCard)}
+      </ScrollView>
     </LinearGradient>
   );
 };
