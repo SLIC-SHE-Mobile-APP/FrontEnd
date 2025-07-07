@@ -1,24 +1,66 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View,} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+} from 'react-native';
+import axios from 'axios';
 
 const ClaimDocRequired = ({ onClose }) => {
   const [expandedSection, setExpandedSection] = useState(null);
+  const [documents, setDocuments] = useState({
+    opd: [],
+    spectacles: [],
+    hospitalization: [],
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
 
+  const fetchDocuments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [opdRes, specRes, hospRes] = await Promise.all([
+        axios.get('http://203.115.11.229:1002/api/ClaimDocumentsCon/Outpatient'),
+        axios.get('http://203.115.11.229:1002/api/ClaimDocumentsCon/Spectacles'),
+        axios.get('http://203.115.11.229:1002/api/ClaimDocumentsCon/Hospitalization'),
+      ]);
+
+      setDocuments({
+        opd: opdRes.data.map((item, index) => `${index + 1}. ${item.description}`),
+        spectacles: specRes.data.map((item, index) => `${index + 1}. ${item.description}`),
+        hospitalization: hospRes.data.map((item, index) => `${index + 1}. ${item.description}`),
+      });
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+      setError('Failed to load documents. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
   const renderSection = (title, content, sectionKey) => (
     <View style={styles.sectionContainer}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.sectionButton}
         onPress={() => toggleSection(sectionKey)}
       >
         <Text style={styles.sectionTitle}>{title}</Text>
       </TouchableOpacity>
-      
+
       {expandedSection === sectionKey && (
         <View style={styles.expandedContent}>
           {content.map((item, index) => (
@@ -30,28 +72,6 @@ const ClaimDocRequired = ({ onClose }) => {
       )}
     </View>
   );
-
-  const opdContent = [
-    "1. Duly completed OPD Claim form (Reimbursement Only)",
-    "2. Original or certified copy of the Prescription",
-    "3. Original bill (pharmacy) with paid seal",
-    "4. Original Channeling receipts"
-  ];
-
-  const spectaclesContent = [
-    "1. Duly completed Spectacles Claim form",
-    "2. Original prescription from qualified Eye Specialist",
-    "3. Original bill with paid seal",
-    "4. Copy of National Identity Card"
-  ];
-
-  const hospitalizationContent = [
-    "1. Duly completed Hospitalization Claim form",
-    "2. Original discharge summary",
-    "3. Original bills with paid seal",
-    "4. Investigation reports",
-    "5. Pre-authorization form (if applicable)"
-  ];
 
   return (
     <LinearGradient
@@ -75,9 +95,17 @@ const ClaimDocRequired = ({ onClose }) => {
       {/* Scrollable Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>
-          {renderSection("OUTPATIENT (OPD)", opdContent, "opd")}
-          {renderSection("SPECTACLES", spectaclesContent, "spectacles")}
-          {renderSection("HOSPITALIZATION", hospitalizationContent, "hospitalization")}
+          {loading ? (
+            <ActivityIndicator size="large" color="#00ADBB" style={{ marginTop: 40 }} />
+          ) : error ? (
+            <Text style={{ color: 'red', marginTop: 40 }}>{error}</Text>
+          ) : (
+            <>
+              {renderSection("OUTPATIENT (OPD)", documents.opd, "opd")}
+              {renderSection("SPECTACLES", documents.spectacles, "spectacles")}
+              {renderSection("HOSPITALIZATION", documents.hospitalization, "hospitalization")}
+            </>
+          )}
         </View>
       </ScrollView>
     </LinearGradient>

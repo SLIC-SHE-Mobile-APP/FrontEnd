@@ -1,6 +1,6 @@
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -9,107 +9,152 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,SafeAreaView
+  View,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import axios from 'axios';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Sample data for different sections
-const approvedHospitals = [
-  { id: '1', name: 'Lanka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 010' },
-  { id: '2', name: 'Hemas Hospitals (Pvt) Ltd.', location: 'Wattala', phone: '0114 - 530 057' },
-  { id: '3', name: 'Asiri Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 018' },
-  { id: '4', name: 'Leasons Hospitals (Pvt) Ltd.', location: 'Ragama', phone: '0114 - 530 058' },
-  { id: '5', name: 'Ninewells Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 028' },
-  { id: '6', name: 'Nawaloka Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
-  { id: '7', name: 'Durdans Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
-  { id: '8', name: 'Kings Hospitals (Pvt) Ltd.', location: 'Colombo', phone: '0114 - 530 000' },
-];
+// API endpoints mapped by category id
+const API_ENDPOINTS = {
+  approved: 'http://203.115.11.229:1002/api/HospitalListAppCon/GetHospitalList',
+  notApproved: 'http://203.115.11.229:1002/api/HospitalListNonAppCon/GetNotApprovedHospitals',
+  dental: 'http://203.115.11.229:1002/api/UnapprovedProviders/dentals',
+  pharmacy: 'http://203.115.11.229:1002/api/UnapprovedProviders/pharmacies',
+  optical: 'http://203.115.11.229:1002/api/UnapprovedProviders/opticians',
+  medical: 'http://203.115.11.229:1002/api/UnapprovedProviders/medicals',
+};
 
-const notApprovedHospitals = [
-  { id: '1', name: 'Number 1 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '2', name: 'Number 2 Hospital', location: 'Wattala', phone: '011 - 4530 000' },
-  { id: '3', name: 'Number 3 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '4', name: 'Number 4 Hospital', location: 'Ragama', phone: '011 - 4530 000' },
-  { id: '5', name: 'Number 5 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '6', name: 'Number 6 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '7', name: 'Number 7 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
-  { id: '8', name: 'Number 8 Hospital', location: 'Colombo', phone: '011 - 4530 000' },
-];
-
-const dentalCare = [
-  { id: '1', name: 'Micro Dental Care', location: 'Dental Town', phone: '011 - 2345 678' },
-  { id: '2', name: 'Elite Dental Clinic', location: 'Colombo', phone: '011 - 2345 679' },
-  { id: '3', name: 'Prime Dental Care', location: 'Kandy', phone: '011 - 2345 680' },
-];
-
-const pharmacy = [
-  { id: '1', name: 'New Lanka Medicare (Pvt) Ltd', location: 'Kandy', phone: '011 - 3456 789' },
-  { id: '2', name: 'Health Plus Pharmacy', location: 'Colombo', phone: '011 - 3456 790' },
-  { id: '3', name: 'Care Pharmacy', location: 'Galle', phone: '011 - 3456 791' },
-  { id: '4', name: 'Health Plus Pharmacy', location: 'Colombo', phone: '011 - 3456 790' },
-  { id: '5', name: 'Care Pharmacy', location: 'Galle', phone: '011 - 3456 791' },
-];
-
-const optical = [
-  { id: '1', name: 'Eyescape Optical', location: '61, New Kandy Road Ratmalana', phone: '011 - 4567 892' },
-  { id: '2', name: 'Vision Care Optical', location: 'Colombo', phone: '011 - 4567 893' },
-  { id: '3', name: 'Clear Sight Optical', location: 'Kandy', phone: '011 - 4567 894' },
-];
-
-const medical = [
-  { id: '1', name: 'Medcare Medical Services', location: 'Katunayake', phone: '011 - 5678 903' },
-  { id: '2', name: 'Prime Medical Center', location: 'Colombo', phone: '011 - 5678 904' },
-  { id: '3', name: 'Health First Medical', location: 'Kandy', phone: '011 - 5678 905' },
-  { id: '4', name: 'Medcare Medical Services', location: 'Katunayake', phone: '011 - 5678 903' },
-  { id: '5', name: 'Prime Medical Center', location: 'Colombo', phone: '011 - 5678 904' },
-  
-];
-
+// Navigation items with icons and titles
 const navigationItems = [
-  { id: 'approved', title: 'Approved Hospital', data: approvedHospitals, icon: 'shield-checkmark' },
-  { id: 'notApproved', title: 'Not Approved Hospital', data: notApprovedHospitals, icon: 'shield-half' },
-  { id: 'dental', title: 'Dental Care', data: dentalCare, icon: 'medical' },
-  { id: 'pharmacy', title: 'Pharmacy', data: pharmacy, icon: 'fitness' },
-  { id: 'optical', title: 'Optical / Eye Care', data: optical, icon: 'eye' },
-  { id: 'medical', title: 'Medical Services', data: medical, icon: 'heart' },
+  { id: 'approved', title: 'Approved Hospital', icon: 'shield-checkmark' },
+  { id: 'notApproved', title: 'Not Approved Hospital', icon: 'shield-half' },
+  { id: 'dental', title: 'Dental Care', icon: 'medical' },
+  { id: 'pharmacy', title: 'Pharmacy', icon: 'fitness' },
+  { id: 'optical', title: 'Optical / Eye Care', icon: 'eye' },
+  { id: 'medical', title: 'Medical Services', icon: 'heart' },
 ];
 
 const HospitalList = ({ onClose }) => {
   const [activeSection, setActiveSection] = useState('approved');
   const [searchText, setSearchText] = useState('');
+  const [dataMap, setDataMap] = useState({});
+  const [loadingMap, setLoadingMap] = useState({});
+  const [errorMap, setErrorMap] = useState({});
+
   const sidebarScrollRef = useRef(null);
   const contentScrollRef = useRef(null);
 
-  const getCurrentData = () => {
-    const currentItem = navigationItems.find(item => item.id === activeSection);
-    return currentItem ? currentItem.data : [];
+  // Fetch data for the active section from API
+  const fetchData = async (sectionId) => {
+    // If already loading or data exists, skip fetching again
+    if (loadingMap[sectionId] || dataMap[sectionId]) return;
+
+    setLoadingMap(prev => ({ ...prev, [sectionId]: true }));
+    setErrorMap(prev => ({ ...prev, [sectionId]: null }));
+
+    try {
+      const response = await axios.get(API_ENDPOINTS[sectionId]);
+
+      // Normalize data for each section
+      let normalizedData = [];
+      switch (sectionId) {
+        case 'approved':
+          // API returns array of { hosp_Name, district, contact_No1 }
+          normalizedData = response.data.map((item, index) => ({
+            id: index.toString(),
+            name: item.hosp_Name || 'N/A',
+            location: item.district || 'N/A',
+            phone: item.contact_No1 || '',
+          }));
+          break;
+        case 'notApproved':
+          // API returns array of { name }
+          normalizedData = response.data.map((item, index) => ({
+            id: index.toString(),
+            name: item.name || 'N/A',
+            location: '',
+            phone: '',
+          }));
+          break;
+        case 'dental':
+          // API returns array of { refNoD, dentalName, address }
+          normalizedData = response.data.map((item) => ({
+            id: item.refNoD?.toString() || Math.random().toString(),
+            name: item.dentalName || 'N/A',
+            location: item.address || '',
+            phone: '',
+          }));
+          break;
+        case 'pharmacy':
+          // API returns array of { refNoP, pharmName, address }
+          normalizedData = response.data.map((item) => ({
+            id: item.refNoP?.toString() || Math.random().toString(),
+            name: item.pharmName || 'N/A',
+            location: item.address || '',
+            phone: '',
+          }));
+          break;
+        case 'optical':
+          // API returns array of { refNoO, opticianName, address }
+          normalizedData = response.data.map((item) => ({
+            id: item.refNoO?.toString() || Math.random().toString(),
+            name: item.opticianName || 'N/A',
+            location: item.address || '',
+            phone: '',
+          }));
+          break;
+        case 'medical':
+          // API returns array of { refNoM, medicalName, address }
+          normalizedData = response.data.map((item) => ({
+            id: item.refNoM?.toString() || Math.random().toString(),
+            name: item.medicalName || 'N/A',
+            location: item.address || '',
+            phone: '',
+          }));
+          break;
+        default:
+          normalizedData = [];
+      }
+
+      setDataMap(prev => ({ ...prev, [sectionId]: normalizedData }));
+    } catch (error) {
+      setErrorMap(prev => ({ ...prev, [sectionId]: 'Failed to load data' }));
+      console.error(`Error fetching ${sectionId} data:`, error);
+    } finally {
+      setLoadingMap(prev => ({ ...prev, [sectionId]: false }));
+    }
   };
 
-  const filteredData = getCurrentData().filter((item) =>
+  // Fetch data whenever activeSection changes
+  React.useEffect(() => {
+    fetchData(activeSection);
+    setSearchText('');
+    // Scroll content list to top
+    contentScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [activeSection]);
+
+  // Get filtered data based on search
+  const filteredData = (dataMap[activeSection] || []).filter(item =>
     item.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const handleNavItemPress = (sectionId) => {
-    setActiveSection(sectionId);
-    setSearchText('');
-    // Reset content scroll to top when switching categories
-    contentScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
-
+  // Sidebar item renderer
   const renderSidebarItem = ({ item }) => {
     const isActive = activeSection === item.id;
     return (
       <TouchableOpacity
         style={[styles.sidebarItem, isActive && styles.activeSidebarItem]}
-        onPress={() => handleNavItemPress(item.id)}
+        onPress={() => setActiveSection(item.id)}
         activeOpacity={0.7}
       >
         <View style={styles.sidebarItemContent}>
-          <Ionicons 
-            name={item.icon} 
-            size={20} 
-            color={isActive ? '#FFFFFF' : '#00ADBB'} 
+          <Ionicons
+            name={item.icon}
+            size={20}
+            color={isActive ? '#FFFFFF' : '#00ADBB'}
             style={styles.sidebarIcon}
           />
           <Text style={[styles.sidebarItemText, isActive && styles.activeSidebarItemText]}>
@@ -121,12 +166,13 @@ const HospitalList = ({ onClose }) => {
     );
   };
 
+  // Hospital/item card renderer
   const renderHospitalItem = ({ item }) => {
     return (
       <TouchableOpacity style={styles.card} activeOpacity={0.8}>
         <Text style={styles.hospitalName}>{item.name}</Text>
-        <Text style={styles.location}>{item.location}</Text>
-        {item.phone && (
+        {item.location ? <Text style={styles.location}>{item.location}</Text> : null}
+        {item.phone ? (
           <TouchableOpacity
             style={styles.phoneContainer}
             onPress={() => Linking.openURL(`tel:${item.phone.replace(/[^0-9]/g, '')}`)}
@@ -134,22 +180,19 @@ const HospitalList = ({ onClose }) => {
             <FontAwesome name="phone" size={16} color="#00ADBB" />
             <Text style={styles.phoneText}>{item.phone}</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </TouchableOpacity>
     );
   };
 
+  // Get current title for header
   const getCurrentTitle = () => {
     const currentItem = navigationItems.find(item => item.id === activeSection);
     return currentItem ? currentItem.title : 'Hospital List';
   };
 
   return (
-    
-    <LinearGradient
-      colors={['#FFFFFF', '#6DD3D3']}
-      style={styles.container}
-    >
+    <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
       {/* Fixed Header */}
       <View style={styles.header}>
         <View style={{ width: 26 }} />
@@ -163,12 +206,11 @@ const HospitalList = ({ onClose }) => {
       <View style={styles.mainContent}>
         {/* Vertical Sidebar Navigation */}
         <View style={styles.sidebar}>
-          
           <FlatList
             ref={sidebarScrollRef}
             data={navigationItems}
             renderItem={renderSidebarItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={item => item.id}
             showsVerticalScrollIndicator={true}
             contentContainerStyle={styles.sidebarContent}
             style={styles.sidebarList}
@@ -180,7 +222,9 @@ const HospitalList = ({ onClose }) => {
           {/* Section Title */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{getCurrentTitle()}</Text>
-            <Text style={styles.sectionCount}>({filteredData.length} found)</Text>
+            <Text style={styles.sectionCount}>
+              ({loadingMap[activeSection] ? 'Loading...' : `${filteredData.length} found`})
+            </Text>
           </View>
 
           {/* Search Bar */}
@@ -192,26 +236,41 @@ const HospitalList = ({ onClose }) => {
             onChangeText={setSearchText}
           />
 
+          {/* Loading Indicator */}
+          {loadingMap[activeSection] && (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
+              <ActivityIndicator size="large" color="#00ADBB" />
+            </View>
+          )}
+
+          {/* Error Message */}
+          {errorMap[activeSection] && (
+            <View style={{ padding: 20 }}>
+              <Text style={{ color: 'red', textAlign: 'center' }}>{errorMap[activeSection]}</Text>
+            </View>
+          )}
+
           {/* Hospital List */}
-          <FlatList
-            ref={contentScrollRef}
-            data={filteredData}
-            keyExtractor={(item) => `${activeSection}-${item.id}`}
-            renderItem={renderHospitalItem}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="search" size={48} color="#B0B0B0" />
-                <Text style={styles.emptyText}>No hospitals found</Text>
-                <Text style={styles.emptySubText}>Try adjusting your search</Text>
-              </View>
-            }
-          />
+          {!loadingMap[activeSection] && !errorMap[activeSection] && (
+            <FlatList
+              ref={contentScrollRef}
+              data={filteredData}
+              keyExtractor={(item) => `${activeSection}-${item.id}`}
+              renderItem={renderHospitalItem}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="search" size={48} color="#B0B0B0" />
+                  <Text style={styles.emptyText}>No hospitals found</Text>
+                  <Text style={styles.emptySubText}>Try adjusting your search</Text>
+                </View>
+              }
+            />
+          )}
         </View>
       </View>
     </LinearGradient>
-   
   );
 };
 
