@@ -16,31 +16,31 @@ const PendingRequirement = ({ onClose }) => {
     {
       id: 1,
       claimNumber: 'G/010/SHE/22201',
-      requiredDocuments: 'Medical Report',
+      requiredDocuments: ['Medical Report', 'Prescription'],
       requiredDate: '15/07/2025'
     },
     {
       id: 2,
       claimNumber: 'G/010/SHE/22202',
-      requiredDocuments: 'Prescription',
+      requiredDocuments: ['Prescription'],
       requiredDate: '18/07/2025'
     },
     {
       id: 3,
       claimNumber: 'G/010/SHE/22203',
-      requiredDocuments: 'Lab Test Results',
+      requiredDocuments: ['Lab Test Results'],
       requiredDate: '20/07/2025'
     },
     {
       id: 4,
       claimNumber: 'G/010/SHE/22204',
-      requiredDocuments: 'X-Ray Report',
+      requiredDocuments: ['X-Ray Report'],
       requiredDate: '22/07/2025'
     },
     {
       id: 5,
       claimNumber: 'G/010/SHE/22205',
-      requiredDocuments: 'Discharge Summary',
+      requiredDocuments: ['Discharge Summary'],
       requiredDate: '25/07/2025'
     }
   ]);
@@ -60,7 +60,7 @@ const PendingRequirement = ({ onClose }) => {
           pathname: '/PendingRequirement1',
           params: { 
             claimNumber: requirement.claimNumber,
-            requiredDocuments: requirement.requiredDocuments,
+            requiredDocuments: JSON.stringify(requirement.requiredDocuments),
             requiredDate: requirement.requiredDate,
             requirementId: requirement.id.toString()
           }
@@ -84,7 +84,7 @@ const PendingRequirement = ({ onClose }) => {
         <View style={styles.infoRow}>
           <Text style={styles.label}>Required Documents</Text>
           <Text style={styles.colon}>:</Text>
-          <Text style={styles.value}>{requirement.requiredDocuments}</Text>
+          <Text style={styles.value}>{requirement.requiredDocuments.join(', ')}</Text>
         </View>
         
         <View style={styles.infoRow}>

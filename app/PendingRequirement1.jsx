@@ -6,22 +6,35 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Modal,
+  Dimensions
 } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 const PendingRequirement1 = () => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [selectedDocument, setSelectedDocument] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   // Get requirement data from route params
   const params = useLocalSearchParams();
+  const requiredDocuments = params?.requiredDocuments
+    ? JSON.parse(params.requiredDocuments)
+    : ['Prescription'];
+
   const requirementData = {
     claimNumber: params?.claimNumber || 'G/010/12334/525',
-    requiredDocuments: params?.requiredDocuments || 'Prescription',
+    requiredDocuments: requiredDocuments,
     requiredDate: params?.requiredDate || '12/05/2025',
     requirementId: params?.requirementId || '1'
   };
@@ -32,7 +45,22 @@ const PendingRequirement1 = () => {
 
   const allowedFormats = ['JPG', 'JPEG', 'TIFF', 'PNG'];
 
+  const handleImagePress = (imageUri) => {
+    setSelectedImage(imageUri);
+    setIsImageModalOpen(true);
+  };
+
+  const handleCloseImageModal = () => {
+    setIsImageModalOpen(false);
+    setSelectedImage(null);
+  };
+
   const handleBrowseFiles = async () => {
+    if (!selectedDocument) {
+      Alert.alert('Select Document', 'Please select a required document first.');
+      return;
+    }
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff'],
@@ -47,17 +75,22 @@ const PendingRequirement1 = () => {
           uri: file.uri,
           type: file.mimeType,
           size: file.size,
+          documentType: selectedDocument,
         };
         setUploadedDocuments(prev => [...prev, newDocument]);
         Alert.alert('Success', 'Document uploaded successfully!');
       }
     } catch (error) {
       console.error('Error picking document:', error);
-      Alert.alert('Error', 'Failed to pick document');
     }
   };
 
   const handleTakePhoto = async () => {
+    if (!selectedDocument) {
+      Alert.alert('Select Document', 'Please select a required document first.');
+      return;
+    }
+
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
@@ -66,22 +99,22 @@ const PendingRequirement1 = () => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false, 
         quality: 0.8,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
 
       if (!result.canceled && result.assets?.length > 0) {
         const photo = result.assets[0];
         const newDocument = {
           id: Date.now().toString(),
-          name: `Photo_${Date.now()}.jpg`,
+          name: `${selectedDocument}_${Date.now()}.jpg`,
           uri: photo.uri,
           type: 'image/jpeg',
           size: photo.fileSize || 0,
+          documentType: selectedDocument,
         };
         setUploadedDocuments(prev => [...prev, newDocument]);
-        Alert.alert('Success', 'Photo captured successfully!');
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -132,20 +165,19 @@ const PendingRequirement1 = () => {
 
   const renderUploadedDocument = (document, index) => (
     <View key={document.id} style={styles.documentRow}>
-      <View style={styles.documentCell}>
-        <Text style={styles.documentCellText}>{index + 1}</Text>
+      <View style={styles.documentDescriptionCell}>
+        <Text style={styles.documentCellText}>{document.documentType}</Text>
       </View>
-      <View style={styles.documentCell}>
-        <Text style={styles.documentCellText} numberOfLines={1}>
-          {document.name}
-        </Text>
+      <View style={styles.documentImageCell}>
+        <TouchableOpacity onPress={() => handleImagePress(document.uri)}>
+          <Image source={{ uri: document.uri }} style={styles.documentImage} />
+        </TouchableOpacity>
       </View>
-      <View style={styles.documentCell}>
+      <View style={styles.documentDeleteCell}>
         <TouchableOpacity onPress={() => handleDeleteDocument(document.id)}>
           <Ionicons name="trash" size={20} color="#D32F2F" />
         </TouchableOpacity>
       </View>
-      
     </View>
   );
 
@@ -169,17 +201,12 @@ const PendingRequirement1 = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* Claim Info */}
+          {/* Claim Info - Only show claim number and date */}
           <View style={styles.claimCard}>
             <View style={styles.claimRow}>
               <Text style={styles.claimLabel}>Claim Number</Text>
               <Text style={styles.claimColon}>:</Text>
               <Text style={styles.claimValue}>{requirementData.claimNumber}</Text>
-            </View>
-            <View style={styles.claimRow}>
-              <Text style={styles.claimLabel}>Required Document</Text>
-              <Text style={styles.claimColon}>:</Text>
-              <Text style={styles.claimValue}>{requirementData.requiredDocuments}</Text>
             </View>
             <View style={styles.claimRow}>
               <Text style={styles.claimLabel}>Required Date</Text>
@@ -188,9 +215,36 @@ const PendingRequirement1 = () => {
             </View>
           </View>
 
-          {/* Upload UI */}
+          {/* Required Documents Section */}
+          {/* <View style={styles.requiredDocumentsSection}>
+            <Text style={styles.sectionTitle}>Required Documents</Text>
+            <View style={styles.requiredDocumentsBox}>
+              {requirementData.requiredDocuments.map((doc, index) => (
+                <View key={index} style={styles.requiredDocItem}>
+                  <Text style={styles.requiredDocText}>• {doc}</Text>
+                </View>
+              ))}
+            </View>
+          </View> */}
+
+
           <View style={styles.documentSection}>
-            <Text style={styles.documentTitle}>Document</Text>
+            <Text style={styles.documentTitle}>Document Upload</Text>
+
+
+            {/* Document Selection Dropdown */}
+            <View style={styles.dropdownContainer}>
+              <Text style={styles.dropdownLabel}>Select Required Document:</Text>
+              <TouchableOpacity
+                style={styles.dropdown}
+                onPress={() => setIsDropdownOpen(true)}
+              >
+                <Text style={styles.dropdownText}>
+                  {selectedDocument || 'Choose document type...'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#00ADBB" />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.allowedFormats}>Allowed formats: {allowedFormats.join(', ')}</Text>
 
             <View style={styles.uploadArea}>
@@ -208,7 +262,6 @@ const PendingRequirement1 = () => {
                 </TouchableOpacity>
               </View>
             </View>
-
           </View>
 
           {/* Uploaded Documents Table */}
@@ -216,9 +269,15 @@ const PendingRequirement1 = () => {
             <Text style={styles.uploadedTitle}>Uploaded Documents</Text>
             <View style={styles.documentsTable}>
               <View style={styles.tableHeader}>
-                <View style={styles.headerCell}><Text style={styles.headerCellText}>No</Text></View>
-                <View style={styles.headerCell}><Text style={styles.headerCellText}>Image</Text></View>  
-                <View style={styles.headerCell}><Text style={styles.headerCellText}>Delete</Text></View>
+                <View style={styles.headerDescriptionCell}>
+                  <Text style={styles.headerCellText}>Description</Text>
+                </View>
+                <View style={styles.headerImageCell}>
+                  <Text style={styles.headerCellText}>Image</Text>
+                </View>
+                <View style={styles.headerDeleteCell}>
+                  <Text style={styles.headerCellText}>Delete</Text>
+                </View>
               </View>
 
               {uploadedDocuments.length > 0 ? (
@@ -236,6 +295,62 @@ const PendingRequirement1 = () => {
             <Text style={styles.submitButtonText}>Submit</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Dropdown Modal */}
+        <Modal
+          visible={isDropdownOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsDropdownOpen(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setIsDropdownOpen(false)}
+          >
+            <View style={styles.modalContent}>
+              {requirementData.requiredDocuments.map((doc, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedDocument(doc);
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{doc}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Image Preview Modal */}
+        <Modal
+          visible={isImageModalOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleCloseImageModal}
+        >
+          <View style={styles.imageModalOverlay}>
+            <TouchableOpacity
+              style={styles.imageModalCloseButton}
+              onPress={handleCloseImageModal}
+            >
+              <Ionicons name="close" size={30} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.imageModalContent}>
+              {selectedImage && (
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -244,7 +359,7 @@ const PendingRequirement1 = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'black',
   },
   container: {
     flex: 1,
@@ -279,7 +394,8 @@ const styles = StyleSheet.create({
   claimCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 15,
-    padding: 15,
+    padding: 15, 
+    marginTop: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#00ADBB',
@@ -306,6 +422,30 @@ const styles = StyleSheet.create({
     color: '#13646D',
     flex: 1,
   },
+  requiredDocumentsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#13646D',
+    marginBottom: 10,
+  },
+  requiredDocumentsBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#00ADBB',
+  },
+  requiredDocItem: {
+    marginBottom: 5,
+  },
+  requiredDocText: {
+    fontSize: 14,
+    color: '#13646D',
+    fontWeight: '500',
+  },
   documentSection: {
     marginBottom: 20,
   },
@@ -319,6 +459,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 15,
+  },
+  dropdownContainer: {
+    marginBottom: 15,
+  },
+  dropdownLabel: {
+    fontSize: 14,
+    color: '#13646D',
+    fontWeight: '500',
+    marginBottom: 5,
+  },
+  dropdown: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#00ADBB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownText: {
+    fontSize: 14,
+    color: '#13646D',
+    flex: 1,
   },
   uploadArea: {
     borderWidth: 2,
@@ -348,17 +512,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  addDocumentButton: {
-    backgroundColor: '#00ADBB',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  addDocumentButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   uploadedSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 15,
@@ -379,12 +532,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#00ADBB',
   },
-  headerCell: {
-    flex: 1,
+  headerDescriptionCell: {
+    flex: 2,
     padding: 12,
     alignItems: 'center',
     borderRightWidth: 1,
     borderRightColor: '#FFFFFF',
+  },
+  headerImageCell: {
+    flex: 2,
+    padding: 12,
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#FFFFFF',
+  },
+  headerDeleteCell: {
+    flex: 1,
+    padding: 12,
+    alignItems: 'center',
   },
   headerCellText: {
     color: '#FFFFFF',
@@ -396,19 +561,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    alignItems: 'center',
   },
-  documentCell: {
-    flex: 1,
+  documentDescriptionCell: {
+    flex: 2,
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: 1,
     borderRightColor: '#E0E0E0',
   },
+  documentImageCell: {
+    flex: 2,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#E0E0E0',
+  },
+  documentDeleteCell: {
+    flex: 1,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   documentCellText: {
     color: '#13646D',
     fontSize: 12,
     textAlign: 'center',
+  },
+  documentImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    resizeMode: 'cover',
   },
   emptyRow: {
     backgroundColor: '#FFFFFF',
@@ -431,6 +617,59 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 20,
+    minWidth: 250,
+    maxWidth: 300,
+  },
+  modalItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#13646D',
+    textAlign: 'center',
+  },
+  // New styles for image modal
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalContent: {
+    width: width * 0.9,
+    height: height * 0.7,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
   },
 });
 
