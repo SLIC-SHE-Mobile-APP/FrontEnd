@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
 import {
     Alert,
     Modal,
@@ -12,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
+
 
 const EditClaimIntimation = ({ route}) => {
     const navigation = useNavigation();
@@ -69,6 +71,16 @@ const EditClaimIntimation = ({ route}) => {
         date: '',
         amount: '',
     });
+
+    // Navigate to UploadDocuments page
+    const handleNavigateToUploadDocuments = () => {
+        navigation.navigate('UploadDocuments', {
+            claim: claim,
+            beneficiaries: beneficiaries,
+            documents: documents,
+            fromEditClaim: true
+        });
+    };
 
     // Add beneficiary
     const handleAddBeneficiary = () => {
@@ -187,6 +199,7 @@ const EditClaimIntimation = ({ route}) => {
     };
 
     return (
+        <SafeAreaView style={styles.safeArea}>
         <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
@@ -266,7 +279,7 @@ const EditClaimIntimation = ({ route}) => {
 
                     <TouchableOpacity
                         style={styles.addBeneficiaryButton}
-                        onPress={() => setAddBeneficiaryModalVisible(true)}
+                        onPress={handleNavigateToUploadDocuments}
                     >
                         <Text style={styles.addBeneficiaryText}>Add More Beneficiary</Text>
                     </TouchableOpacity>
@@ -503,11 +516,15 @@ const EditClaimIntimation = ({ route}) => {
                     </View>
                 </View>
             </Modal>
-        </LinearGradient>
+        </LinearGradient></SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: 'black', 
+    },
     container: {
         flex: 1,
         backgroundColor: '#FFFFFF',
@@ -516,7 +533,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 50,
+        paddingTop: 30,
         paddingBottom: 20,
         backgroundColor: 'transparent',
     },
