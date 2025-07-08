@@ -211,12 +211,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingRight: 20,
+    paddingLeft: 20
   },
   claimCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 15,
-    marginBottom: 15,
+    marginBottom: 25,
     padding: 16,
     elevation: 3,
     shadowColor: '#000',

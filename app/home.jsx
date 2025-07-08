@@ -20,6 +20,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
 import ClaimTypeSelection from "./ClaimTypeSelection";
 import PendingIntimations from "./PendingIntimations";
+import ClaimHistory from "./ClaimHistory";
+import PendingRequirement from "./PendingRequirement";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -37,6 +39,10 @@ export default function PolicyHome() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [showPendingIntimations, setShowPendingIntimations] = useState(false);
+  const [showClaimHistory, setShowClaimHistory] = useState(false);
+  const [claimHistorySlideAnim] = useState(new Animated.Value(screenHeight));
+  const [showPendingRequirement, setShowPendingRequirement] = useState(false);
+  const [pendingRequirementSlideAnim] = useState(new Animated.Value(screenHeight));
   const [pendingIntimationsSlideAnim] = useState(
     new Animated.Value(screenHeight)
   );
@@ -705,10 +711,20 @@ export default function PolicyHome() {
       }).start();
     } else if (normalizedType === "Claim History") {
       console.log("Claim History pressed");
-      // Add your navigation logic here
+      setShowClaimHistory(true);
+      Animated.timing(claimHistorySlideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else if (normalizedType === "Pending Requirement") {
       console.log("Pending Requirement pressed");
-      // Add your navigation logic here
+      setShowPendingRequirement(true);
+      Animated.timing(pendingRequirementSlideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else {
       console.log(`${normalizedType} pressed`);
     }
@@ -723,6 +739,27 @@ export default function PolicyHome() {
       setShowPendingIntimations(false);
     });
   };
+
+  const handleCloseClaimHistory = () => {
+    Animated.timing(claimHistorySlideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowClaimHistory(false);
+    });
+  };
+  
+  const handleClosePendingRequirement = () => {
+    Animated.timing(pendingRequirementSlideAnim, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPendingRequirement(false);
+    });
+  };
+  
 
   const handleCloseModal = () => {
     Animated.timing(slideAnim, {
@@ -857,8 +894,8 @@ export default function PolicyHome() {
     return "No User";
   };
 
-  return (
-    <SafeAreaView  style={styles.safeArea}>
+    return (
+    <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
@@ -961,7 +998,7 @@ export default function PolicyHome() {
                       style={[
                         styles.dropdownItem,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownItem,
+                        styles.selectedDropdownItem,
                       ]}
                       onPress={() => handleMemberSelect(member)}
                     >
@@ -1098,7 +1135,7 @@ export default function PolicyHome() {
                         style={[
                           styles.policyItem,
                           selectedPolicyNumber === policy.policyNumber &&
-                            styles.selectedPolicyItem,
+                          styles.selectedPolicyItem,
                         ]}
                         onPress={() => handlePolicySelection(policy)}
                       >
@@ -1173,7 +1210,51 @@ export default function PolicyHome() {
               <PendingIntimations onClose={handleClosePendingIntimations} />
             </Animated.View>
           </Modal>
+
         </View>
+        {/* Claim History Modal */}
+        <Modal
+          visible={showClaimHistory}
+          transparent
+          animationType="none"
+          onRequestClose={handleCloseClaimHistory}
+        >
+          <TouchableOpacity
+            style={styles.overlayTouchable}
+            activeOpacity={1}
+            onPress={handleCloseClaimHistory}
+          />
+          <Animated.View
+            style={[
+              styles.animatedModal,
+              { transform: [{ translateY: claimHistorySlideAnim }] },
+            ]}
+          >
+            <ClaimHistory onClose={handleCloseClaimHistory} />
+          </Animated.View>
+        </Modal>
+
+        {/* Pending Requirement Modal */}
+        <Modal
+          visible={showPendingRequirement}
+          transparent
+          animationType="none"
+          onRequestClose={handleClosePendingRequirement}
+        >
+          <TouchableOpacity
+            style={styles.overlayTouchable}
+            activeOpacity={1}
+            onPress={handleClosePendingRequirement}
+          />
+          <Animated.View
+            style={[
+              styles.animatedModal,
+              { transform: [{ translateY: pendingRequirementSlideAnim }] },
+            ]}
+          >
+            <PendingRequirement onClose={handleClosePendingRequirement} />
+          </Animated.View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1182,8 +1263,8 @@ export default function PolicyHome() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'black', 
-},
+    backgroundColor: 'black',
+  },
   container: {
     flex: 1,
   },

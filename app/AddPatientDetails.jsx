@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
-// ✅ Use router from Expo Router
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const AddPatientDetails = ({ onClose }) => {

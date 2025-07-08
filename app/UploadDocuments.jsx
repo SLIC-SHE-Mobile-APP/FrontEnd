@@ -13,23 +13,46 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker from '@react-native-community/datetimepicker';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const UploadDocuments = ({ route }) => {
-  const navigation = useNavigation(); // Use this hook to ensure navigation is available
-
-  // Get patient data from navigation params
+  const navigation = useNavigation();
   const patientData = route?.params?.patientData || {};
 
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
   const [amount, setAmount] = useState('');
-  const [documentDate, setDocumentDate] = useState('');
+  const [documentDate, setDocumentDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  
+  // Image popup state
+  const [showImagePopup, setShowImagePopup] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  
+  // Sample images with local image sources
   const [sampleImages] = useState([
-    { id: 1, uri: null, placeholder: true },
-    { id: 2, uri: null, placeholder: true },
-    { id: 3, uri: null, placeholder: true },
+    { 
+      id: 1, 
+      source: require('../assets/images/sample1.jpg'),
+      description: 'Medical Bill Sample'
+    },
+    { 
+      id: 2, 
+      source: require('../assets/images/sample2.jpg'),
+      description: 'Prescription Sample'
+    },
+    { 
+      id: 3, 
+      source: require('../assets/images/sample3.jpg'),
+      description: 'Diagnosis Report Sample'
+    },
   ]);
 
   useEffect(() => {
@@ -45,6 +68,74 @@ const UploadDocuments = ({ route }) => {
 
   const handleDocumentTypeSelect = (type) => {
     setSelectedDocumentType(type);
+  };
+
+  const handleDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || documentDate;
+    setShowDatePicker(Platform.OS === 'ios');
+    setDocumentDate(currentDate);
+  };
+
+  const showDatePickerModal = () => {
+    setShowDatePicker(true);
+  };
+
+  const formatDate = (date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleAmountChange = (text) => {
+    // Remove any non-numeric characters except decimal point
+    const cleanedText = text.replace(/[^0-9.]/g, '');
+    
+    // Ensure only one decimal point
+    const parts = cleanedText.split('.');
+    if (parts.length > 2) {
+      return;
+    }
+    
+    // Format the amount
+    let formattedAmount = cleanedText;
+    
+    // If there's a decimal point, ensure only 2 decimal places
+    if (parts.length === 2) {
+      if (parts[1].length > 2) {
+        formattedAmount = parts[0] + '.' + parts[1].substring(0, 2);
+      }
+    }
+    
+    setAmount(formattedAmount);
+  };
+
+  const validateAmount = (amountString) => {
+    if (!amountString || amountString.trim() === '') {
+      return false;
+    }
+    
+    const amount = parseFloat(amountString);
+    if (isNaN(amount) || amount <= 0) {
+      return false;
+    }
+    
+    // Check if it has proper decimal format
+    const decimalParts = amountString.split('.');
+    if (decimalParts.length === 2 && decimalParts[1].length !== 2) {
+      return false;
+    }
+    
+    return true;
+  };
+
+  const formatAmountForDisplay = (amountString) => {
+    if (!amountString) return '';
+    
+    const amount = parseFloat(amountString);
+    if (isNaN(amount)) return amountString;
+    
+    return amount.toFixed(2);
   };
 
   const handleBrowseFiles = async () => {
@@ -74,7 +165,6 @@ const UploadDocuments = ({ route }) => {
 
   const handleTakePhoto = async () => {
     try {
-      // Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Camera permission is required to take photos');
@@ -136,11 +226,16 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
+    if (!validateAmount(amount)) {
+      Alert.alert('Validation Error', 'Please enter a valid amount in format XX.XX (e.g., 100.00)');
+      return;
+    }
+
     const documentInfo = {
       patientData,
       documentType: selectedDocumentType,
-      amount: amount.trim(),
-      documentDate: documentDate.trim(),
+      amount: formatAmountForDisplay(amount),
+      documentDate: formatDate(documentDate),
       documents: uploadedDocuments,
     };
 
@@ -153,7 +248,6 @@ const UploadDocuments = ({ route }) => {
         {
           text: 'OK',
           onPress: () => {
-            // Navigate to next screen or go back
             navigation.goBack();
           },
         },
@@ -162,13 +256,11 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleBackPress = () => {
-    console.log('Back button pressed'); // Add this for debugging
+    console.log('Back button pressed');
     try {
       navigation.goBack();
     } catch (error) {
       console.error('Navigation error:', error);
-      // Fallback - you might want to navigate to a specific screen
-      // navigation.navigate('YourPreviousScreenName');
     }
   };
 
@@ -180,16 +272,23 @@ const UploadDocuments = ({ route }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Handle image popup
+  const handleImagePress = (image) => {
+    setSelectedImage(image);
+    setShowImagePopup(true);
+  };
+
+  const closeImagePopup = () => {
+    setShowImagePopup(false);
+    setSelectedImage(null);
+  };
+
   return (
-<SafeAreaView style={styles.safeArea}>
-    <View style={styles.container}>
-
-
-
-    <LinearGradient
-      colors={['#FAFAFA', '#6DD3D3']}
-      style={[styles.gradient]}
-    >
+    <SafeAreaView style={styles.safeArea}>
+      <LinearGradient
+        colors={['#FAFAFA', '#6DD3D3']}
+        style={[styles.gradient]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
@@ -198,7 +297,6 @@ const UploadDocuments = ({ route }) => {
           <Text style={styles.headerTitle}>Upload Documents</Text>
           <View style={styles.placeholder} />
         </View>
-
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Patient Info Display */}
@@ -246,42 +344,75 @@ const UploadDocuments = ({ route }) => {
             </View>
           </View>
 
+          {/* Document Date Input */}
+          <View style={styles.section}>
+            <Text style={styles.inputLabel}>Document Date</Text>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={showDatePickerModal}
+            >
+              <Text style={styles.datePickerText}>
+                {formatDate(documentDate)}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#00C4CC" />
+            </TouchableOpacity>
+            
+            {showDatePicker && (
+              <DateTimePicker
+                testID="dateTimePicker"
+                value={documentDate}
+                mode="date"
+                is24Hour={true}
+                display="default"
+                onChange={handleDateChange}
+                maximumDate={new Date()} // Prevent future dates
+              />
+            )}
+          </View>
+
           {/* Amount Input */}
           <View style={styles.section}>
             <Text style={styles.inputLabel}>Amount</Text>
             <TextInput
-              style={styles.textInput}
+              style={[
+                styles.textInput,
+                !validateAmount(amount) && amount !== '' && styles.textInputError
+              ]}
               placeholder="Enter amount"
               placeholderTextColor="#B0B0B0"
               value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
+              onChangeText={handleAmountChange}
+              keyboardType="decimal-pad"
             />
-          </View>
-
-          {/* Document Date Input */}
-          <View style={styles.section}>
-            <Text style={styles.inputLabel}>Document Date</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Enter document date (DD/MM/YYYY)"
-              placeholderTextColor="#B0B0B0"
-              value={documentDate}
-              onChangeText={setDocumentDate}
-            />
+            
           </View>
 
           {/* Sample Images Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Sample Images</Text>
-            <Text style={styles.sectionSubtitle}>Only support JPG, JPEG, TIFF and PNG</Text>
+            <Text style={styles.sectionSubtitle}>Any document without "Submitted to SLICGL on [Date],[Policy No],[MemberID]" will be rejected by SLICGL</Text>
             <View style={styles.sampleImagesContainer}>
               {sampleImages.map((image) => (
-                <View key={image.id} style={styles.sampleImageCard}>
-                  <View style={styles.sampleImagePlaceholder}>
-                    <Ionicons name="image-outline" size={30} color="#B0B0B0" />
+                <TouchableOpacity
+                  key={image.id}
+                  style={styles.sampleImageCard}
+                  onPress={() => handleImagePress(image)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.sampleImageWrapper}>
+                    <Image
+                      source={image.source}
+                      style={styles.sampleImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.sampleImageOverlay}>
+                      <Text style={styles.sampleImageDescription}>{image.description}</Text>
+                      <View style={styles.expandIcon}>
+                        <Ionicons name="expand-outline" size={16} color="#fff" />
+                      </View>
+                    </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -351,9 +482,51 @@ const UploadDocuments = ({ route }) => {
             <Text style={styles.addDocumentButtonText}>Add Document</Text>
           </TouchableOpacity>
         </ScrollView>
-    
-    </LinearGradient >
-    </View></SafeAreaView>
+
+        {/* Image Popup Modal */}
+        <Modal
+          visible={showImagePopup}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeImagePopup}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalCloseArea}
+              onPress={closeImagePopup}
+              activeOpacity={1}
+            >
+              <View style={styles.modalContent}>
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={closeImagePopup}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+                
+                {selectedImage && (
+                  <>
+                    <Image
+                      source={selectedImage.source}
+                      style={styles.modalImage}
+                      resizeMode="contain"
+                    />
+                    <View style={styles.modalImageInfo}>
+                      <Text style={styles.modalImageTitle}>
+                        {selectedImage.description}
+                      </Text>
+                      <Text style={styles.modalImageSubtitle}>
+                        Tap outside to close
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      </LinearGradient>
+    </SafeAreaView>
   );
 };
 
@@ -361,7 +534,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: 'black', 
-},
+  },
   gradient: {
     flex: 1,
     backgroundColor: '#6DD3D3',
@@ -377,9 +550,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
   },
   backButton: {
     padding: 5,
@@ -499,25 +669,79 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+  textInputError: {
+    borderColor: '#FF6B6B',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
+  },
+  datePickerButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  datePickerText: {
+    fontSize: 15,
+    color: '#333',
+  },
   sampleImagesContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   sampleImageCard: {
-    width: '30%',
-    aspectRatio: 1,
+    width: '31%',
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  sampleImagePlaceholder: {
-    flex: 1,
+  sampleImageWrapper: {
+    position: 'relative',
+  },
+  sampleImage: {
+    width: '100%',
+    height: 120,
+  },
+  sampleImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    borderRadius: 8,
-    borderStyle: 'dashed',
+  },
+  sampleImageName: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  sampleImageDescription: {
+    fontSize: 8,
+    color: '#fff',
+    opacity: 0.9,
+    flex: 1,
+  },
+  expandIcon: {
+    marginLeft: 5,
   },
   uploadContainer: {
     backgroundColor: '#fff',
@@ -612,6 +836,54 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  modalContent: {
+    width: screenWidth * 0.9,
+    maxHeight: screenHeight * 0.8,
+    position: 'relative',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  modalImage: {
+    width: '100%',
+    height: screenHeight * 0.6,
+    borderRadius: 10,
+  },
+  modalImageInfo: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  modalImageTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalImageSubtitle: {
+    fontSize: 14,
+    color: '#ccc',
     textAlign: 'center',
   },
 });
