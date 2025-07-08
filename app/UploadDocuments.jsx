@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const UploadDocuments = ({ route }) => {
   const navigation = useNavigation(); // Use this hook to ensure navigation is available
@@ -180,7 +181,7 @@ const UploadDocuments = ({ route }) => {
   };
 
   return (
-
+<SafeAreaView style={styles.safeArea}>
     <View style={styles.container}>
 
 
@@ -352,11 +353,15 @@ const UploadDocuments = ({ route }) => {
         </ScrollView>
     
     </LinearGradient >
-    </View>
+    </View></SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'black', 
+},
   gradient: {
     flex: 1,
     backgroundColor: '#6DD3D3',
@@ -370,7 +375,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,

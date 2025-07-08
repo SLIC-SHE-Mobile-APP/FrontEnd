@@ -858,7 +858,7 @@ export default function PolicyHome() {
   };
 
   return (
-    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
+    <SafeAreaView  style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
@@ -1180,6 +1180,10 @@ export default function PolicyHome() {
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'black', 
+},
   container: {
     flex: 1,
   },

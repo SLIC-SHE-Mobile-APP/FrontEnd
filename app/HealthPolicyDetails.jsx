@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 50,
+    marginTop: 30,
   },
   backIcon: {
     marginRight: 1,
