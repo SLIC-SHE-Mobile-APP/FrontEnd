@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
 import {
     Alert,
     Modal,
@@ -69,6 +69,16 @@ const EditClaimIntimation = ({ route}) => {
         date: '',
         amount: '',
     });
+
+    // Navigate to UploadDocuments page
+    const handleNavigateToUploadDocuments = () => {
+        navigation.navigate('UploadDocuments', {
+            claim: claim,
+            beneficiaries: beneficiaries,
+            documents: documents,
+            fromEditClaim: true
+        });
+    };
 
     // Add beneficiary
     const handleAddBeneficiary = () => {
@@ -266,7 +276,7 @@ const EditClaimIntimation = ({ route}) => {
 
                     <TouchableOpacity
                         style={styles.addBeneficiaryButton}
-                        onPress={() => setAddBeneficiaryModalVisible(true)}
+                        onPress={handleNavigateToUploadDocuments}
                     >
                         <Text style={styles.addBeneficiaryText}>Add More Beneficiary</Text>
                     </TouchableOpacity>
