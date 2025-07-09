@@ -11,22 +11,47 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import * as SecureStore from "expo-secure-store";
 
-const PendingIntimations = ({
-  onClose,
-  onEditClaim,
-  userId = "000682",
-  policyNo = "G/010/SHE/17087/22",
-}) => {
+const PendingIntimations = ({ onClose, onEditClaim }) => {
   const navigation = useNavigation();
 
   const [pendingClaims, setPendingClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [policyNo, setPolicyNo] = useState(null);
+
+  // Fetch stored values from SecureStore
+  useEffect(() => {
+    const getStoredValues = async () => {
+      try {
+        const policyNum = await SecureStore.getItemAsync(
+          "selected_policy_number"
+        );
+        const memberNum = await SecureStore.getItemAsync(
+          "selected_member_number"
+        );
+
+        setUserId(memberNum);
+        setPolicyNo(policyNum);
+      } catch (error) {
+        console.error("Error retrieving stored values:", error);
+        setError("Failed to retrieve stored policy information");
+      }
+    };
+
+    getStoredValues();
+  }, []);
 
   // Fetch claims data from API
   useEffect(() => {
     const fetchClaims = async () => {
+      // Don't fetch if we don't have the required values yet
+      if (!userId || !policyNo) {
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -63,7 +88,7 @@ const PendingIntimations = ({
     };
 
     fetchClaims();
-  }, [userId, policyNo]);
+  }, [userId, policyNo]); // Depend on both userId and policyNo
 
   // Format date function
   const formatDate = (dateString) => {
@@ -83,6 +108,11 @@ const PendingIntimations = ({
 
   // Refresh data function
   const refreshData = async () => {
+    if (!userId || !policyNo) {
+      Alert.alert("Error", "Missing policy information");
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await fetch(
@@ -145,17 +175,50 @@ const PendingIntimations = ({
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            setPendingClaims((prev) => prev.filter((item) => item.id !== id));
-            // Here you would typically also make an API call to delete from server
-            // deleteClaimFromServer(id);
-          },
+          onPress: () => deleteClaimFromServer(id),
         },
       ]
     );
   };
 
-  if (loading) {
+  // Delete claim from server
+  const deleteClaimFromServer = async (claimId) => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/DeleteClaim/DeleteClaim",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            claimNo: claimId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // Remove the claim from local state after successful deletion
+      setPendingClaims((prev) => prev.filter((item) => item.id !== claimId));
+
+      Alert.alert("Success", "Claim deleted successfully");
+    } catch (error) {
+      console.error("Error deleting claim:", error);
+      Alert.alert("Error", "Failed to delete claim. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading while fetching stored values or claims
+  if (loading || !userId || !policyNo) {
     return (
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.header}>
@@ -172,7 +235,11 @@ const PendingIntimations = ({
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2E7D7D" />
-          <Text style={styles.loadingText}>Loading claims...</Text>
+          <Text style={styles.loadingText}>
+            {!userId || !policyNo
+              ? "Loading policy information..."
+              : "Loading claims..."}
+          </Text>
         </View>
       </LinearGradient>
     );
