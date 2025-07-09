@@ -15,7 +15,7 @@ const SHEClaimIntimation = ({ route, navigation }) => {
   const documentData = route?.params?.documentData || null;
   
   const [claimData] = useState({
-    referenceNo: 'M000428',
+    referenceNo: 'M000427',
     enteredBy: 'Member',
     status: 'Submission for Approval Pending',
     claimType: 'Out-door',

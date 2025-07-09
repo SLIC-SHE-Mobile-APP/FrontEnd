@@ -14,7 +14,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 
 const IllnessPopup = ({ visible, onClose }) => {
   const glowAnimation = useRef(new Animated.Value(0)).current;
-  const router = useRouter(); // ✅ useRouter should be called inside the component
+  const router = useRouter(); 
 
   useEffect(() => {
     if (visible) {

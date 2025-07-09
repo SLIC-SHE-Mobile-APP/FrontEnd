@@ -1,116 +1,168 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  Image,
+  Modal,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
+import axios from "axios";
 
 const ClaimHistory1 = ({ onClose, claimData }) => {
-  // Sample document data based on the UI mockup
-  const documents = [
-    {
-      id: 1,
-      documentType: "Diagnosis Card",
-      dateOfDocument: "06/07/2025",
-      amount: "2.00",
-    },
-    {
-      id: 2,
-      documentType: "Diagnosis Card",
-      dateOfDocument: "06/07/2025",
-      amount: "2.00",
-    },
-    {
-      id: 3,
-      documentType: "Diagnosis Card",
-      dateOfDocument: "06/07/2025",
-      amount: "2.00",
-    },
-    {
-      id: 4,
-      documentType: "Diagnosis Card",
-      dateOfDocument: "06/07/2025",
-      amount: "2.00",
-    },
-    {
-      id: 5,
-      documentType: "Diagnosis Card",
-      dateOfDocument: "06/07/2025",
-      amount: "2.00",
-    },
-    {
-      id: 6,
-      documentType: "Diagnosis Card",
-      dateOfDocument: "06/07/2025",
-      amount: "2.00",
-    },
-  ];
+  const [documents, setDocuments] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const renderDocumentCard = (document) => (
-    <View key={document.id} style={styles.documentCard}>
-      <View style={styles.iconContainer}>
-        <View style={styles.documentIcon}>
-          <Ionicons name="document-outline" size={24} color="#17ABB7" />
-        </View>
-      </View>
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await axios.get(
+          `http://203.115.11.229:1002/api/UploadedDocumentCon/${claimData.seqNo}`
+        );
+        if (Array.isArray(response.data)) {
+          setDocuments(response.data);
+        } else {
+          setDocuments([response.data]); // in case it's a single object
+        }
+      } catch (error) {
+        console.error("Document fetch error:", error);
+        Alert.alert("Error", "Failed to load claim documents.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, [claimData]);
+
+  const openImageModal = (doc) => {
+    if (doc.imagePath !== "0") {
+      setSelectedImage({ type: "url", src: doc.imagePath });
+    } else {
+      setSelectedImage({ type: "base64", src: doc.imgContent });
+    }
+    setIsImageModalVisible(true);
+  };
+
+  const closeImageModal = () => {
+    setIsImageModalVisible(false);
+    setSelectedImage(null);
+  };
+
+  const renderDocumentCard = (document, index) => (
+    <View key={index} style={styles.documentCard}>
+      <TouchableOpacity
+        onPress={() => openImageModal(document)}
+        style={styles.iconContainer}
+      >
+        {document.imagePath !== "0" ? (
+          <Image
+            source={{ uri: document.imagePath }}
+            style={styles.documentIcon}
+            resizeMode="contain"
+          />
+        ) : (
+          <Image
+            source={{ uri: `data:image/png;base64,${document.imgContent}` }}
+            style={styles.documentIcon}
+            resizeMode="contain"
+          />
+        )}
+      </TouchableOpacity>
 
       <View style={styles.documentContent}>
         <View style={styles.documentRow}>
           <Text style={styles.documentLabel}>Document Type</Text>
           <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.documentType}</Text>
+          <Text style={styles.documentValue}>{document.docType}</Text>
         </View>
 
         <View style={styles.documentRow}>
-          <Text style={styles.documentLabel}>Date of Document</Text>
+          <Text style={styles.documentLabel}>Claim No</Text>
           <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.dateOfDocument}</Text>
+          <Text style={styles.documentValue}>{document.clmSeqNo}</Text>
         </View>
 
         <View style={styles.documentRow}>
           <Text style={styles.documentLabel}>Amount</Text>
           <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.amount}</Text>
+          <Text style={styles.documentValue}>{document.docAmount}</Text>
         </View>
       </View>
     </View>
   );
 
   return (
-    <LinearGradient
-      colors={["#FFFFFF", "#6DD3D3"]}
-      style={{
-        flex: 1,
-        borderTopLeftRadius: 25,
-        borderTopRightRadius: 25,
-        overflow: "hidden",
-      }}
-    >
-      <View style={styles.header}>
-        <View style={{ width: 26 }} />
-        <Text style={styles.headerTitle}>Claim History</Text>
-        <TouchableOpacity onPress={onClose}>
-          <Ionicons
-            name="close"
-            size={26}
-            color="#13646D"
-            style={{ marginRight: 15 }}
-          />
-        </TouchableOpacity>
-      </View>
+    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <View style={styles.modalContainer}>
+        <View style={styles.header}>
+          <View style={{ width: 26 }} />
+          <Text style={styles.headerTitle}>Claim Documents</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons
+              name="close"
+              size={26}
+              color="#13646D"
+              style={{ marginRight: 15 }}
+            />
+          </TouchableOpacity>
+        </View>
 
-      {/* Documents List */}
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {documents.map(renderDocumentCard)}
-      </ScrollView>
+        {loading ? (
+          <ActivityIndicator size="large" color="#17ABB7" />
+        ) : (
+          <ScrollView
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {documents.length > 0 ? (
+              documents.map(renderDocumentCard)
+            ) : (
+              <Text style={{ textAlign: "center", color: "#333" }}>
+                No documents found.
+              </Text>
+            )}
+          </ScrollView>
+        )}
+
+        {/* Image Modal */}
+        <Modal
+          visible={isImageModalVisible}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                onPress={closeImageModal}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={26} color="#000" />
+              </TouchableOpacity>
+              {selectedImage && (
+                <Image
+                  source={{
+                    uri:
+                      selectedImage.type === "base64"
+                        ? `data:image/png;base64,${selectedImage.src}`
+                        : selectedImage.src,
+                  }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
+      </View>
     </LinearGradient>
   );
 };
@@ -142,9 +194,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    flex: 1, 
-    paddingRight: 20,
-    paddingLeft: 20
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 20,
@@ -174,12 +224,9 @@ const styles = StyleSheet.create({
   documentIcon: {
     width: 50,
     height: 50,
-    backgroundColor: "#E8F8F8",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "#17ABB7",
-    borderStyle: "dashed",
+    borderRadius: 5,
   },
   documentContent: {
     flex: 1,
@@ -192,7 +239,6 @@ const styles = StyleSheet.create({
   documentLabel: {
     fontSize: 14,
     color: "#17ABB7",
-    fontFamily: "AbhayaLibreMedium",
     fontWeight: "500",
     width: 120,
     flexShrink: 0,
@@ -206,9 +252,38 @@ const styles = StyleSheet.create({
   documentValue: {
     fontSize: 14,
     color: "#333333",
-    fontFamily: "AbhayaLibreMedium",
     fontWeight: "400",
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "90%",
+    height: "70%",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  fullImage: {
+    width: "100%",
+    height: "100%",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 5,
+    elevation: 5,
   },
 });
 
