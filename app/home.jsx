@@ -18,9 +18,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import ClaimTypeSelection from "./ClaimTypeSelection";
-import PendingIntimations from "./PendingIntimations";
+import ClaimTypeSelection from "./AddPatientDetails.jsx";
 import ClaimHistory from "./ClaimHistory";
+import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
@@ -1752,7 +1752,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animatedModal: {
-    height: "85%",
+    height: "65%",
     backgroundColor: "transparent",
   },
 });

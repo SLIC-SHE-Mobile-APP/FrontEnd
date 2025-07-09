@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
-
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const AddPatientDetails = ({ onClose }) => {
@@ -19,9 +18,18 @@ const AddPatientDetails = ({ onClose }) => {
 
   const [patientName, setPatientName] = useState('');
   const [illness, setIllness] = useState('');
+  const [selectedClaimType, setSelectedClaimType] = useState('outdoor'); // Default to outdoor
   const [patientNameError, setPatientNameError] = useState('');
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [memberList, setMemberList] = useState([]);
+
+  // Define claim types - only outdoor is enabled
+  const claimTypes = [
+    { id: 'outdoor', label: 'Outdoor', icon: '🩺', enabled: true },
+    { id: 'indoor', label: 'Indoor', icon: '🏠', enabled: false },
+    { id: 'dental', label: 'Dental', icon: '🦷', enabled: false },
+    { id: 'spectacles', label: 'Spectacles', icon: '👓', enabled: false },
+  ];
 
   useEffect(() => {
     const defaultMembers = [
@@ -62,7 +70,8 @@ const AddPatientDetails = ({ onClose }) => {
 
     const patientData = {
       patientName: patientName.trim(),
-      illness
+      illness,
+      claimType: selectedClaimType
     };
 
     // Use only Expo Router for navigation
@@ -72,15 +81,17 @@ const AddPatientDetails = ({ onClose }) => {
     });
   };
 
-  const handlePatientNameChange = (text) => {
-    setPatientName(text);
-    if (patientNameError) setPatientNameError('');
-  };
-
   const handleMemberSelect = (member) => {
     setPatientName(member.name);
     setShowMemberDropdown(false);
     if (patientNameError) setPatientNameError('');
+  };
+
+  const handleClaimTypeSelect = (claimTypeId, enabled) => {
+    // Only allow selection if the claim type is enabled
+    if (enabled) {
+      setSelectedClaimType(claimTypeId);
+    }
   };
 
   const toggleDropdown = () => {
@@ -122,22 +133,72 @@ const AddPatientDetails = ({ onClose }) => {
       />
       <View style={styles.popupContainer}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Add Patient Details</Text>
+          {/* Header with close button */}
+          <View style={styles.header}>
+            <View style={{ width: 26 }} />
+            <Text style={styles.cardTitle}>Add Patient Details</Text>
+            <TouchableOpacity onPress={handleBackPress}>
+              <Icon
+                name="close"
+                size={26}
+                color="#13646D"
+                style={{ marginRight: 15 }}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Claim Type Selection */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Claim Type</Text>
+            <View style={styles.claimTypeGrid}>
+              {claimTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.claimTypeButton,
+                    selectedClaimType === type.id && styles.selectedClaimType,
+                    !type.enabled && styles.disabledClaimType
+                  ]}
+                  onPress={() => handleClaimTypeSelect(type.id, type.enabled)}
+                  disabled={!type.enabled}
+                >
+                  <Text style={[
+                    styles.claimTypeIcon,
+                    !type.enabled && styles.disabledClaimTypeIcon
+                  ]}>
+                    {type.icon}
+                  </Text>
+                  <Text style={[
+                    styles.claimTypeLabel,
+                    selectedClaimType === type.id && styles.selectedClaimTypeLabel,
+                    !type.enabled && styles.disabledClaimTypeLabel
+                  ]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Patient Name *</Text>
             <View style={styles.inputWrapper}>
-              <TextInput
+              <TouchableOpacity
                 style={[
                   styles.textInput,
                   styles.textInputWithDropdown,
+                  styles.dropdownSelectInput,
                   patientNameError ? styles.textInputError : null
                 ]}
-                placeholder="Enter patient name"
-                placeholderTextColor="#B0B0B0"
-                value={patientName}
-                onChangeText={handlePatientNameChange}
-              />
+                onPress={toggleDropdown}
+              >
+                <Text style={[
+                  styles.dropdownSelectText,
+                  !patientName && styles.placeholderText
+                ]}>
+                  {patientName || 'Select patient name'}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.dropdownButton}
                 onPress={toggleDropdown}
@@ -221,12 +282,19 @@ const styles = StyleSheet.create({
     shadowRadius: 25,
     elevation: 10,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 20,
+    backgroundColor: "transparent",
+    zIndex: 1,
+  },
   cardTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#13646D',
-    marginBottom: 25,
     textAlign: 'center',
+    flex: 1,
   },
   inputContainer: {
     marginBottom: 30,
@@ -258,6 +326,17 @@ const styles = StyleSheet.create({
   textInputError: {
     borderColor: '#FF6B6B',
     borderWidth: 2,
+  },
+  // New styles for dropdown-only patient name
+  dropdownSelectInput: {
+    justifyContent: 'center',
+  },
+  dropdownSelectText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  placeholderText: {
+    color: '#B0B0B0',
   },
   dropdownButton: {
     position: 'absolute',
@@ -318,6 +397,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 5,
     marginLeft: 5,
+  },
+  // Claim Type Styles
+  claimTypeGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  claimTypeButton: {
+    width: '22%',
+    height: 70,
+    borderRadius: 12,
+    backgroundColor: '#F9F9F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 5,
+    borderWidth: 2,
+    borderColor: '#E8E8E8',
+  },
+  selectedClaimType: {
+    backgroundColor: '#00C4CC',
+    borderColor: '#00C4CC',
+  },
+  // New styles for disabled claim types
+  disabledClaimType: {
+    backgroundColor: '#F0F0F0',
+    borderColor: '#D0D0D0',
+    opacity: 0.6,
+  },
+  claimTypeIcon: {
+    fontSize: 20,
+    marginBottom: 5,
+  },
+  disabledClaimTypeIcon: {
+    opacity: 0.5,
+  },
+  claimTypeLabel: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  selectedClaimTypeLabel: {
+    color: 'white',
+  },
+  disabledClaimTypeLabel: {
+    color: '#999',
   },
   nextButton: {
     backgroundColor: '#00C4CC',
