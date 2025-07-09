@@ -281,7 +281,7 @@ const EditClaimIntimation = ({ route}) => {
                         style={styles.addBeneficiaryButton}
                         onPress={handleNavigateToUploadDocuments}
                     >
-                        <Text style={styles.addBeneficiaryText}>Add More Beneficiary</Text>
+                        <Text style={styles.addBeneficiaryText}>Add More Documents</Text>
                     </TouchableOpacity>
                 </View>
 

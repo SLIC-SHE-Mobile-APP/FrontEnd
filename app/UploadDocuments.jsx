@@ -188,7 +188,6 @@ const UploadDocuments = ({ route }) => {
           size: photo.fileSize || 0,
         };
         setUploadedDocuments(prev => [...prev, newDocument]);
-        Alert.alert('Success', 'Photo captured successfully!');
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -241,18 +240,10 @@ const UploadDocuments = ({ route }) => {
 
     console.log('Document submission data:', documentInfo);
 
-    Alert.alert(
-      'Success',
-      'Documents added successfully!',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    // Navigate to OnlineClaimIntimation1 page with the data
+    navigation.navigate('OnlineClaimIntimation1', { 
+      submittedData: documentInfo 
+    });
   };
 
   const handleBackPress = () => {
