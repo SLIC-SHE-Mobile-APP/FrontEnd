@@ -1,56 +1,44 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import ClaimHistory1 from './ClaimHistory1'; // Import the detail view
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
+import axios from 'axios';
+import ClaimHistory1 from './ClaimHistory1'; // detail screen
 
 const ClaimHistory = ({ onClose, availableHeight }) => {
+  const [claimData, setClaimData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showDetailView, setShowDetailView] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState(null);
 
-  // Sample claim data - replace with actual data from your API
-  const claimData = [
-    {
-      id: 1,
-      referenceNo: 'M000428',
-      patientName: 'Ganeshi Kavindya',
-      relationship: 'Employee',
-      status: 'Approved by HR.(Approval by SLIC Pending)',
-      claimType: 'Out Door',
-      claimAmount: '1500.00',
-      submissionDate: '22/06/2025'
-    },
-    {
-      id: 2,
-      referenceNo: 'M000428',
-      patientName: 'Ganeshi Kavindya',
-      relationship: 'Employee',
-      status: 'Reject',
-      claimType: 'Out Door',
-      claimAmount: '1500.00',
-      submissionDate: '22/06/2025',
-      rejectReason: 'Not cross the bill'
-    },
-    {
-      id: 3,
-      referenceNo: 'M000428',
-      patientName: 'Ganeshi Kavindya',
-      relationship: 'Employee',
-      status: 'Approved by HR.(Approval by SLIC Pending)',
-      claimType: 'Out Door',
-      claimAmount: '1500.00',
-      submissionDate: '22/06/2025'
-    }
-  ];
+  // Replace with dynamic values if needed
+  const policyNo = "G/010/SHE/19410/22";
+  const memberNo = "1722";
+
+  useEffect(() => {
+    const fetchClaimHistory = async () => {
+      try {
+        const response = await axios.get(`http://203.115.11.229:1002/api/ClaimHistoryCon?policy_no=${policyNo}&member_no=${memberNo}`);
+        if (Array.isArray(response.data)) {
+          setClaimData(response.data);
+        } else {
+          setClaimData([response.data]); // In case single object
+        }
+      } catch (error) {
+        console.error("Error fetching claim history:", error);
+        Alert.alert("Error", "Failed to fetch claim history.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClaimHistory();
+  }, []);
 
   const getStatusColor = (status) => {
-    if (status.toLowerCase().includes('reject')) {
-      return '#FF6B6B';
-    } else if (status.toLowerCase().includes('approved')) {
-      return '#4CAF50';
-    } else if (status.toLowerCase().includes('pending')) {
-      return '#FF9800';
-    }
+    if (status?.toLowerCase().includes('reject')) return '#FF6B6B';
+    if (status?.toLowerCase().includes('approved')) return '#4CAF50';
+    if (status?.toLowerCase().includes('pending')) return '#FF9800';
     return '#17ABB7';
   };
 
@@ -64,100 +52,49 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     setSelectedClaim(null);
   };
 
-  const renderClaimCard = (claim) => (
-    <View key={claim.id} style={styles.claimCard}>
+  const renderClaimCard = (claim, index) => (
+    <View key={index} style={styles.claimCard}>
       <View style={styles.cardContent}>
-        {/* Reference Number */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Reference No</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.fieldValue}>{claim.referenceNo}</Text>
-        </View>
+        {[
+          ['Reference No', claim.seqNo],
+          ['Patient Name', claim.patientName],
+          ['Relationship', claim.relationship],
+          ['Status', claim.status],
+          ['Claim Type', claim.indOut],
+          ['Claim Amount', claim.claimAmount],
+          ['Submission Date', new Date(claim.intimationDate).toLocaleDateString()]
+        ].map(([label, value], idx) => (
+          <View key={idx} style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>{label}</Text>
+            <Text style={styles.separator}>:</Text>
+            <Text style={[styles.fieldValue, label === 'Status' && { color: getStatusColor(value) }]}>{value}</Text>
+          </View>
+        ))}
 
-        {/* Patient Name */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Patient Name</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.fieldValue}>{claim.patientName}</Text>
-        </View>
-
-        {/* Relationship */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Relationship</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.fieldValue}>{claim.relationship}</Text>
-        </View>
-
-        {/* Status */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Status</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={[styles.fieldValue, { color: getStatusColor(claim.status) }]}>
-            {claim.status}
-          </Text>
-        </View>
-
-        {/* Claim Type */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Claim Type</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.fieldValue}>{claim.claimType}</Text>
-        </View>
-
-        {/* Claim Amount */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Claim Amount</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.fieldValue}>{claim.claimAmount}</Text>
-        </View>
-
-        {/* Submission Date */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Submission Date</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.fieldValue}>{claim.submissionDate}</Text>
-        </View>
-
-        {/* Reject Reason (if applicable) */}
-        {claim.rejectReason && (
+        {/* Reject Reason */}
+        {claim.slicRejectRsn ? (
           <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>Reject Reason</Text>
             <Text style={styles.separator}>:</Text>
-            <Text style={[styles.fieldValue, { color: '#FF6B6B' }]}>{claim.rejectReason}</Text>
+            <Text style={[styles.fieldValue, { color: '#FF6B6B' }]}>{claim.slicRejectRsn}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {/* More button */}
-      <TouchableOpacity 
-        style={styles.moreButton}
-        onPress={() => handleMorePress(claim)}
-      >
+      {/* More Button */}
+      <TouchableOpacity style={styles.moreButton} onPress={() => handleMorePress(claim)}>
         <Text style={styles.moreButtonText}>More</Text>
       </TouchableOpacity>
     </View>
   );
 
-  // Show detail view if requested
-  if (showDetailView) {
-    return (
-      <ClaimHistory1 
-        onClose={handleBackFromDetail}
-        claimData={selectedClaim}
-      />
-    );
+  if (showDetailView && selectedClaim) {
+    return <ClaimHistory1 onClose={handleBackFromDetail} claimData={selectedClaim} />;
   }
 
   return (
-    <LinearGradient
-          colors={["#FFFFFF", "#6DD3D3"]}
-          style={{
-            flex: 1,
-            borderTopLeftRadius: 25,
-            borderTopRightRadius: 25,
-            overflow: "hidden",
-          }}
-        >
+    <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
+      <View style={styles.modalContainer}>
         {/* Header */}
         <View style={styles.header}>
           <View style={{ width: 26 }} />
@@ -167,15 +104,15 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Claims List */}
-        <ScrollView 
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {claimData.map(renderClaimCard)}
-        </ScrollView>
-   
+        {/* Loading Spinner */}
+        {loading ? (
+          <ActivityIndicator size="large" color="#17ABB7" />
+        ) : (
+          <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {claimData.map(renderClaimCard)}
+          </ScrollView>
+        )}
+      </View>
     </LinearGradient>
   );
 };
@@ -189,8 +126,8 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    paddingRight:20,
-    paddingLeft:20,
+    paddingRight: 20,
+    paddingLeft: 20,
     paddingTop: 10,
   },
   header: {
@@ -211,20 +148,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingRight: 20,
-    paddingLeft: 20
+    paddingBottom: 20,
   },
   claimCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 15,
-    marginBottom: 25,
+    marginBottom: 15,
     padding: 16,
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     borderWidth: 1,
@@ -242,7 +175,6 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     color: '#17ABB7',
-    fontFamily: 'AbhayaLibreMedium',
     fontWeight: '500',
     width: 110,
     flexShrink: 0,
@@ -256,7 +188,6 @@ const styles = StyleSheet.create({
   fieldValue: {
     fontSize: 14,
     color: '#333333',
-    fontFamily: 'AbhayaLibreMedium',
     fontWeight: '400',
     flex: 1,
     flexWrap: 'wrap',
@@ -271,7 +202,6 @@ const styles = StyleSheet.create({
   moreButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontFamily: 'AbhayaLibreMedium',
     fontWeight: '500',
   },
 });
