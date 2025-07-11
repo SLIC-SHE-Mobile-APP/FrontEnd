@@ -42,7 +42,9 @@ export default function PolicyHome() {
   const [showClaimHistory, setShowClaimHistory] = useState(false);
   const [claimHistorySlideAnim] = useState(new Animated.Value(screenHeight));
   const [showPendingRequirement, setShowPendingRequirement] = useState(false);
-  const [pendingRequirementSlideAnim] = useState(new Animated.Value(screenHeight));
+  const [pendingRequirementSlideAnim] = useState(
+    new Animated.Value(screenHeight)
+  );
   const [pendingIntimationsSlideAnim] = useState(
     new Animated.Value(screenHeight)
   );
@@ -686,7 +688,7 @@ export default function PolicyHome() {
     router.push("/PolicyMemberDetails");
   };
 
-  const handleTypePress = (type) => {
+  const handleTypePress = async (type) => {
     // Remove newline characters and normalize the type string
     const normalizedType = type.replace(/\n/g, " ").trim();
 
@@ -703,14 +705,62 @@ export default function PolicyHome() {
       }).start();
     } else if (normalizedType === "Saved Claims") {
       console.log("Saved Claims pressed");
-      setShowPendingIntimations(true);
-      Animated.timing(pendingIntimationsSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+
+      // Check if a member is selected
+      if (!selectedMember) {
+        Alert.alert(
+          "Member Selection Required",
+          "Please select a member from the dropdown before accessing Saved Claims.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // Verify member data is stored in SecureStore
+      try {
+        const storedMemberData = await SecureStore.getItemAsync(
+          "selected_member_complete"
+        );
+        if (!storedMemberData) {
+          Alert.alert(
+            "Member Selection Required",
+            "Please select a member from the dropdown before accessing Saved Claims.",
+            [{ text: "OK" }]
+          );
+          return;
+        }
+
+        const memberData = JSON.parse(storedMemberData);
+        console.log("Member data for Saved Claims:", memberData);
+
+        // Proceed to open Saved Claims modal
+        setShowPendingIntimations(true);
+        Animated.timing(pendingIntimationsSlideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      } catch (error) {
+        console.error("Error checking member data:", error);
+        Alert.alert(
+          "Error",
+          "Unable to verify member selection. Please select a member again.",
+          [{ text: "OK" }]
+        );
+      }
     } else if (normalizedType === "Claim History") {
       console.log("Claim History pressed");
+
+      // Check if a member is selected for Claim History as well
+      if (!selectedMember) {
+        Alert.alert(
+          "Member Selection Required",
+          "Please select a member from the dropdown before accessing Claim History.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
       setShowClaimHistory(true);
       Animated.timing(claimHistorySlideAnim, {
         toValue: 0,
@@ -719,6 +769,17 @@ export default function PolicyHome() {
       }).start();
     } else if (normalizedType === "Pending Requirement") {
       console.log("Pending Requirement pressed");
+
+      // Check if a member is selected for Pending Requirement as well
+      if (!selectedMember) {
+        Alert.alert(
+          "Member Selection Required",
+          "Please select a member from the dropdown before accessing Pending Requirement.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
       setShowPendingRequirement(true);
       Animated.timing(pendingRequirementSlideAnim, {
         toValue: 0,
@@ -749,7 +810,7 @@ export default function PolicyHome() {
       setShowClaimHistory(false);
     });
   };
-  
+
   const handleClosePendingRequirement = () => {
     Animated.timing(pendingRequirementSlideAnim, {
       toValue: screenHeight,
@@ -759,7 +820,6 @@ export default function PolicyHome() {
       setShowPendingRequirement(false);
     });
   };
-  
 
   const handleCloseModal = () => {
     Animated.timing(slideAnim, {
@@ -894,7 +954,7 @@ export default function PolicyHome() {
     return "No User";
   };
 
-    return (
+  return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.headerContent}>
@@ -998,7 +1058,7 @@ export default function PolicyHome() {
                       style={[
                         styles.dropdownItem,
                         selectedMember?.id === member.id &&
-                        styles.selectedDropdownItem,
+                          styles.selectedDropdownItem,
                       ]}
                       onPress={() => handleMemberSelect(member)}
                     >
@@ -1135,7 +1195,7 @@ export default function PolicyHome() {
                         style={[
                           styles.policyItem,
                           selectedPolicyNumber === policy.policyNumber &&
-                          styles.selectedPolicyItem,
+                            styles.selectedPolicyItem,
                         ]}
                         onPress={() => handlePolicySelection(policy)}
                       >
@@ -1210,7 +1270,6 @@ export default function PolicyHome() {
               <PendingIntimations onClose={handleClosePendingIntimations} />
             </Animated.View>
           </Modal>
-
         </View>
         {/* Claim History Modal */}
         <Modal
@@ -1263,7 +1322,7 @@ export default function PolicyHome() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: "black",
   },
   container: {
     flex: 1,
