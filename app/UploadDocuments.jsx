@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,19 +7,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   Image,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
-  Modal,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -31,25 +31,31 @@ const UploadDocuments = ({ route }) => {
   const [documentDate, setDocumentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
-  
+
   // Image popup state
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editDocumentType, setEditDocumentType] = useState('');
+
   // Sample images with local image sources
   const [sampleImages] = useState([
-    { 
-      id: 1, 
+    {
+      id: 1,
       source: require('../assets/images/sample1.jpg'),
-      description: 'Medical Bill Sample'
-    },
-    { 
-      id: 2, 
-      source: require('../assets/images/sample2.jpg'),
       description: 'Prescription Sample'
     },
-    { 
-      id: 3, 
+    {
+      id: 2,
+      source: require('../assets/images/sample2.jpg'),
+      description: 'Medical Bill Sample'
+    },
+    {
+      id: 3,
       source: require('../assets/images/sample3.jpg'),
       description: 'Diagnosis Report Sample'
     },
@@ -68,6 +74,18 @@ const UploadDocuments = ({ route }) => {
 
   const handleDocumentTypeSelect = (type) => {
     setSelectedDocumentType(type);
+
+    // Set amount based on document type
+    if (type === 'prescription' || type === 'diagnosis') {
+      setAmount('0.00');
+    } else if (type === 'bill') {
+      setAmount(''); // Clear amount for bill type so user can enter
+    } else {
+      setAmount(''); // Clear for other types
+    }
+
+    // Don't clear uploaded documents when switching document types
+    // setUploadedDocuments([]);
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -88,73 +106,151 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleAmountChange = (text) => {
+    // If document type is prescription or diagnosis, don't allow editing
+    if (selectedDocumentType === 'prescription' || selectedDocumentType === 'diagnosis') {
+      return;
+    }
+
     // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, '');
-    
+
     // Ensure only one decimal point
     const parts = cleanedText.split('.');
     if (parts.length > 2) {
       return;
     }
-    
+
     // Format the amount
     let formattedAmount = cleanedText;
-    
+
     // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + '.' + parts[1].substring(0, 2);
       }
     }
-    
+
     setAmount(formattedAmount);
   };
 
+  const handleEditAmountChange = (text) => {
+    // If document type is prescription or diagnosis, don't allow editing
+    if (editDocumentType === 'prescription' || editDocumentType === 'diagnosis') {
+      return;
+    }
+
+    // Remove any non-numeric characters except decimal point
+    const cleanedText = text.replace(/[^0-9.]/g, '');
+
+    // Ensure only one decimal point
+    const parts = cleanedText.split('.');
+    if (parts.length > 2) {
+      return;
+    }
+
+    // Format the amount
+    let formattedAmount = cleanedText;
+
+    // If there's a decimal point, ensure only 2 decimal places
+    if (parts.length === 2) {
+      if (parts[1].length > 2) {
+        formattedAmount = parts[0] + '.' + parts[1].substring(0, 2);
+      }
+    }
+
+    setEditAmount(formattedAmount);
+  };
+
   const validateAmount = (amountString) => {
+    // For prescription and diagnosis, 0.00 is valid
+    if (selectedDocumentType === 'prescription' || selectedDocumentType === 'diagnosis') {
+      return true;
+    }
+
+    // For bill type, amount must be greater than 0
+    if (selectedDocumentType === 'bill') {
+      if (!amountString || amountString.trim() === '') {
+        return false;
+      }
+
+      const amount = parseFloat(amountString);
+      if (isNaN(amount) || amount <= 0) {
+        return false;
+      }
+
+      return true;
+    }
+
+    // For other types, any valid number is acceptable
     if (!amountString || amountString.trim() === '') {
       return false;
     }
-    
+
     const amount = parseFloat(amountString);
-    if (isNaN(amount) || amount <= 0) {
+    if (isNaN(amount) || amount < 0) {
       return false;
     }
-    
-    // Check if it has proper decimal format
-    const decimalParts = amountString.split('.');
-    if (decimalParts.length === 2 && decimalParts[1].length !== 2) {
-      return false;
-    }
-    
+
     return true;
   };
 
   const formatAmountForDisplay = (amountString) => {
     if (!amountString) return '';
-    
+
     const amount = parseFloat(amountString);
     if (isNaN(amount)) return amountString;
-    
+
     return amount.toFixed(2);
   };
 
+  // FIXED: Check if maximum documents reached based on document type
+  const canAddMoreDocuments = () => {
+    if (selectedDocumentType === 'bill') {
+      // Count only bill-type documents
+      const billDocuments = uploadedDocuments.filter(doc => doc.documentType === 'bill');
+      return billDocuments.length < 1; // Only 1 bill document allowed
+    }
+    return true; // No limit for other document types
+  };
+
   const handleBrowseFiles = async () => {
+    if (!canAddMoreDocuments()) {
+      Alert.alert('Document Limit', 'You can only upload 1 document for Bill type.');
+      return;
+    }
+  
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf', 'image/jpeg', 'image/png'],
         copyToCacheDirectory: true,
       });
-
+  
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
+  
+        // Generate custom name based on document type
+        const fileExtension = file.name.split('.').pop();
+        const customName = selectedDocumentType ?
+          `${selectedDocumentType.charAt(0).toUpperCase() + selectedDocumentType.slice(1)}.${fileExtension}` :
+          file.name;
+  
         const newDocument = {
           id: Date.now(),
-          name: file.name,
+          name: customName,
           uri: file.uri,
           type: file.mimeType,
           size: file.size,
+          documentType: selectedDocumentType,
+          amount: formatAmountForDisplay(amount),
+          date: formatDate(documentDate),
         };
         setUploadedDocuments(prev => [...prev, newDocument]);
+        
+        // ADD THESE RESET LINES:
+        setSelectedDocumentType('');
+        setAmount('');
+        setDocumentDate(new Date());
+        
         Alert.alert('Success', 'Document uploaded successfully!');
       }
     } catch (error) {
@@ -164,30 +260,48 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleTakePhoto = async () => {
+    if (!canAddMoreDocuments()) {
+      Alert.alert('Document Limit', 'You can only upload 1 document for Bill type.');
+      return;
+    }
+  
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Camera permission is required to take photos');
         return;
       }
-
+  
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false, // Removed cropping
         quality: 0.8,
       });
-
+  
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const photo = result.assets[0];
+  
+        // Generate custom name based on document type
+        const customName = selectedDocumentType ?
+          `${selectedDocumentType.charAt(0).toUpperCase() + selectedDocumentType.slice(1)}.jpg` :
+          `Photo_${Date.now()}.jpg`;
+  
         const newDocument = {
           id: Date.now(),
-          name: `Photo_${Date.now()}.jpg`,
+          name: customName,
           uri: photo.uri,
           type: 'image/jpeg',
           size: photo.fileSize || 0,
+          documentType: selectedDocumentType,
+          amount: formatAmountForDisplay(amount),
+          date: formatDate(documentDate),
         };
         setUploadedDocuments(prev => [...prev, newDocument]);
+        
+        // ADD THESE RESET LINES:
+        setSelectedDocumentType('');
+        setAmount('');
+        setDocumentDate(new Date());
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -195,23 +309,84 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
+  
   const handleRemoveDocument = (documentId) => {
     Alert.alert(
-      'Remove Document',
-      'Are you sure you want to remove this document?',
+      'Delete Document',
+      'Are you sure you want to delete this document? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Remove',
+          text: 'Delete',
           style: 'destructive',
           onPress: () => {
             setUploadedDocuments(prev =>
               prev.filter(doc => doc.id !== documentId)
             );
+            Alert.alert('Success', 'Document deleted successfully.');
           },
         },
       ]
     );
+  };
+
+  
+  const handleSaveEdit = () => {
+    if (!validateEditAmount(editAmount)) {
+      if (editDocumentType === 'bill') {
+        Alert.alert('Validation Error', 'Please enter a valid amount greater than 0 for Bill type');
+      } else {
+        Alert.alert('Validation Error', 'Please enter a valid amount');
+      }
+      return;
+    }
+
+    setUploadedDocuments(prev =>
+      prev.map(doc =>
+        doc.id === editingDocument.id
+          ? { ...doc, amount: formatAmountForDisplay(editAmount) }
+          : doc
+      )
+    );
+
+    setShowEditModal(false);
+    setEditingDocument(null);
+    setEditAmount('');
+    setEditDocumentType('');
+    Alert.alert('Success', 'Document details updated successfully.');
+  };
+
+  const validateEditAmount = (amountString) => {
+    // For prescription and diagnosis, 0.00 is valid
+    if (editDocumentType === 'prescription' || editDocumentType === 'diagnosis') {
+      return true;
+    }
+
+    // For bill type, amount must be greater than 0
+    if (editDocumentType === 'bill') {
+      if (!amountString || amountString.trim() === '') {
+        return false;
+      }
+
+      const amount = parseFloat(amountString);
+      if (isNaN(amount) || amount <= 0) {
+        return false;
+      }
+
+      return true;
+    }
+
+    // For other types, any valid number is acceptable
+    if (!amountString || amountString.trim() === '') {
+      return false;
+    }
+
+    const amount = parseFloat(amountString);
+    if (isNaN(amount) || amount < 0) {
+      return false;
+    }
+
+    return true;
   };
 
   const handleAddDocument = () => {
@@ -226,7 +401,11 @@ const UploadDocuments = ({ route }) => {
     }
 
     if (!validateAmount(amount)) {
-      Alert.alert('Validation Error', 'Please enter a valid amount in format XX.XX (e.g., 100.00)');
+      if (selectedDocumentType === 'bill') {
+        Alert.alert('Validation Error', 'Please enter a valid amount greater than 0 for Bill type');
+      } else {
+        Alert.alert('Validation Error', 'Please enter a valid amount');
+      }
       return;
     }
 
@@ -241,8 +420,8 @@ const UploadDocuments = ({ route }) => {
     console.log('Document submission data:', documentInfo);
 
     // Navigate to OnlineClaimIntimation1 page with the data
-    navigation.navigate('OnlineClaimIntimation1', { 
-      submittedData: documentInfo 
+    navigation.navigate('OnlineClaimIntimation1', {
+      submittedData: documentInfo
     });
   };
 
@@ -255,23 +434,45 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
   // Handle image popup
   const handleImagePress = (image) => {
     setSelectedImage(image);
     setShowImagePopup(true);
   };
 
+  // Handle document image popup
+  const handleDocumentImagePress = (document) => {
+    if (document.type?.startsWith('image/')) {
+      setSelectedImage({
+        source: { uri: document.uri },
+        description: document.name
+      });
+      setShowImagePopup(true);
+    }
+  };
+
   const closeImagePopup = () => {
     setShowImagePopup(false);
     setSelectedImage(null);
+  };
+
+  // FIXED: Get upload instruction text based on document type
+  const getUploadInstructionText = () => {
+    if (selectedDocumentType === 'bill') {
+      const billDocuments = uploadedDocuments.filter(doc => doc.documentType === 'bill');
+      return `You can upload only 1 document for Bill type (${billDocuments.length}/1 uploaded)`;
+    }
+    const currentTypeDocuments = uploadedDocuments.filter(doc => doc.documentType === selectedDocumentType);
+    return `You can upload multiple documents for this type (${currentTypeDocuments.length} uploaded)`;
+  };
+
+  // Check if amount field should be editable
+  const isAmountEditable = () => {
+    return selectedDocumentType !== 'prescription' && selectedDocumentType !== 'diagnosis';
+  };
+
+  const isEditAmountEditable = () => {
+    return editDocumentType !== 'prescription' && editDocumentType !== 'diagnosis';
   };
 
   return (
@@ -335,6 +536,31 @@ const UploadDocuments = ({ route }) => {
             </View>
           </View>
 
+          {/* Amount Input */}
+          <View style={styles.section}>
+            <Text style={styles.inputLabel}>
+              Amount {selectedDocumentType === 'bill' && <Text style={styles.requiredAsterisk}>*</Text>}
+            </Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                !isAmountEditable() && styles.textInputDisabled,
+                !validateAmount(amount) && amount !== '' && styles.textInputError
+              ]}
+              placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
+              placeholderTextColor="#B0B0B0"
+              value={amount}
+              onChangeText={handleAmountChange}
+              keyboardType="decimal-pad"
+              editable={isAmountEditable()}
+            />
+            {selectedDocumentType === 'prescription' || selectedDocumentType === 'diagnosis' ? (
+              <Text style={styles.helpText}>Amount is automatically set to 0.00 for {selectedDocumentType}</Text>
+            ) : selectedDocumentType === 'bill' ? (
+              <Text style={styles.helpText}>Amount is required for Bill type</Text>
+            ) : null}
+          </View>
+
           {/* Document Date Input */}
           <View style={styles.section}>
             <Text style={styles.inputLabel}>Document Date</Text>
@@ -347,7 +573,7 @@ const UploadDocuments = ({ route }) => {
               </Text>
               <Ionicons name="calendar-outline" size={20} color="#00C4CC" />
             </TouchableOpacity>
-            
+
             {showDatePicker && (
               <DateTimePicker
                 testID="dateTimePicker"
@@ -359,23 +585,6 @@ const UploadDocuments = ({ route }) => {
                 maximumDate={new Date()} // Prevent future dates
               />
             )}
-          </View>
-
-          {/* Amount Input */}
-          <View style={styles.section}>
-            <Text style={styles.inputLabel}>Amount</Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                !validateAmount(amount) && amount !== '' && styles.textInputError
-              ]}
-              placeholder="Enter amount"
-              placeholderTextColor="#B0B0B0"
-              value={amount}
-              onChangeText={handleAmountChange}
-              keyboardType="decimal-pad"
-            />
-            
           </View>
 
           {/* Sample Images Section */}
@@ -413,6 +622,16 @@ const UploadDocuments = ({ route }) => {
             <Text style={styles.sectionTitle}>Document</Text>
             <Text style={styles.sectionSubtitle}>Allowed formats: JPG, JPEG, TIFF, PNG</Text>
 
+            {/* Upload instruction based on document type */}
+            {selectedDocumentType && (
+              <Text style={[
+                styles.sectionSubtitle,
+                selectedDocumentType === 'bill' ? styles.limitWarning : styles.limitInfo
+              ]}>
+                {getUploadInstructionText()}
+              </Text>
+            )}
+
             <View style={styles.uploadContainer}>
               <View style={styles.uploadArea}>
                 <Ionicons name="cloud-upload-outline" size={40} color="#00C4CC" />
@@ -420,50 +639,90 @@ const UploadDocuments = ({ route }) => {
 
                 <View style={styles.uploadButtons}>
                   <TouchableOpacity
-                    style={styles.uploadButton}
+                    style={[
+                      styles.uploadButton,
+                      !canAddMoreDocuments() && styles.uploadButtonDisabled
+                    ]}
                     onPress={handleBrowseFiles}
+                    disabled={!canAddMoreDocuments()}
                   >
-                    <Text style={styles.uploadButtonText}>Browse files</Text>
+                    <Text style={[
+                      styles.uploadButtonText,
+                      !canAddMoreDocuments() && styles.uploadButtonTextDisabled
+                    ]}>
+                      Browse files
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.uploadButton}
+                    style={[
+                      styles.uploadButton,
+                      !canAddMoreDocuments() && styles.uploadButtonDisabled
+                    ]}
                     onPress={handleTakePhoto}
+                    disabled={!canAddMoreDocuments()}
                   >
-                    <Text style={styles.uploadButtonText}>Take Photo</Text>
+                    <Text style={[
+                      styles.uploadButtonText,
+                      !canAddMoreDocuments() && styles.uploadButtonTextDisabled
+                    ]}>
+                      Take Photo
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
+          </View>
 
-            {/* Uploaded Documents List */}
-            {uploadedDocuments.length > 0 && (
+          {/* Uploaded Documents List - Show after document type selection */}
+          {uploadedDocuments.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Uploaded Documents</Text>
               <View style={styles.uploadedDocuments}>
-                <Text style={styles.uploadedDocumentsTitle}>Uploaded Documents:</Text>
                 {uploadedDocuments.map((doc) => (
                   <View key={doc.id} style={styles.documentItem}>
                     {doc.type?.startsWith('image/') && (
-                      <Image source={{ uri: doc.uri }} style={styles.documentThumbnail} />
+                      <TouchableOpacity onPress={() => handleDocumentImagePress(doc)}>
+                        <Image
+                          source={{ uri: doc.uri }}
+                          style={styles.documentThumbnail}
+                        />
+                      </TouchableOpacity>
                     )}
                     <View style={styles.documentInfo}>
                       <Text style={styles.documentName} numberOfLines={1}>
                         {doc.name}
                       </Text>
-                      <Text style={styles.documentSize}>
-                        {formatFileSize(doc.size)}
+                      {/* <Text style={styles.documentType}>
+                        Type: {doc.documentType ? doc.documentType.charAt(0).toUpperCase() + doc.documentType.slice(1) : 'Unknown'}
+                      </Text> */}
+                      <Text style={styles.documentAmount}>
+                        Rs {doc.amount || '0.00'}
+                      </Text>
+                      <Text style={styles.documentDate}>
+                        Date: {doc.date}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => handleRemoveDocument(doc.id)}
-                      style={styles.removeButton}
-                    >
-                      <Ionicons name="close" size={20} color="#FF6B6B" />
-                    </TouchableOpacity>
+                    <View style={styles.actionButtons}>
+                      {/* <TouchableOpacity
+                        onPress={() => handleEditDocument(doc)}
+                        style={styles.editButton}
+                      >
+                        <Ionicons name="create-outline" size={20} color="#00C4CC" />
+                      </TouchableOpacity> */}
+                      <TouchableOpacity
+                        onPress={() => handleRemoveDocument(doc.id)}
+                        style={styles.deleteButton}
+                      >
+                        <Ionicons name="trash-outline" size={28} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
               </View>
-            )}
-          </View>
+            </View>
+          )}
+
 
           {/* Add Document Button */}
           <TouchableOpacity
@@ -488,13 +747,6 @@ const UploadDocuments = ({ route }) => {
               activeOpacity={1}
             >
               <View style={styles.modalContent}>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={closeImagePopup}
-                >
-                  <Ionicons name="close" size={24} color="#fff" />
-                </TouchableOpacity>
-                
                 {selectedImage && (
                   <>
                     <Image
@@ -516,6 +768,75 @@ const UploadDocuments = ({ route }) => {
             </TouchableOpacity>
           </View>
         </Modal>
+
+        {/* Edit Document Modal */}
+        <Modal
+          visible={showEditModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowEditModal(false)}
+        >
+          <View style={styles.editModalOverlay}>
+            <View style={styles.editModalContent}>
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>Edit Document Details</Text>
+                <TouchableOpacity
+                  onPress={() => setShowEditModal(false)}
+                  style={styles.editModalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.editModalBody}>
+                <View style={styles.editSection}>
+                  <Text style={styles.editLabel}>Document Type</Text>
+                  <Text style={styles.editValue}>
+                    {editDocumentType ? editDocumentType.charAt(0).toUpperCase() + editDocumentType.slice(1) : 'Unknown'}
+                  </Text>
+                </View>
+
+                <View style={styles.editSection}>
+                  <Text style={styles.editLabel}>
+                    Amount {editDocumentType === 'bill' && <Text style={styles.requiredAsterisk}>*</Text>}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.editInput,
+                      !isEditAmountEditable() && styles.editInputDisabled,
+                    ]}
+                    placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                    placeholderTextColor="#B0B0B0"
+                    value={editAmount}
+                    onChangeText={handleEditAmountChange}
+                    keyboardType="decimal-pad"
+                    editable={isEditAmountEditable()}
+                  />
+                  {editDocumentType === 'prescription' || editDocumentType === 'diagnosis' ? (
+                    <Text style={styles.editHelpText}>Amount is automatically set to 0.00 for {editDocumentType}</Text>
+                  ) : editDocumentType === 'bill' ? (
+                    <Text style={styles.editHelpText}>Amount is required for Bill type</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.editModalFooter}>
+                <TouchableOpacity
+                  style={styles.editCancelButton}
+                  onPress={() => setShowEditModal(false)}
+                >
+                  <Text style={styles.editCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.editSaveButton}
+                  onPress={handleSaveEdit}
+                >
+                  <Text style={styles.editSaveButtonText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -524,7 +845,7 @@ const UploadDocuments = ({ route }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'black', 
+    backgroundColor: 'black',
   },
   gradient: {
     flex: 1,
@@ -544,8 +865,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 5,
-    borderRadius: 20, 
-    minWidth: 34, 
+    borderRadius: 20,
+    minWidth: 34,
     minHeight: 34,
     alignItems: 'center',
     justifyContent: 'center',
@@ -602,6 +923,14 @@ const styles = StyleSheet.create({
     color: '#888',
     marginBottom: 15,
   },
+  limitWarning: {
+    color: '#FF6B6B',
+    fontWeight: '500',
+  },
+  limitInfo: {
+    color: '#00C4CC',
+    fontWeight: '500',
+  },
   documentTypeContainer: {
     backgroundColor: '#fff',
     borderRadius: 15,
@@ -650,6 +979,10 @@ const styles = StyleSheet.create({
     color: '#13646D',
     marginBottom: 10,
   },
+  requiredAsterisk: {
+    color: '#FF6B6B',
+    fontSize: 16,
+  },
   textInput: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -660,9 +993,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+  textInputDisabled: {
+    backgroundColor: '#F5F5F5',
+    color: '#888',
+  },
   textInputError: {
     borderColor: '#FF6B6B',
     borderWidth: 2,
+  },
+  helpText: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
   },
   errorText: {
     color: '#FF6B6B',
@@ -763,13 +1106,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
+  uploadButtonDisabled: {
+    backgroundColor: '#B0B0B0',
+  },
   uploadButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
   },
+  uploadButtonTextDisabled: {
+    color: '#666',
+  },
   uploadedDocuments: {
-    marginTop: 20,
+    marginTop: 0,
   },
   uploadedDocumentsTitle: {
     fontSize: 14,
