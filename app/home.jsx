@@ -16,12 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+
 import Icon from "react-native-vector-icons/FontAwesome";
 import ClaimTypeSelection from "./AddPatientDetails.jsx";
 import ClaimHistory from "./ClaimHistory";
 import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -850,7 +851,7 @@ export default function PolicyHome() {
     setShowPolicySelection(true);
     Animated.timing(policySelectSlideAnim, {
       toValue: 0,
-      duration: 300,
+      duration: 100,
       useNativeDriver: true,
     }).start();
   };

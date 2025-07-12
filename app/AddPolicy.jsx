@@ -1,18 +1,38 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from 'react';
+import { Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const AddPolicy = () => {
     const [policyNumber, setPolicyNumber] = useState('');
     const [policyList, setPolicyList] = useState([]);
     const [deletedPolicies, setDeletedPolicies] = useState([]);
+    const [showDropdown, setShowDropdown] = useState(false);
     const navigation = useNavigation();
+
+    // Required prefix for policy numbers
+    const REQUIRED_PREFIX = 'G/010/SHE/';
+
+    // Sample dropdown options - you can modify these as needed
+    const dropdownOptions = [
+        'G/010/SHE/18666/25',
+        'G/010/SHE/18667/26',
+        'G/010/SHE/18668/27',
+        'G/010/SHE/18669/28',
+        'G/010/SHE/18670/29',
+        'G/010/SHE/18671/30',
+    ];
 
     const handleAddPolicy = () => {
         if (!policyNumber.trim()) {
             Alert.alert('Validation', 'Please enter a policy number');
+            return;
+        }
+
+        // Check if policy number starts with required prefix
+        if (!policyNumber.startsWith(REQUIRED_PREFIX)) {
+            Alert.alert('Invalid Format', `Policy number must start with ${REQUIRED_PREFIX}`);
             return;
         }
 
@@ -49,6 +69,41 @@ const AddPolicy = () => {
         setPolicyNumber(number);
     };
 
+    const handleDropdownSelect = (option) => {
+        setPolicyNumber(option);
+        setShowDropdown(false);
+    };
+
+    // Auto-complete input with prefix and validate format
+    const handleInputChange = (text) => {
+        // If user is typing and hasn't included the prefix, auto-add it
+        if (text.length > 0 && !text.startsWith(REQUIRED_PREFIX)) {
+            // Check if the text could be part of the prefix
+            if (REQUIRED_PREFIX.startsWith(text)) {
+                setPolicyNumber(text);
+            } else {
+                setPolicyNumber(REQUIRED_PREFIX + text);
+            }
+        } else {
+            // Validate the part after the prefix
+            if (text.startsWith(REQUIRED_PREFIX)) {
+                const afterPrefix = text.substring(REQUIRED_PREFIX.length);
+                
+                // Filter out letters after any '/' in the suffix
+                const parts = afterPrefix.split('/');
+                const filteredParts = parts.map(part => {
+                    // Allow only numbers after '/'
+                    return part.replace(/[^0-9]/g, '');
+                });
+                
+                const cleanedAfterPrefix = filteredParts.join('/');
+                setPolicyNumber(REQUIRED_PREFIX + cleanedAfterPrefix);
+            } else {
+                setPolicyNumber(text);
+            }
+        }
+    };
+
     const renderDeletedPolicy = ({ item }) => (
         <TouchableOpacity style={styles.deletedTag} onPress={() => handleRestoreDeleted(item)}>
             <Text style={styles.deletedTagText}>{item}</Text>
@@ -65,9 +120,18 @@ const AddPolicy = () => {
                 </TouchableOpacity>
             </View>
             <Text style={styles.infoText}>Company Name : {item.companyName}</Text>
-                  <Text style={styles.infoText}>Policy Period : {item.policyPeriod}</Text>
+            <Text style={styles.infoText}>Policy Period : {item.policyPeriod}</Text>
             <Text style={styles.infoText}>Status : {item.status}</Text>
         </View>
+    );
+
+    const renderDropdownItem = ({ item }) => (
+        <TouchableOpacity 
+            style={styles.dropdownItem} 
+            onPress={() => handleDropdownSelect(item)}
+        >
+            <Text style={styles.dropdownItemText}>{item}</Text>
+        </TouchableOpacity>
     );
 
     return (
@@ -94,12 +158,36 @@ const AddPolicy = () => {
 
                 <Text style={styles.sectionTitle}>ADD POLICY</Text>
 
-                <TextInput
-                    style={styles.input}
-                    placeholder="G/010/SHE/18666/25"
-                    value={policyNumber}
-                    onChangeText={setPolicyNumber}
-                />
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="G/010/SHE/18666/25"
+                        value={policyNumber}
+                        onChangeText={handleInputChange}
+                    />
+                    <TouchableOpacity 
+                        style={styles.dropdownButton}
+                        onPress={() => setShowDropdown(!showDropdown)}
+                    >
+                        <Ionicons 
+                            name={showDropdown ? "chevron-up" : "chevron-down"} 
+                            size={20} 
+                            color="#05445E" 
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                {showDropdown && (
+                    <View style={styles.dropdownContainer}>
+                        <FlatList
+                            data={dropdownOptions}
+                            keyExtractor={(item, index) => index.toString()}
+                            renderItem={renderDropdownItem}
+                            style={styles.dropdown}
+                            nestedScrollEnabled={true}
+                        />
+                    </View>
+                )}
 
                 <TouchableOpacity style={styles.addButton} onPress={handleAddPolicy}>
                     <Text style={styles.addButtonText}>Add</Text>
@@ -113,13 +201,26 @@ const AddPolicy = () => {
                     renderItem={renderPolicyItem}
                     contentContainerStyle={{ paddingBottom: 40 }}
                 />
+
+                {/* Modal overlay to close dropdown when clicking outside */}
+                <Modal
+                    visible={showDropdown}
+                    transparent={true}
+                    animationType="none"
+                    onRequestClose={() => setShowDropdown(false)}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={() => setShowDropdown(false)}
+                    />
+                </Modal>
             </View>
         </LinearGradient>
     );
 };
 
 export default AddPolicy;
-
 
 const styles = StyleSheet.create({
     gradient: {
@@ -141,11 +242,43 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginLeft: 20,
     },
-    input: {
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: 'white',
         borderRadius: 8,
-        padding: 10,
         marginBottom: 10,
+        position: 'relative',
+    },
+    input: {
+        flex: 1,
+        padding: 10,
+        borderRadius: 8,
+    },
+    dropdownButton: {
+        padding: 10,
+        paddingLeft: 5,
+    },
+    dropdownContainer: {
+        position: 'relative',
+        zIndex: 1000,
+        marginBottom: 10,
+    },
+    dropdown: {
+        backgroundColor: 'white',
+        borderRadius: 8,
+        maxHeight: 150,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    dropdownItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    dropdownItemText: {
+        fontSize: 16,
+        color: '#05445E',
     },
     addButton: {
         backgroundColor: '#189AB4',
@@ -198,5 +331,9 @@ const styles = StyleSheet.create({
     deletedTagText: {
         color: 'white',
         fontSize: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'transparent',
     },
 });
