@@ -52,6 +52,9 @@ const EditClaimIntimation = ({ route }) => {
   const [selectedBeneficiary, setSelectedBeneficiary] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
 
+  const [isImageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+
   // New beneficiary form
   const [newBeneficiary, setNewBeneficiary] = useState({
     name: "",
@@ -592,8 +595,14 @@ const EditClaimIntimation = ({ route }) => {
 
   // Handle submit later
   const handleSubmitLater = () => {
-    Alert.alert("Saved", "Claim saved for later submission.");
-    navigation?.goBack();
+    Alert.alert("Saved", "Claim saved for later submission.", [
+      {
+        text: "OK",
+        onPress: () => {
+          navigation?.goBack();
+        },
+      },
+    ]);
   };
 
   const renderDocumentImage = (document) => {
@@ -618,7 +627,13 @@ const EditClaimIntimation = ({ route }) => {
       console.log("Image URI preview:", imageUri.substring(0, 50) + "...");
 
       return (
-        <View style={styles.documentImageContainer}>
+        <TouchableOpacity
+          style={styles.documentImageContainer}
+          onPress={() => {
+            setSelectedImageUri(imageUri);
+            setImageModalVisible(true);
+          }}
+        >
           <Image
             source={{ uri: imageUri }}
             style={styles.documentImage}
@@ -646,7 +661,7 @@ const EditClaimIntimation = ({ route }) => {
               console.log("🏁 Image load ended for document:", document.id);
             }}
           />
-        </View>
+        </TouchableOpacity>
       );
     } else {
       console.log("No image content for document:", document.id);
@@ -1069,6 +1084,29 @@ const EditClaimIntimation = ({ route }) => {
             </View>
           </View>
         </Modal>
+        {/* Image Preview Modal */}
+        <Modal
+          visible={isImageModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setImageModalVisible(false)}
+        >
+          <View style={styles.imageModalOverlay}>
+            <TouchableOpacity
+              style={styles.imageModalClose}
+              onPress={() => setImageModalVisible(false)}
+            >
+              <Ionicons name="close" size={30} color="#fff" />
+            </TouchableOpacity>
+            {selectedImageUri && (
+              <Image
+                source={{ uri: selectedImageUri }}
+                style={styles.enlargedImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1253,7 +1291,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  
+
   documentContent: {
     flex: 1,
     paddingRight: 60,
@@ -1418,16 +1456,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#f0f0f0",
-    marginTop:8,
-    marginRight:5,
+    marginTop: 10,
+    marginRight: 5,
   },
   documentImage: {
     width: "100%",
     height: "100%",
   },
   documentImagePlaceholder: {
-    width: 60,
-    height: 60,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     backgroundColor: "#f0f0f0",
     justifyContent: "center",
@@ -1439,6 +1477,27 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#666",
     marginTop: 2,
+  },
+  // Add these to the existing styles object
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageModalClose: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 20,
+    padding: 5,
+  },
+  enlargedImage: {
+    width: "90%",
+    height: "80%",
+    borderRadius: 10,
   },
 });
 
