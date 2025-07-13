@@ -698,20 +698,12 @@ export default function PolicyHome() {
 
     if (normalizedType === "New Claim") {
       console.log("Opening New Claim modal");
-      setModalVisible(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else if (normalizedType === "Saved Claims") {
-      console.log("Saved Claims pressed");
 
-      // Check if a member is selected
+      // Check if a member is selected for New Claim
       if (!selectedMember) {
         Alert.alert(
           "Member Selection Required",
-          "Please select a member from the dropdown before accessing Saved Claims.",
+          "Please select a member from the dropdown before creating a New Claim.",
           [{ text: "OK" }]
         );
         return;
@@ -725,18 +717,18 @@ export default function PolicyHome() {
         if (!storedMemberData) {
           Alert.alert(
             "Member Selection Required",
-            "Please select a member from the dropdown before accessing Saved Claims.",
+            "Please select a member from the dropdown before creating a New Claim.",
             [{ text: "OK" }]
           );
           return;
         }
 
         const memberData = JSON.parse(storedMemberData);
-        console.log("Member data for Saved Claims:", memberData);
+        console.log("Member data for New Claim:", memberData);
 
-        // Proceed to open Saved Claims modal
-        setShowPendingIntimations(true);
-        Animated.timing(pendingIntimationsSlideAnim, {
+        // Proceed to open New Claim modal
+        setModalVisible(true);
+        Animated.timing(slideAnim, {
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
@@ -749,19 +741,20 @@ export default function PolicyHome() {
           [{ text: "OK" }]
         );
       }
+    } else if (normalizedType === "Saved Claims") {
+      console.log("Saved Claims pressed");
+
+      // Remove member selection requirement - directly open Saved Claims
+      setShowPendingIntimations(true);
+      Animated.timing(pendingIntimationsSlideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else if (normalizedType === "Claim History") {
       console.log("Claim History pressed");
 
-      // Check if a member is selected for Claim History as well
-      if (!selectedMember) {
-        Alert.alert(
-          "Member Selection Required",
-          "Please select a member from the dropdown before accessing Claim History.",
-          [{ text: "OK" }]
-        );
-        return;
-      }
-
+      // Remove member selection requirement - directly open Claim History
       setShowClaimHistory(true);
       Animated.timing(claimHistorySlideAnim, {
         toValue: 0,
@@ -771,16 +764,7 @@ export default function PolicyHome() {
     } else if (normalizedType === "Pending Requirement") {
       console.log("Pending Requirement pressed");
 
-      // Check if a member is selected for Pending Requirement as well
-      if (!selectedMember) {
-        Alert.alert(
-          "Member Selection Required",
-          "Please select a member from the dropdown before accessing Pending Requirement.",
-          [{ text: "OK" }]
-        );
-        return;
-      }
-
+      // Remove member selection requirement - directly open Pending Requirement
       setShowPendingRequirement(true);
       Animated.timing(pendingRequirementSlideAnim, {
         toValue: 0,

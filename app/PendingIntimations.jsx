@@ -44,7 +44,6 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
     getStoredValues();
   }, []);
 
-  // Fetch claims data from API
   useEffect(() => {
     const fetchClaims = async () => {
       // Don't fetch if we don't have the required values yet
@@ -66,6 +65,11 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
 
         const data = await response.json();
 
+        // Check if data is an array
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid data format received from server");
+        }
+
         // Transform API data to match component structure
         const transformedData = data.map((claim, index) => ({
           id: claim.clmSeqNo || `claim_${index}`,
@@ -74,35 +78,61 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
           relationship: claim.relationship,
           claimType: claim.indOut,
           createdOn: formatDate(claim.createdDate),
-          policyNo: claim.policyNo,
+          policyNo: policyNo, // Use the policyNo from params since it's not in API response
+          illness: claim.illness, // Added this field from API
         }));
 
         setPendingClaims(transformedData);
       } catch (err) {
         console.error("Error fetching claims:", err);
         setError(err.message);
-        Alert.alert("Error", "Failed to load claims data. Please try again.");
+
+        // More specific error messages
+        if (
+          err.message.includes("NetworkError") ||
+          err.message.includes("Failed to fetch")
+        ) {
+          Alert.alert(
+            "Network Error",
+            "Please check your internet connection and try again."
+          );
+        } else if (err.message.includes("HTTP error")) {
+          Alert.alert(
+            "Server Error",
+            "The server is currently unavailable. Please try again later."
+          );
+        } else {
+          Alert.alert("Error", "Failed to load claims data. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchClaims();
-  }, [userId, policyNo]); // Depend on both userId and policyNo
+  }, [userId, policyNo]);
 
-  // Format date function
+  // Helper function to format date safely
   const formatDate = (dateString) => {
-    if (!dateString) return "";
+    if (!dateString) return "N/A";
 
     try {
       const date = new Date(dateString);
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "Invalid Date";
+      }
+
+      // Format as needed (example: DD/MM/YYYY)
       return date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
       });
     } catch (error) {
-      return dateString;
+      console.error("Date formatting error:", error);
+      return "Invalid Date";
     }
   };
 
@@ -115,6 +145,8 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
 
     try {
       setLoading(true);
+      setError(null); // Clear previous errors
+
       const response = await fetch(
         `http://203.115.11.229:1002/api/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
       );
@@ -124,6 +156,12 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       }
 
       const data = await response.json();
+
+      // Validate response data
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid data format received from server");
+      }
+
       const transformedData = data.map((claim, index) => ({
         id: claim.clmSeqNo || `claim_${index}`,
         referenceNo: claim.clmSeqNo,
@@ -131,24 +169,67 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         relationship: claim.relationship,
         claimType: claim.indOut,
         createdOn: formatDate(claim.createdDate),
-        policyNo: claim.policyNo,
+        policyNo: policyNo, // Use the parameter value since it's not in API response
+        illness: claim.illness, // Include illness field from API
       }));
 
       setPendingClaims(transformedData);
+
+      // Optional: Show success message
+      // Alert.alert("Success", "Claims data refreshed successfully");
     } catch (err) {
       console.error("Error refreshing claims:", err);
-      Alert.alert("Error", "Failed to refresh claims data.");
+      setError(err.message);
+
+      // More specific error messages
+      if (
+        err.message.includes("NetworkError") ||
+        err.message.includes("Failed to fetch")
+      ) {
+        Alert.alert(
+          "Network Error",
+          "Please check your internet connection and try again."
+        );
+      } else if (err.message.includes("HTTP error! status: 404")) {
+        Alert.alert("Not Found", "No claims found for this policy.");
+      } else if (err.message.includes("HTTP error! status: 500")) {
+        Alert.alert(
+          "Server Error",
+          "The server is experiencing issues. Please try again later."
+        );
+      } else if (err.message.includes("Invalid data format")) {
+        Alert.alert(
+          "Data Error",
+          "Received unexpected data format from server."
+        );
+      } else {
+        Alert.alert(
+          "Error",
+          "Failed to refresh claims data. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (claim) => {
+  const handleEdit = async (claim) => {
     try {
+      await SecureStore.setItemAsync("edit_referenceNo", claim.referenceNo);
+      await SecureStore.setItemAsync("edit_enteredBy", claim.enteredBy); //patient name
+      await SecureStore.setItemAsync("edit_relationship", claim.relationship); // relationship
+      await SecureStore.setItemAsync("edit_claimType", claim.claimType);
+      await SecureStore.setItemAsync("edit_createdOn", claim.createdOn);
+      await SecureStore.setItemAsync("edit_claimId", claim.id);
+      await SecureStore.setItemAsync("edit_illness", claim.illness || "");
+
+      console.log("Claim data stored successfully in SecureStore");
+
       if (onEditClaim) {
         onEditClaim(claim);
       }
 
+      // Navigate to edit screen
       navigation.navigate("EditClaimIntimation", {
         claimData: claim,
         onUpdate: (updatedClaim) => {
@@ -160,8 +241,11 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         },
       });
     } catch (error) {
-      console.error("Navigation error:", error);
-      Alert.alert("Error", "Could not navigate to edit page");
+      console.error("Error storing claim data or navigating:", error);
+      Alert.alert(
+        "Error",
+        "Could not save claim data or navigate to edit page"
+      );
     }
   };
 
