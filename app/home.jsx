@@ -2,6 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -57,6 +58,44 @@ export default function PolicyHome() {
   const [membersCount, setMembersCount] = useState(0);
   const [policyInfo, setPolicyInfo] = useState(null);
   const [isLoadingPolicyInfo, setIsLoadingPolicyInfo] = useState(false);
+
+  useFocusEffect(
+  React.useCallback(() => {
+    // This will run every time the screen comes into focus
+    const refreshPageData = async () => {
+      try {
+        // Refresh employee info
+        await fetchEmployeeInfo();
+        
+        // Refresh policy info
+        await fetchPolicyInfo();
+        
+        // Refresh members count
+        const count = await fetchMembersCount();
+        setMembersCount(count);
+        
+        // Refresh dependents for health card display
+        const dependentsData = await fetchDependentsWithoutEmployee();
+        setDependents(dependentsData);
+        
+        // If a member was previously selected, refresh the members list
+        const storedMemberName = await SecureStore.getItemAsync("selected_member_name");
+        if (storedMemberName && members.length > 0) {
+          await fetchMembers();
+        }
+        
+        // Refresh available policies
+        await fetchPolicies();
+        
+        console.log("Page refreshed successfully");
+      } catch (error) {
+        console.error("Error refreshing page data:", error);
+      }
+    };
+    
+    refreshPageData();
+  }, [])
+);
 
   const fetchPolicyInfo = async () => {
     try {
@@ -834,6 +873,8 @@ export default function PolicyHome() {
       BackHandler.exitApp();
       return true;
     };
+
+    
 
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
