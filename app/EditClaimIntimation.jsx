@@ -11,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
@@ -31,19 +32,13 @@ const EditClaimIntimation = ({ route }) => {
   // Employee info state
   const [employeeInfo, setEmployeeInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [documentsLoading, setDocumentsLoading] = useState(true);
 
   // Beneficiaries state - Initialize as empty array
   const [beneficiaries, setBeneficiaries] = useState([]);
 
-  // Documents state
-  const [documents, setDocuments] = useState([
-    {
-      id: "1",
-      type: "Diagnosis Card",
-      date: "06/07/2025",
-      amount: "2.00",
-    },
-  ]);
+  // Documents state - Initialize as empty array (will be populated from API)
+  const [documents, setDocuments] = useState([]);
 
   // Modal states
   const [isAddBeneficiaryModalVisible, setAddBeneficiaryModalVisible] =
@@ -72,21 +67,192 @@ const EditClaimIntimation = ({ route }) => {
     amount: "",
   });
 
-  // Test function to debug API call
-  const testApiCall = async () => {
-    console.log("Testing API call...");
+  // Format date from API response (e.g., "2025-03-04T00:00:00" to "04/03/2025")
+  const formatDate = (dateString) => {
     try {
-      // Test with a sample reference number
-      const testReferenceNo = "A00002269";
-      console.log("Testing with reference number:", testReferenceNo);
-      
-      const result = await fetchClaimAmount(testReferenceNo);
-      console.log("Test result:", result);
-      
-      Alert.alert("API Test", `Test completed. Result: ${result}`);
+      const date = new Date(dateString);
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     } catch (error) {
-      console.error("Test failed:", error);
-      Alert.alert("API Test Failed", error.message);
+      console.error("Error formatting date:", error);
+      return dateString;
+    }
+  };
+
+  // Fetch documents from API
+  const fetchDocuments = async (referenceNo) => {
+    try {
+      setDocumentsLoading(true);
+      console.log("Fetching documents for referenceNo:", referenceNo);
+
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/ClaimDocuments/${referenceNo}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Documents API Error Response:", errorText);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Documents API Response:", result);
+
+      if (result.success && result.data && Array.isArray(result.data)) {
+        // Transform API data to match component structure
+        const transformedDocuments = result.data.map((doc, index) => {
+          console.log(`Processing document ${index}:`, {
+            id: doc.clmMemSeqNo,
+            type: doc.docType,
+            hasImgContent: !!doc.imgContent,
+            imgContentType: typeof doc.imgContent,
+            imgContentLength: doc.imgContent?.length,
+          });
+
+          return {
+            id: doc.clmMemSeqNo || `doc_${index}`,
+            type: doc.docType || "Unknown",
+            date: formatDate(doc.docDate),
+            amount: doc.docAmount ? doc.docAmount.toString() : "0.00",
+            imagePath: doc.imagePath || "0",
+            // Convert byte array to base64 string if imgContent exists
+            imgContent: doc.imgContent
+              ? arrayBufferToBase64(doc.imgContent)
+              : null,
+            originalImgContent: doc.imgContent, // Keep original for debugging
+          };
+        });
+
+        setDocuments(transformedDocuments);
+        console.log(
+          "Transformed documents:",
+          transformedDocuments.map((doc) => ({
+            id: doc.id,
+            type: doc.type,
+            hasImgContent: !!doc.imgContent,
+            imgContentLength: doc.imgContent?.length,
+          }))
+        );
+      } else {
+        console.log("No documents found or invalid response structure");
+        setDocuments([]);
+      }
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        referenceNo: referenceNo,
+      });
+
+      // Show user-friendly error message
+      Alert.alert(
+        "Documents Loading Error",
+        `Unable to fetch documents. Error: ${error.message}`
+      );
+
+      // Set empty documents array as fallback
+      setDocuments([]);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  // Add this helper function at the top of your component (before the component definition)
+  const arrayBufferToBase64 = (buffer) => {
+    try {
+      console.log("Converting buffer to base64, buffer type:", typeof buffer);
+      console.log("Buffer value:", buffer);
+
+      // If buffer is already a string (base64), return it
+      if (typeof buffer === "string") {
+        console.log("Buffer is already a string, length:", buffer.length);
+        return buffer;
+      }
+
+      // If buffer is null or undefined
+      if (!buffer) {
+        console.log("Buffer is null or undefined");
+        return null;
+      }
+
+      // If buffer is an array of bytes
+      if (Array.isArray(buffer)) {
+        console.log("Buffer is an array, length:", buffer.length);
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        console.log("Converted array to base64, length:", base64.length);
+        return base64;
+      }
+
+      // If buffer is ArrayBuffer or similar
+      if (buffer instanceof ArrayBuffer) {
+        console.log("Buffer is ArrayBuffer, byteLength:", buffer.byteLength);
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        console.log("Converted ArrayBuffer to base64, length:", base64.length);
+        return base64;
+      }
+
+      // If buffer is a typed array
+      if (buffer.buffer instanceof ArrayBuffer) {
+        console.log("Buffer is typed array, length:", buffer.length);
+        let binary = "";
+        for (let i = 0; i < buffer.length; i++) {
+          binary += String.fromCharCode(buffer[i]);
+        }
+        const base64 = btoa(binary);
+        console.log("Converted typed array to base64, length:", base64.length);
+        return base64;
+      }
+
+      console.log("Unknown buffer type, trying JSON.stringify:", typeof buffer);
+      console.log("Buffer constructor:", buffer.constructor.name);
+
+      // Last resort: try to convert object to array
+      if (typeof buffer === "object" && buffer !== null) {
+        const keys = Object.keys(buffer);
+        console.log("Buffer object keys:", keys.slice(0, 10)); // Show first 10 keys
+
+        // Check if it's an object with numeric keys (like {0: 255, 1: 216, ...})
+        const isNumericKeys = keys.every((key) => !isNaN(key));
+        if (isNumericKeys) {
+          console.log("Buffer appears to be an object with numeric keys");
+          const array = keys.map((key) => buffer[key]);
+          const bytes = new Uint8Array(array);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+          console.log("Converted object to base64, length:", base64.length);
+          return base64;
+        }
+      }
+
+      console.log("Could not convert buffer to base64");
+      return null;
+    } catch (error) {
+      console.error("Error converting buffer to base64:", error);
+      return null;
     }
   };
 
@@ -94,12 +260,11 @@ const EditClaimIntimation = ({ route }) => {
   const fetchClaimAmount = async (referenceNo) => {
     try {
       console.log("Fetching claim amount for referenceNo:", referenceNo);
-      
+
       const requestBody = {
         seqNo: referenceNo,
       };
-      
-      
+
       const response = await fetch(
         "http://203.115.11.229:1002/api/ClaimAmount/GetClaimAmount",
         {
@@ -114,28 +279,32 @@ const EditClaimIntimation = ({ route }) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("API Error Response:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
       }
 
       const data = await response.json();
-      
-      const formattedAmount = data.claimAmount ? `${data.claimAmount}.00` : "0.00";
-      
+
+      const formattedAmount = data.claimAmount
+        ? `${data.claimAmount}.00`
+        : "0.00";
+
       return formattedAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        referenceNo: referenceNo
+        referenceNo: referenceNo,
       });
-      
+
       // Show user-friendly error message
       Alert.alert(
-        "Network Error", 
+        "Network Error",
         `Unable to fetch claim amount. Using default amount. Error: ${error.message}`
       );
-      
+
       return "0.00"; // Default fallback amount
     }
   };
@@ -185,7 +354,7 @@ const EditClaimIntimation = ({ route }) => {
       if (storedEnteredBy && storedRelationship) {
         // Fetch claim amount for this beneficiary
         const claimAmount = await fetchClaimAmount(referenceNo);
-        
+
         const beneficiary = {
           id: "1",
           name: storedEnteredBy,
@@ -270,6 +439,8 @@ const EditClaimIntimation = ({ route }) => {
       const referenceNo = await retrieveClaimDetails();
       // Retrieve beneficiary data from SecureStore and fetch claim amount
       await retrieveBeneficiaryData(referenceNo);
+      // Fetch documents from API
+      await fetchDocuments(referenceNo);
       // Then fetch employee info
       await fetchEmployeeInfo();
       // Store the claim details (in case they came from route params)
@@ -294,7 +465,7 @@ const EditClaimIntimation = ({ route }) => {
     if (newBeneficiary.name && newBeneficiary.relationship) {
       // Fetch claim amount for the new beneficiary
       const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
-      
+
       setBeneficiaries((prev) => [
         ...prev,
         {
@@ -324,7 +495,7 @@ const EditClaimIntimation = ({ route }) => {
   const handleSaveBeneficiaryEdit = async () => {
     // Fetch updated claim amount
     const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
-    
+
     setBeneficiaries((prev) =>
       prev.map((item) =>
         item.id === selectedBeneficiary.id
@@ -425,6 +596,69 @@ const EditClaimIntimation = ({ route }) => {
     navigation?.goBack();
   };
 
+  const renderDocumentImage = (document) => {
+    console.log("=== Rendering document image ===");
+    console.log("Document ID:", document.id);
+    console.log("Document type:", document.type);
+    console.log("Has imgContent:", !!document.imgContent);
+    console.log("ImgContent type:", typeof document.imgContent);
+    console.log("ImgContent length:", document.imgContent?.length);
+
+    if (document.imgContent) {
+      // Test if it's valid base64
+      try {
+        const testDecode = atob(document.imgContent.substring(0, 100));
+        console.log("Base64 decode test successful");
+      } catch (error) {
+        console.error("Base64 decode test failed:", error);
+      }
+
+      const imageUri = `data:image/jpeg;base64,${document.imgContent}`;
+      console.log("Image URI length:", imageUri.length);
+      console.log("Image URI preview:", imageUri.substring(0, 50) + "...");
+
+      return (
+        <View style={styles.documentImageContainer}>
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.documentImage}
+            resizeMode="cover"
+            onError={(error) => {
+              console.error("❌ Image load error for document:", document.id);
+              console.error("Error details:", error.nativeEvent?.error);
+              console.log("Failed image URI length:", imageUri.length);
+              console.log(
+                "ImgContent first 50 chars:",
+                document.imgContent.substring(0, 50)
+              );
+              console.log("Original imgContent:", document.originalImgContent);
+            }}
+            onLoad={() => {
+              console.log(
+                "✅ Image loaded successfully for document:",
+                document.id
+              );
+            }}
+            onLoadStart={() => {
+              console.log("🔄 Image load started for document:", document.id);
+            }}
+            onLoadEnd={() => {
+              console.log("🏁 Image load ended for document:", document.id);
+            }}
+          />
+        </View>
+      );
+    } else {
+      console.log("No image content for document:", document.id);
+      return (
+        <View style={styles.documentImagePlaceholder}>
+          <Ionicons name="document-outline" size={24} color="#4DD0E1" />
+          <Text style={styles.noImageText}>No Image</Text>
+        </View>
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
@@ -483,7 +717,7 @@ const EditClaimIntimation = ({ route }) => {
                 <View key={beneficiary.id} style={styles.beneficiaryCard}>
                   <View style={styles.beneficiaryContent}>
                     <View style={styles.beneficiaryRow}>
-                      <Text style={styles.beneficiaryLabel}>Name</Text>
+                      <Text style={styles.beneficiaryLabel}>Patient Name</Text>
                       <Text style={styles.beneficiaryColon}>:</Text>
                       <Text style={styles.beneficiaryValue}>
                         {beneficiary.name}
@@ -532,44 +766,54 @@ const EditClaimIntimation = ({ route }) => {
 
           {/* Documents Section */}
           <View style={styles.documentsSection}>
-            {documents.map((document) => (
-              <View key={document.id} style={styles.documentCard}>
-                <View style={styles.documentImagePlaceholder}>
-                  <Ionicons name="document-outline" size={24} color="#4DD0E1" />
-                </View>
-                <View style={styles.documentContent}>
-                  <View style={styles.documentRow}>
-                    <Text style={styles.documentLabel}>Document Type</Text>
-                    <Text style={styles.documentColon}>:</Text>
-                    <Text style={styles.documentValue}>{document.type}</Text>
-                  </View>
-                  <View style={styles.documentRow}>
-                    <Text style={styles.documentLabel}>Date of Document</Text>
-                    <Text style={styles.documentColon}>:</Text>
-                    <Text style={styles.documentValue}>{document.date}</Text>
-                  </View>
-                  <View style={styles.documentRow}>
-                    <Text style={styles.documentLabel}>Amount</Text>
-                    <Text style={styles.documentColon}>:</Text>
-                    <Text style={styles.documentValue}>{document.amount}</Text>
-                  </View>
-                </View>
-                <View style={styles.documentActionIcons}>
-                  <TouchableOpacity
-                    style={styles.documentIconButton}
-                    onPress={() => handleEditDocument(document)}
-                  >
-                    <Ionicons name="create-outline" size={16} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.documentIconButton}
-                    onPress={() => handleDeleteDocument(document.id)}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#fff" />
-                  </TouchableOpacity>
-                </View>
+            {documentsLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading documents...</Text>
               </View>
-            ))}
+            ) : documents.length > 0 ? (
+              documents.map((document) => (
+                <View key={document.id} style={styles.documentCard}>
+                  {renderDocumentImage(document)}
+                  <View style={styles.documentContent}>
+                    <View style={styles.documentRow}>
+                      <Text style={styles.documentLabel}>Document Type</Text>
+                      <Text style={styles.documentColon}>:</Text>
+                      <Text style={styles.documentValue}>{document.type}</Text>
+                    </View>
+                    <View style={styles.documentRow}>
+                      <Text style={styles.documentLabel}>Date of Document</Text>
+                      <Text style={styles.documentColon}>:</Text>
+                      <Text style={styles.documentValue}>{document.date}</Text>
+                    </View>
+                    <View style={styles.documentRow}>
+                      <Text style={styles.documentLabel}>Amount</Text>
+                      <Text style={styles.documentColon}>:</Text>
+                      <Text style={styles.documentValue}>
+                        {document.amount}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.documentActionIcons}>
+                    <TouchableOpacity
+                      style={styles.documentIconButton}
+                      onPress={() => handleEditDocument(document)}
+                    >
+                      <Ionicons name="create-outline" size={16} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.documentIconButton}
+                      onPress={() => handleDeleteDocument(document.id)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.noDocumentsContainer}>
+                <Text style={styles.noDocumentsText}>No documents found.</Text>
+              </View>
+            )}
           </View>
 
           {/* Action Buttons */}
@@ -830,7 +1074,6 @@ const EditClaimIntimation = ({ route }) => {
   );
 };
 
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -1002,26 +1245,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: 10,
     marginBottom: 15,
-    padding: 12,
+    padding: 5,
     borderWidth: 1,
     borderColor: "#4DD0E1",
     position: "relative",
-    minHeight: 100,
+    minHeight: 120,
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  documentImagePlaceholder: {
-    width: 50,
-    height: 60,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#4DD0E1",
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    backgroundColor: "rgba(77, 208, 225, 0.1)",
-  },
+  
   documentContent: {
     flex: 1,
     paddingRight: 60,
@@ -1179,6 +1411,34 @@ const styles = StyleSheet.create({
   saveText: {
     color: "#fff",
     fontWeight: "500",
+  },
+  documentImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#f0f0f0",
+    marginTop:8,
+    marginRight:5,
+  },
+  documentImage: {
+    width: "100%",
+    height: "100%",
+  },
+  documentImagePlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  noImageText: {
+    fontSize: 8,
+    color: "#666",
+    marginTop: 2,
   },
 });
 
