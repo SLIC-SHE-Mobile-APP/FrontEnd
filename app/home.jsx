@@ -60,42 +60,45 @@ export default function PolicyHome() {
   const [isLoadingPolicyInfo, setIsLoadingPolicyInfo] = useState(false);
 
   useFocusEffect(
-  React.useCallback(() => {
-    // This will run every time the screen comes into focus
-    const refreshPageData = async () => {
-      try {
-        // Refresh employee info
-        await fetchEmployeeInfo();
-        
-        // Refresh policy info
-        await fetchPolicyInfo();
-        
-        // Refresh members count
-        const count = await fetchMembersCount();
-        setMembersCount(count);
-        
-        // Refresh dependents for health card display
-        const dependentsData = await fetchDependentsWithoutEmployee();
-        setDependents(dependentsData);
-        
-        // If a member was previously selected, refresh the members list
-        const storedMemberName = await SecureStore.getItemAsync("selected_member_name");
-        if (storedMemberName && members.length > 0) {
-          await fetchMembers();
+    React.useCallback(() => {
+      const refreshPageData = async () => {
+        try {
+          // Check if we should refresh (you can set a flag in SecureStore when navigating)
+          const shouldRefresh = await SecureStore.getItemAsync(
+            "should_refresh_home"
+          );
+
+          if (shouldRefresh === "true") {
+            // Clear the refresh flag
+            await SecureStore.deleteItemAsync("should_refresh_home");
+
+            // Refresh all data
+            await fetchEmployeeInfo();
+            await fetchPolicyInfo();
+            const count = await fetchMembersCount();
+            setMembersCount(count);
+            const dependentsData = await fetchDependentsWithoutEmployee();
+            setDependents(dependentsData);
+
+            const storedMemberName = await SecureStore.getItemAsync(
+              "selected_member_name"
+            );
+            if (storedMemberName && members.length > 0) {
+              await fetchMembers();
+            }
+
+            await fetchPolicies();
+
+            console.log("Page refreshed after navigation");
+          }
+        } catch (error) {
+          console.error("Error refreshing page data:", error);
         }
-        
-        // Refresh available policies
-        await fetchPolicies();
-        
-        console.log("Page refreshed successfully");
-      } catch (error) {
-        console.error("Error refreshing page data:", error);
-      }
-    };
-    
-    refreshPageData();
-  }, [])
-);
+      };
+
+      refreshPageData();
+    }, [])
+  );
 
   const fetchPolicyInfo = async () => {
     try {
@@ -873,8 +876,6 @@ export default function PolicyHome() {
       BackHandler.exitApp();
       return true;
     };
-
-    
 
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
