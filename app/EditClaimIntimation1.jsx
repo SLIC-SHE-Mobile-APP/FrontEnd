@@ -20,11 +20,20 @@ const EditClaimIntimation1 = ({ route }) => {
     const navigation = useNavigation();
     const { claim } = route?.params || {};
 
+    const [memberOptions] = useState([
+        { id: 1, name: "John Doe", relationship: "Self" },
+        { id: 2, name: "Jane Smith", relationship: "Spouse" },
+        { id: 3, name: "Michael Johnson", relationship: "Child" }
+    ]);
+
+    const [isDropdownVisible, setDropdownVisible] = useState(false);
+    const [selectedMember, setSelectedMember] = useState(null);
+
     // State for claim details
     const [claimDetails, setClaimDetails] = useState({
         referenceNo: claim?.referenceNo || "M000428",
-        enteredBy: "Loading...", // Will be updated from API
-        status: "Submission for Approval Pending", // Hard-coded as specified
+        enteredBy: "Loading...", 
+        status: "Submission for Approval Pending", 
         claimType: claim?.claimType || "Out-door",
         createdOn: claim?.createdOn || "24-12-2020",
     });
@@ -70,7 +79,7 @@ const EditClaimIntimation1 = ({ route }) => {
         amount: "",
     });
 
-    // Format date from API response (e.g., "2025-03-04T00:00:00" to "04/03/2025")
+   
     const formatDate = (dateString) => {
         try {
             const date = new Date(dateString);
@@ -490,9 +499,31 @@ const EditClaimIntimation1 = ({ route }) => {
     // Edit beneficiary
     const handleEditBeneficiary = (beneficiary) => {
         setSelectedBeneficiary(beneficiary);
-        setNewBeneficiary(beneficiary);
+
+        // Find the member from options if it exists
+        const member = memberOptions.find(m => m.name === beneficiary.name);
+        setSelectedMember(member);
+
+        setNewBeneficiary({
+            name: beneficiary.name,
+            relationship: beneficiary.relationship,
+            illness: beneficiary.illness,
+            amount: beneficiary.amount,
+        });
         setEditBeneficiaryModalVisible(true);
     };
+
+    // Add this function to handle member selection
+    const handleMemberSelect = (member) => {
+        setSelectedMember(member);
+        setNewBeneficiary(prev => ({
+            ...prev,
+            name: member.name,
+            relationship: member.relationship
+        }));
+        setDropdownVisible(false);
+    };
+
 
     // Save beneficiary edit
     const handleSaveBeneficiaryEdit = async () => {
@@ -688,7 +719,7 @@ const EditClaimIntimation1 = ({ route }) => {
                             {
                                 text: "OK",
                                 onPress: () => {
-                                    navigation?.navigate('home');
+                                    navigation?.navigate('PendingIntimations');
                                 },
                             },
                         ]);
@@ -964,25 +995,48 @@ const EditClaimIntimation1 = ({ route }) => {
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
                             <Text style={styles.modalTitle}>Edit Beneficiary</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.name}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({ ...prev, name: value }))
-                                }
-                                placeholder="Enter name"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.relationship}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({
-                                        ...prev,
-                                        relationship: value,
-                                    }))
-                                }
-                                placeholder="Enter relationship"
-                            />
+
+                            {/* Member Name Dropdown */}
+                            <Text style={styles.fieldLabel}>Member Name</Text>
+                            <TouchableOpacity
+                                style={styles.dropdownButton}
+                                onPress={() => setDropdownVisible(!isDropdownVisible)}
+                            >
+                                <Text style={styles.dropdownButtonText}>
+                                    {selectedMember ? selectedMember.name : "Select Member"}
+                                </Text>
+                                <Ionicons
+                                    name={isDropdownVisible ? "chevron-up" : "chevron-down"}
+                                    size={20}
+                                    color="#666"
+                                />
+                            </TouchableOpacity>
+
+                            {/* Dropdown Options */}
+                            {isDropdownVisible && (
+                                <View style={styles.dropdownOptions}>
+                                    {memberOptions.map((member) => (
+                                        <TouchableOpacity
+                                            key={member.id}
+                                            style={[
+                                                styles.dropdownOption,
+                                                selectedMember?.id === member.id && styles.selectedDropdownOption
+                                            ]}
+                                            onPress={() => handleMemberSelect(member)}
+                                        >
+                                            <Text style={[
+                                                styles.dropdownOptionText,
+                                                selectedMember?.id === member.id && styles.selectedDropdownOptionText
+                                            ]}>
+                                                {member.name} ({member.relationship})
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Illness Field */}
+                            <Text style={styles.fieldLabel}>Illness</Text>
                             <TextInput
                                 style={styles.modalInput}
                                 value={newBeneficiary.illness}
@@ -990,20 +1044,17 @@ const EditClaimIntimation1 = ({ route }) => {
                                     setNewBeneficiary((prev) => ({ ...prev, illness: value }))
                                 }
                                 placeholder="Enter illness"
+                                multiline
+                                numberOfLines={3}
                             />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.amount}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({ ...prev, amount: value }))
-                                }
-                                placeholder="Amount will be updated automatically"
-                                keyboardType="numeric"
-                                editable={false}
-                            />
+
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity
-                                    onPress={() => setEditBeneficiaryModalVisible(false)}
+                                    onPress={() => {
+                                        setEditBeneficiaryModalVisible(false);
+                                        setDropdownVisible(false);
+                                        setSelectedMember(null);
+                                    }}
                                     style={styles.cancelBtn}
                                 >
                                     <Text style={styles.cancelText}>Cancel</Text>
@@ -1018,6 +1069,7 @@ const EditClaimIntimation1 = ({ route }) => {
                         </View>
                     </View>
                 </Modal>
+
 
                 {/* Add Document Modal */}
                 <Modal
@@ -1572,6 +1624,60 @@ const styles = StyleSheet.create({
         width: "90%",
         height: "80%",
         borderRadius: 10,
+    },
+    fieldLabel: {
+        fontSize: 14,
+        fontWeight: "500",
+        color: "#2E7D7D",
+        marginBottom: 5,
+        marginTop: 10,
+    },
+    dropdownButton: {
+        borderWidth: 1,
+        borderColor: "#E0E0E0",
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        marginBottom: 10,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        backgroundColor: "#fff",
+    },
+    dropdownButtonText: {
+        fontSize: 14,
+        color: "#333",
+        flex: 1,
+    },
+    dropdownOptions: {
+        borderWidth: 1,
+        borderColor: "#E0E0E0",
+        borderRadius: 8,
+        backgroundColor: "#fff",
+        marginBottom: 15,
+        maxHeight: 200,
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    dropdownOption: {
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    selectedDropdownOption: {
+        backgroundColor: "#E3F2FD",
+    },
+    dropdownOptionText: {
+        fontSize: 14,
+        color: "#333",
+    },
+    selectedDropdownOptionText: {
+        color: "#2E7D7D",
+        fontWeight: "500",
     },
 });
 
