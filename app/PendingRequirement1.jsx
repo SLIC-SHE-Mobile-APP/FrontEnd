@@ -132,6 +132,55 @@ const PendingRequirement1 = () => {
     }
   };
 
+  const deleteDocumentFromAPI = async (polNo, claimNo, docCode, seqNo) => {
+  try {
+    console.log("=== DELETING DOCUMENT FROM API ===");
+    console.log("Policy Number:", polNo);
+    console.log("Claim Number:", claimNo);
+    console.log("Document Code:", docCode);
+    console.log("Sequence Number:", seqNo);
+
+    const requestBody = {
+      polNo: polNo,
+      claimNo: claimNo,
+      docCode: docCode,
+      seqNo: parseInt(seqNo)
+    };
+
+    console.log("Request Body:", JSON.stringify(requestBody));
+
+    const response = await fetch(
+      `${BASE_API_URL}/UploadPendingDocumentCon/delete`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    console.log("Response Status:", response.status);
+    console.log("Response Headers:", response.headers);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Delete error response:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Delete Response:", result);
+    console.log("==================================");
+    
+    return result;
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    throw error;
+  }
+};
+
+
   const loadRequirementData = async () => {
     try {
       setLoading(true);
@@ -569,18 +618,25 @@ const PendingRequirement1 = () => {
     }
   };
 
-  const handleDeleteDocument = (documentId) => {
-    const document = uploadedDocuments.find(doc => doc.id === documentId);
-    
-    // Check if it's an existing document
-    if (document?.isExisting) {
-      Alert.alert(
-        "Cannot Delete",
-        "This document was previously uploaded and cannot be deleted from here."
-      );
-      return;
-    }
+const handleDeleteDocument = async (documentId) => {
+  const document = uploadedDocuments.find(doc => doc.id === documentId);
+  
+  if (!document) {
+    Alert.alert("Error", "Document not found");
+    return;
+  }
 
+  console.log("=== ATTEMPTING TO DELETE DOCUMENT ===");
+  console.log("Document ID:", documentId);
+  console.log("Document Details:", document);
+  console.log("Is Existing:", document.isExisting);
+  console.log("Is Uploaded:", document.uploaded);
+  console.log("Sequence Number:", document.seqNo);
+  console.log("Document Code:", document.documentCode);
+  console.log("=====================================");
+
+  // Check if it's an existing document that came from API
+  if (document?.isExisting) {
     Alert.alert(
       "Delete Document",
       "Are you sure you want to delete this document?",
@@ -589,16 +645,83 @@ const PendingRequirement1 = () => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            setUploadedDocuments((prev) =>
-              prev.filter((doc) => doc.id !== documentId)
-            );
-            Alert.alert("Deleted", "Document deleted successfully!");
+          onPress: async () => {
+            try {
+              setUploadingDocument(true);
+              
+              await deleteDocumentFromAPI(
+                requirementData.polNo,
+                requirementData.claimNumber,
+                document.documentCode,
+                document.seqNo
+              );
+
+              // Remove from local state
+              setUploadedDocuments((prev) =>
+                prev.filter((doc) => doc.id !== documentId)
+              );
+
+              Alert.alert("Success", "Document deleted successfully!");
+            } catch (error) {
+              console.error("Delete failed:", error);
+              Alert.alert(
+                "Delete Error",
+                "Failed to delete document from server. Please try again."
+              );
+            } finally {
+              setUploadingDocument(false);
+            }
           },
         },
       ]
     );
-  };
+    return;
+  }
+
+  // For newly uploaded documents
+  Alert.alert(
+    "Delete Document",
+    "Are you sure you want to delete this document?",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            // Only call API if document has been uploaded (has seqNo)
+            if (document.uploaded && document.seqNo) {
+              setUploadingDocument(true);
+              
+              await deleteDocumentFromAPI(
+                requirementData.polNo,
+                requirementData.claimNumber,
+                document.documentCode,
+                document.seqNo
+              );
+            }
+
+            // Remove from local state
+            setUploadedDocuments((prev) =>
+              prev.filter((doc) => doc.id !== documentId)
+            );
+
+            Alert.alert("Success", "Document deleted successfully!");
+          } catch (error) {
+            console.error("Delete failed:", error);
+            Alert.alert(
+              "Delete Error",
+              "Failed to delete document from server. Please try again."
+            );
+          } finally {
+            setUploadingDocument(false);
+          }
+        },
+      },
+    ]
+  );
+};
+
 
   const handleSubmit = () => {
     if (uploadedDocuments.length === 0) {
