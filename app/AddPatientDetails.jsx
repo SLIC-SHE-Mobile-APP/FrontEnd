@@ -1,29 +1,178 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 
 const AddPatientDetails = ({ onClose }) => {
   const router = useRouter();
-  const { selectedMember, members } = useLocalSearchParams();
+  const {
+    policyNo: paramPolicyNo = '',
+    memberNo: paramMemberNo = '',
+    selectedMember,
+    members,
+  } = useLocalSearchParams();
+
+  const [policyNo, setPolicyNo] = useState('');
+  const [memberNo, setMemberNo] = useState('');
+  const [nic, setNIC] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [initialising, setInitialising] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [storedPolicyNo, storedMemberNo, storedNic, storedMobile] = await Promise.all([
+          SecureStore.getItemAsync('selected_policy_number'),
+          SecureStore.getItemAsync('selected_member_number'),
+          SecureStore.getItemAsync('user_nic'),
+          SecureStore.getItemAsync('user_mobile'),
+        ]);
+
+        setPolicyNo(storedPolicyNo || paramPolicyNo);
+        setMemberNo(storedMemberNo || paramMemberNo);
+        setNIC(storedNic || '');
+        setMobile(storedMobile || '');
+      } catch (err) {
+        console.warn('SecureStore read failed:', err);
+        setPolicyNo(paramPolicyNo);
+        setMemberNo(paramMemberNo);
+      } finally {
+        setInitialising(false);
+      }
+    })();
+  }, [paramPolicyNo, paramMemberNo]);
 
   const [patientName, setPatientName] = useState('');
+  const [relationship, setRelationship] = useState('');
   const [illness, setIllness] = useState('');
-  const [selectedClaimType, setSelectedClaimType] = useState('outdoor'); // Default to outdoor
+  const [selectedClaimType, setSelectedClaimType] = useState('outdoor');
   const [patientNameError, setPatientNameError] = useState('');
-  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [memberList, setMemberList] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Define claim types - only outdoor is enabled
+  useEffect(() => {
+    if (initialising || !policyNo || !memberNo) return;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const fetchMembers = async () => {
+      try {
+        const url = `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${encodeURIComponent(policyNo)}&memberNo=${encodeURIComponent(memberNo)}`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        const data = await res.json();
+        const parsed = data.map((d, i) => ({
+          id: i + 1,
+          name: d.dependentName ?? d.dependentName,
+          relationship: d.relationship,
+        }));
+        if (isMounted) {
+          setMemberList(parsed.length ? parsed : members || []);
+          const defaultMember = selectedMember || parsed[0] || (members ? members[0] : null);
+          if (defaultMember) {
+            setPatientName(defaultMember.name);
+            setRelationship(defaultMember.relationship);
+          }
+          setLoadingMembers(false);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.warn('Fetch Dependents failed:', err.message);
+          setMemberList(members || []);
+          if (members?.length) {
+            setPatientName(members[0].name);
+            setRelationship(members[0].relationship);
+          }
+          setLoadingMembers(false);
+          Alert.alert('Network Error', 'Could not fetch dependents list.');
+        }
+      }
+    };
+
+    fetchMembers();
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [initialising, policyNo, memberNo, selectedMember, members]);
+
+  const validatePatientName = (name) => {
+    if (!name.trim()) return 'Patient name is required';
+    if (name.trim().length < 2) return 'Patient name must be at least 2 characters';
+    return '';
+  };
+
+  const indOutMap = { outdoor: 'O', indoor: 'I', dental: 'D', spectacles: 'S' };
+
+  const handleNextPress = async () => {
+    const nameError = validatePatientName(patientName);
+    setPatientNameError(nameError);
+    if (nameError) {
+      Alert.alert('Validation Error', nameError);
+      return;
+    }
+
+    const payload = {
+      policyNo,
+      memId: memberNo,
+      contactNo: mobile,
+      createdBy: nic,
+      indOut: indOutMap[selectedClaimType] || 'O',
+      patientName: patientName.trim(),
+      illness,
+      relationship,
+    };
+
+    console.log('Sending payload:', payload);
+
+    try {
+      setSubmitting(true);
+      const res = await fetch('http://203.115.11.229:1002/api/Claimintimation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Add authorization headers if needed
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Claim could not be created (HTTP ${res.status}): ${errorText}`);
+      }
+
+      const data = await res.json();
+      if (onClose) onClose();
+      router.push({
+        pathname: '/UploadDocuments',
+        params: {
+          claimId: data?.claimId ?? '',
+          patientName: patientName.trim(),
+          illness,
+          claimType: selectedClaimType,
+        },
+      });
+    } catch (err) {
+      console.warn('Intimate Claim failed:', err);
+      Alert.alert('Error', err.message ?? 'Something went wrong while creating the claim.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const claimTypes = [
     { id: 'outdoor', label: 'Outdoor', icon: '🩺', enabled: true },
     { id: 'indoor', label: 'Indoor', icon: '🏠', enabled: false },
@@ -31,123 +180,45 @@ const AddPatientDetails = ({ onClose }) => {
     { id: 'spectacles', label: 'Spectacles', icon: '👓', enabled: false },
   ];
 
-  useEffect(() => {
-    const defaultMembers = [
-      { id: 1, name: 'H.M.Menaka Herath', relationship: 'Self' },
-      { id: 2, name: 'Kamal Perera', relationship: 'Spouse' },
-      { id: 3, name: 'Saman Herath', relationship: 'Child' },
-      { id: 4, name: 'Nimal Silva', relationship: 'Child' },
-      { id: 5, name: 'Kamala Herath', relationship: 'Parent' },
-    ];
-
-    const availableMembers = members || defaultMembers;
-    setMemberList(availableMembers);
-
-    const defaultMember = selectedMember || availableMembers[0];
-    if (defaultMember) {
-      setPatientName(defaultMember.name);
-    }
-  }, [selectedMember, members]);
-
-  const validatePatientName = (name) => {
-    if (!name.trim()) {
-      return 'Patient name is required';
-    }
-    if (name.trim().length < 2) {
-      return 'Patient name must be at least 2 characters';
-    }
-    return '';
-  };
-
-  const handleNextPress = () => {
-    const nameError = validatePatientName(patientName);
-    setPatientNameError(nameError);
-
-    if (nameError) {
-      Alert.alert('Validation Error', nameError);
-      return;
-    }
-
-    const patientData = {
-      patientName: patientName.trim(),
-      illness,
-      claimType: selectedClaimType
-    };
-
-    // Close the modal first
-    if (onClose) {
-      onClose();
-    }
-
-    // Then navigate to the next page
-    router.push({
-      pathname: '/UploadDocuments',
-      params: patientData
-    });
-  };
-
-  const handleMemberSelect = (member) => {
-    setPatientName(member.name);
-    setShowMemberDropdown(false);
-    if (patientNameError) setPatientNameError('');
-  };
-
-  const handleClaimTypeSelect = (claimTypeId, enabled) => {
-    // Only allow selection if the claim type is enabled
-    if (enabled) {
-      setSelectedClaimType(claimTypeId);
-    }
-  };
-
-  const toggleDropdown = () => {
-    setShowMemberDropdown(!showMemberDropdown);
-  };
-
-  const handleBackPress = () => {
-    if (onClose) {
-      onClose();
-    } else {
-      router.back();
-    }
-  };
-
   const renderMemberItem = ({ item }) => (
     <TouchableOpacity
-      style={[
-        styles.dropdownItem,
-        patientName === item.name && styles.selectedDropdownItem
-      ]}
-      onPress={() => handleMemberSelect(item)}
+      style={styles.dropdownItem}
+      onPress={() => {
+        setPatientName(item.name);
+        setRelationship(item.relationship);
+        setShowDropdown(false);
+        if (patientNameError) setPatientNameError('');
+      }}
     >
       <View style={styles.dropdownMemberInfo}>
         <Text style={styles.dropdownMemberName}>{item.name}</Text>
-        <Text style={styles.dropdownMemberRelationship}>{item.relationship}</Text>
+        <Text style={styles.dropdownMemberRelationship}>({item.relationship})</Text>
       </View>
-      {patientName === item.name && (
-        <Ionicons name="checkmark" size={16} color="#00C4CC" />
-      )}
     </TouchableOpacity>
   );
 
+  if (initialising) {
+    return (
+      <View style={styles.overlay}>
+        <ActivityIndicator size="large" color="#00C4CC" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.overlay}>
-      <TouchableOpacity
-        style={styles.overlayBackground}
-        activeOpacity={1}
-        onPress={handleBackPress}
-      />
       <View style={styles.popupContainer}>
         <View style={styles.card}>
-          {/* Header with close button */}
           <View style={styles.header}>
-            <View style={{ width: 26 }} />
             <Text style={styles.cardTitle}>Add Patient Details</Text>
-            <TouchableOpacity onPress={handleBackPress}>
-              <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
-            </TouchableOpacity>
+            {onClose && (
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color="#13646D" />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Claim Type Selection */}
+          {/* Claim Type Section */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Claim Type</Text>
             <View style={styles.claimTypeGrid}>
@@ -157,22 +228,21 @@ const AddPatientDetails = ({ onClose }) => {
                   style={[
                     styles.claimTypeButton,
                     selectedClaimType === type.id && styles.selectedClaimType,
-                    !type.enabled && styles.disabledClaimType
+                    !type.enabled && styles.disabledClaimType,
                   ]}
-                  onPress={() => handleClaimTypeSelect(type.id, type.enabled)}
+                  onPress={() => type.enabled && setSelectedClaimType(type.id)}
                   disabled={!type.enabled}
                 >
-                  <Text style={[
-                    styles.claimTypeIcon,
-                    !type.enabled && styles.disabledClaimTypeIcon
-                  ]}>
+                  <Text style={[styles.claimTypeIcon, !type.enabled && styles.disabledIcon]}>
                     {type.icon}
                   </Text>
-                  <Text style={[
-                    styles.claimTypeLabel,
-                    selectedClaimType === type.id && styles.selectedClaimTypeLabel,
-                    !type.enabled && styles.disabledClaimTypeLabel
-                  ]}>
+                  <Text
+                    style={[
+                      styles.claimTypeLabel,
+                      selectedClaimType === type.id && styles.selectedClaimTypeLabel,
+                      !type.enabled && styles.disabledClaimTypeLabel,
+                    ]}
+                  >
                     {type.label}
                   </Text>
                 </TouchableOpacity>
@@ -180,97 +250,90 @@ const AddPatientDetails = ({ onClose }) => {
             </View>
           </View>
 
+          {/* Patient Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Patient Name *</Text>
             <View style={styles.inputWrapper}>
-              <TouchableOpacity
-                style={[
-                  styles.textInput,
-                  styles.textInputWithDropdown,
-                  styles.dropdownSelectInput,
-                  patientNameError ? styles.textInputError : null
-                ]}
-                onPress={toggleDropdown}
-              >
-                <Text style={[
-                  styles.dropdownSelectText,
-                  !patientName && styles.placeholderText
-                ]}>
-                  {patientName || 'Select patient name'}
-                </Text>
-              </TouchableOpacity>
+              {loadingMembers ? (
+                <View style={styles.textInput}>
+                  <ActivityIndicator size="small" color="#00C4CC" />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.textInput,
+                    styles.dropdownSelectInput,
+                    patientNameError && styles.textInputError,
+                  ]}
+                  onPress={() => setShowDropdown(!showDropdown)}
+                >
+                  <Text style={[styles.dropdownSelectText, !patientName && styles.placeholderText]}>
+                    {patientName || 'Select patient name'}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={toggleDropdown}
+                onPress={() => setShowDropdown(!showDropdown)}
               >
                 <Ionicons
-                  name={showMemberDropdown ? "chevron-up" : "chevron-down"}
-                  size={16}
+                  name={showDropdown ? 'chevron-up' : 'chevron-down'}
+                  size={20}
                   color="#666"
                 />
               </TouchableOpacity>
+              {showDropdown && (
+                <View style={styles.dropdownContainer}>
+                  <FlatList
+                    data={memberList}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderMemberItem}
+                    style={styles.membersList}
+                    showsVerticalScrollIndicator={false}
+                  />
+                </View>
+              )}
             </View>
-
-            {showMemberDropdown && (
-              <View style={styles.dropdownContainer}>
-                <FlatList
-                  data={memberList}
-                  renderItem={renderMemberItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  style={styles.membersList}
-                  showsVerticalScrollIndicator={false}
-                />
-              </View>
-            )}
-
-            {patientNameError ? (
-              <Text style={styles.errorText}>{patientNameError}</Text>
-            ) : null}
+            {patientNameError ? <Text style={styles.errorText}>{patientNameError}</Text> : null}
           </View>
 
+          {/* Illness */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Illness</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { height: 80 }]}
               placeholder="Enter illness description"
-              placeholderTextColor="#B0B0B0"
               value={illness}
               onChangeText={setIllness}
-              multiline={true}
-              numberOfLines={3}
+              multiline
+              textAlignVertical="top"
             />
           </View>
 
+          {/* Next Button */}
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNextPress}
+            disabled={submitting}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
+            {submitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.nextButtonText}>Next</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 };
-
+/* ------------------------------------------------------------------
+   Styles
+------------------------------------------------------------------ */
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  overlayBackground: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-  },
-  popupContainer: {
-    height:'80%',
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  overlayBackground: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
+  popupContainer: { height: '80%', width: '100%', maxWidth: 400, alignItems: 'center', justifyContent: 'center' },
   card: {
     backgroundColor: '#fff',
     borderTopRightRadius: 25,
@@ -283,33 +346,11 @@ const styles = StyleSheet.create({
     shadowRadius: 25,
     elevation: 10,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingBottom: 20,
-    backgroundColor: "transparent",
-    zIndex: 1,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#13646D',
-    textAlign: 'center',
-    flex: 1,
-  },
-  inputContainer: {
-    marginBottom: 30,
-    position: 'relative',
-  },
-  inputLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#13646D',
-    marginBottom: 10,
-  },
-  inputWrapper: {
-    position: 'relative',
-  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 20, zIndex: 1 },
+  cardTitle: { flex: 1, fontSize: 20, fontWeight: '600', color: '#13646D', textAlign: 'center' },
+  inputContainer: { marginBottom: 30 },
+  inputLabel: { fontSize: 15, fontWeight: '500', color: '#13646D', marginBottom: 10 },
+  inputWrapper: { position: 'relative' },
   textInput: {
     borderWidth: 1,
     borderColor: '#E8E8E8',
@@ -319,26 +360,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
     backgroundColor: '#F9F9F9',
-    minHeight: 30,
   },
-  textInputWithDropdown: {
-    paddingRight: 50,
-  },
-  textInputError: {
-    borderColor: '#FF6B6B',
-    borderWidth: 2,
-  },
-  // New styles for dropdown-only patient name
-  dropdownSelectInput: {
-    justifyContent: 'center',
-  },
-  dropdownSelectText: {
-    fontSize: 15,
-    color: '#333',
-  },
-  placeholderText: {
-    color: '#B0B0B0',
-  },
+  textInputWithDropdown: { paddingRight: 50 },
+  textInputError: { borderColor: '#FF6B6B', borderWidth: 2 },
+  dropdownSelectInput: { justifyContent: 'center', paddingRight: 50 },
+  dropdownSelectText: { fontSize: 15, color: '#333' },
+  placeholderText: { color: '#B0B0B0' },
   dropdownButton: {
     position: 'absolute',
     right: 15,
@@ -353,21 +380,19 @@ const styles = StyleSheet.create({
     top: 60,
     left: 0,
     right: 0,
+    zIndex: 1000,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E8E8E8',
     borderRadius: 15,
     maxHeight: 200,
-    zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
   },
-  membersList: {
-    maxHeight: 180,
-  },
+  membersList: { maxHeight: 180 },
   dropdownItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -377,35 +402,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  selectedDropdownItem: {
-    backgroundColor: '#F0F8FF',
-  },
-  dropdownMemberInfo: {
-    flex: 1,
-  },
-  dropdownMemberName: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-  },
-  dropdownMemberRelationship: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  errorText: {
-    color: '#FF6B6B',
-    fontSize: 12,
-    marginTop: 5,
-    marginLeft: 5,
-  },
-  // Claim Type Styles
-  claimTypeGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    marginTop: 10,
-  },
+  selectedDropdownItem: { backgroundColor: '#F0F8FF' },
+  dropdownMemberInfo: { flex: 1 },
+  dropdownMemberName: { fontSize: 14, fontWeight: '500', color: '#333' },
+  dropdownMemberRelationship: { fontSize: 12, color: '#666', marginTop: 2 },
+  errorText: { color: '#FF6B6B', fontSize: 12, marginTop: 5, marginLeft: 5 },
+  claimTypeGrid: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 10 },
   claimTypeButton: {
     width: '22%',
     height: 70,
@@ -417,35 +419,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E8E8E8',
   },
-  selectedClaimType: {
-    backgroundColor: '#00C4CC',
-    borderColor: '#00C4CC',
-  },
-  // New styles for disabled claim types
-  disabledClaimType: {
-    backgroundColor: '#F0F0F0',
-    borderColor: '#D0D0D0',
-    opacity: 0.6,
-  },
-  claimTypeIcon: {
-    fontSize: 20,
-    marginBottom: 5,
-  },
-  disabledClaimTypeIcon: {
-    opacity: 0.5,
-  },
-  claimTypeLabel: {
-    fontSize: 11,
-    color: '#666',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  selectedClaimTypeLabel: {
-    color: 'white',
-  },
-  disabledClaimTypeLabel: {
-    color: '#999',
-  },
+  selectedClaimType: { backgroundColor: '#00C4CC', borderColor: '#00C4CC' },
+  disabledClaimType: { backgroundColor: '#F0F0F0', borderColor: '#D0D0D0', opacity: 0.6 },
+  claimTypeIcon: { fontSize: 20, marginBottom: 5 },
+  disabledIcon: { opacity: 0.5 },
+  claimTypeLabel: { fontSize: 11, color: '#666', fontWeight: '500', textAlign: 'center' },
+  selectedClaimTypeLabel: { color: '#fff' },
+  disabledClaimTypeLabel: { color: '#999' },
   nextButton: {
     backgroundColor: '#00C4CC',
     borderRadius: 15,
@@ -457,12 +437,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+  nextButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center' },
 });
 
 export default AddPatientDetails;
