@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   endDateText: {
-    fontSize: 9,
+    fontSize: 8,
     color: "#000",
     textAlign: "center",
   },
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   },
   memberNumberOverlay: {
     position: "absolute",
-    top: "71%",
+    top: "70%",
     left: "29%",
     alignItems: "center",
     justifyContent: "center",

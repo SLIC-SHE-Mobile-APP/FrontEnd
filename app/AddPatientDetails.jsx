@@ -74,7 +74,12 @@ const AddPatientDetails = ({ onClose }) => {
       claimType: selectedClaimType
     };
 
-    // Use only Expo Router for navigation
+    // Close the modal first
+    if (onClose) {
+      onClose();
+    }
+
+    // Then navigate to the next page
     router.push({
       pathname: '/UploadDocuments',
       params: patientData
@@ -260,6 +265,7 @@ const styles = StyleSheet.create({
     top: 0, left: 0, right: 0, bottom: 0,
   },
   popupContainer: {
+    height:'80%',
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
