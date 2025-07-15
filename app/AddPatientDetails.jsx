@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -119,7 +119,7 @@ const AddPatientDetails = ({ onClose }) => {
         <Text style={styles.dropdownMemberRelationship}>{item.relationship}</Text>
       </View>
       {patientName === item.name && (
-        <Icon name="check" size={16} color="#00C4CC" />
+        <Ionicons name="checkmark" size={16} color="#00C4CC" />
       )}
     </TouchableOpacity>
   );
@@ -138,12 +138,7 @@ const AddPatientDetails = ({ onClose }) => {
             <View style={{ width: 26 }} />
             <Text style={styles.cardTitle}>Add Patient Details</Text>
             <TouchableOpacity onPress={handleBackPress}>
-              <Icon
-                name="close"
-                size={26}
-                color="#13646D"
-                style={{ marginRight: 15 }}
-              />
+              <Ionicons name="close" size={26} color="#13646D" style={{ marginRight: 15 }} />
             </TouchableOpacity>
           </View>
 
@@ -203,7 +198,7 @@ const AddPatientDetails = ({ onClose }) => {
                 style={styles.dropdownButton}
                 onPress={toggleDropdown}
               >
-                <Icon
+                <Ionicons
                   name={showMemberDropdown ? "chevron-up" : "chevron-down"}
                   size={16}
                   color="#666"
