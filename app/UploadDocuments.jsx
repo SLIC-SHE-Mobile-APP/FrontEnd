@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -24,23 +25,25 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 const UploadDocuments = ({ route }) => {
   const navigation = useNavigation();
-  const patientData = route?.params?.patientData || {};
+  const {
+    memberNo = "",
+    policyNo = "",
+    patientData: initialPatientData = {},
+  } = route?.params || {};
 
+  const patientData = route?.params?.patientData || {};
   const [selectedDocumentType, setSelectedDocumentType] = useState("");
   const [amount, setAmount] = useState("");
   const [documentDate, setDocumentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
-
-  // Image popup state
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-
-  // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingDocument, setEditingDocument] = useState(null);
   const [editAmount, setEditAmount] = useState("");
   const [editDocumentType, setEditDocumentType] = useState("");
+
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -60,6 +63,51 @@ const UploadDocuments = ({ route }) => {
       description: "Diagnosis Report Sample",
     },
   ]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadHeader = async () => {
+      if (!memberNo) return;
+
+      try {
+        const response = await fetch(
+          `http://203.115.11.229:1002/api/UploadedDocumentsCon/${memberNo}`
+        );
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const data = await response.json();
+
+        if (!isMounted) return;
+        setPatientData(data); 
+
+        // store clmSeqNo in SecureStore
+        if (data.clmSeqNo) {
+          await SecureStore.setItemAsync("clmSeqNo", data.clmSeqNo);
+        }
+      } catch (err) {
+        console.error("Failed to load header:", err);
+        Alert.alert("Error", "Unable to load patient information");
+      }
+    };
+    loadHeader();
+    return () => {
+      isMounted = false;
+    };
+  }, [memberNo]);
+
+  useEffect(() => {
+    const fetchStoredClmSeqNo = async () => {
+      try {
+        const clmSeqNo = await SecureStore.getItemAsync("clmSeqNo");
+        console.log("📦 Stored clmSeqNo (session sequence number):", clmSeqNo);
+      } catch (error) {
+        console.error("❌ Error fetching clmSeqNo from SecureStore:", error);
+      }
+    };
+  
+    fetchStoredClmSeqNo();
+  }, []);
+
+ 
 
   useEffect(() => {
     console.log("Patient Data received:", patientData);
@@ -245,10 +293,9 @@ const UploadDocuments = ({ route }) => {
         // Generate custom name based on document type
         const fileExtension = file.name.split(".").pop();
         const customName = selectedDocumentType
-          ? `${
-              selectedDocumentType.charAt(0).toUpperCase() +
-              selectedDocumentType.slice(1)
-            }.${fileExtension}`
+          ? `${selectedDocumentType.charAt(0).toUpperCase() +
+          selectedDocumentType.slice(1)
+          }.${fileExtension}`
           : file.name;
 
         const newDocument = {
@@ -306,10 +353,9 @@ const UploadDocuments = ({ route }) => {
 
         // Generate custom name based on document type
         const customName = selectedDocumentType
-          ? `${
-              selectedDocumentType.charAt(0).toUpperCase() +
-              selectedDocumentType.slice(1)
-            }.jpg`
+          ? `${selectedDocumentType.charAt(0).toUpperCase() +
+          selectedDocumentType.slice(1)
+          }.jpg`
           : `Photo_${Date.now()}.jpg`;
 
         const newDocument = {
@@ -419,7 +465,7 @@ const UploadDocuments = ({ route }) => {
     return true;
   };
 
- 
+
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
       Alert.alert("Validation Error", "Please upload at least one document");
@@ -443,7 +489,7 @@ const UploadDocuments = ({ route }) => {
 
     if (invalidDocuments.length > 0) {
       Alert.alert(
-        "Validation Error", 
+        "Validation Error",
         "Some uploaded documents have invalid information. Please check and re-upload if necessary."
       );
       return;
@@ -572,7 +618,7 @@ const UploadDocuments = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                      styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
                 >
@@ -581,7 +627,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                          styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                       ]}
                     >
                       {selectedDocumentType === type.id && (
@@ -592,7 +638,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                          styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                       ]}
                     >
                       {type.label}
@@ -616,8 +662,8 @@ const UploadDocuments = ({ route }) => {
                 styles.textInput,
                 !isAmountEditable() && styles.textInputDisabled,
                 !validateAmount(amount) &&
-                  amount !== "" &&
-                  styles.textInputError,
+                amount !== "" &&
+                styles.textInputError,
               ]}
               placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
               placeholderTextColor="#B0B0B0"
@@ -627,7 +673,7 @@ const UploadDocuments = ({ route }) => {
               editable={isAmountEditable()}
             />
             {selectedDocumentType === "prescription" ||
-            selectedDocumentType === "diagnosis" ? (
+              selectedDocumentType === "diagnosis" ? (
               <Text style={styles.helpText}>
                 Amount is automatically set to 0.00 for {selectedDocumentType}
               </Text>
@@ -748,7 +794,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.uploadButtonText,
                         !canAddMoreDocuments() &&
-                          styles.uploadButtonTextDisabled,
+                        styles.uploadButtonTextDisabled,
                       ]}
                     >
                       Browse files
@@ -767,7 +813,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.uploadButtonText,
                         !canAddMoreDocuments() &&
-                          styles.uploadButtonTextDisabled,
+                        styles.uploadButtonTextDisabled,
                       ]}
                     >
                       Take Photo
@@ -796,7 +842,7 @@ const UploadDocuments = ({ route }) => {
                       </TouchableOpacity>
                     )}
                     <View style={styles.documentInfo}>
-                      
+
                       <Text style={styles.documentType}>
                         Type: {doc.documentType ? doc.documentType.charAt(0).toUpperCase() + doc.documentType.slice(1) : 'Unknown'}
                       </Text>
@@ -893,7 +939,7 @@ const UploadDocuments = ({ route }) => {
                   <Text style={styles.editValue}>
                     {editDocumentType
                       ? editDocumentType.charAt(0).toUpperCase() +
-                        editDocumentType.slice(1)
+                      editDocumentType.slice(1)
                       : "Unknown"}
                   </Text>
                 </View>
@@ -920,7 +966,7 @@ const UploadDocuments = ({ route }) => {
                     editable={isEditAmountEditable()}
                   />
                   {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
+                    editDocumentType === "diagnosis" ? (
                     <Text style={styles.editHelpText}>
                       Amount is automatically set to 0.00 for {editDocumentType}
                     </Text>
@@ -1277,7 +1323,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#00C4CC",
     borderRadius: 15,
     paddingVertical: 18,
-    marginVertical: 30 ,
+    marginVertical: 30,
     shadowColor: "#00C4CC",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

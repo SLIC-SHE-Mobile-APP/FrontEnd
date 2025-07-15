@@ -1,8 +1,7 @@
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -18,12 +17,12 @@ import {
   View,
 } from "react-native";
 
+import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
 import ClaimTypeSelection from "./AddPatientDetails.jsx";
 import ClaimHistory from "./ClaimHistory";
 import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
