@@ -20,6 +20,29 @@ export default function PolicyMemberDetails() {
   const [storedData, setStoredData] = useState(null);
   const [policyDates, setPolicyDates] = useState(null);
 
+  // Function to mask contact number
+  const maskContactNumber = (contactNo) => {
+    if (!contactNo || contactNo === "N/A") return "N/A";
+    const contact = contactNo.toString();
+    if (contact.length <= 4) return contact;
+    // Show first 2 digits and last 2 digits, mask the middle
+    const firstPart = contact.substring(0, 2);
+    const lastPart = contact.substring(contact.length - 2);
+    const maskedMiddle = "*".repeat(contact.length - 4);
+    return `${firstPart}${maskedMiddle}${lastPart}`;
+  };
+
+  // Function to mask date of birth
+  const maskDateOfBirth = (dateOfBirth) => {
+    if (!dateOfBirth || dateOfBirth === "N/A") return "N/A";
+    // Format: DD/MM/YYYY -> DD/MM/****
+    const parts = dateOfBirth.split("/");
+    if (parts.length === 3) {
+      return `${parts[0]}/${parts[1]}/****`;
+    }
+    return dateOfBirth;
+  };
+
   // Function to load data from SecureStore
   const loadStoredData = async () => {
     try {
@@ -247,15 +270,15 @@ export default function PolicyMemberDetails() {
             )
           : { from: formatDate(apiData.effectiveDate), to: "N/A" };
 
-        // Transform API data to match component structure
+        // Transform API data to match component structure with masking
         const transformedData = {
           policyNumber: stored.policyNumber,
           memberName: apiData.memberName,
-          contactNo: stored.userMobile || "N/A", // Use stored mobile number
-          company: policyInfo?.name || "N/A", // Use company name from policy info API
+          contactNo: maskContactNumber(stored.userMobile || "N/A"), // Mask contact number
+          company: policyInfo?.name || "N/A",
           memberNo: apiData.employeeNumber,
           empCategory: apiData.employeeCategory,
-          dateOfBirth: formatDate(apiData.dateOfBirth),
+          dateOfBirth: maskDateOfBirth(formatDate(apiData.dateOfBirth)), // Mask date of birth
           effectiveDate: formatDate(apiData.effectiveDate),
           policyPeriod: policyPeriod,
           opdLimits: {
@@ -345,11 +368,11 @@ export default function PolicyMemberDetails() {
                   const transformedData = {
                     policyNumber: stored.policyNumber,
                     memberName: apiData.memberName,
-                    contactNo: stored.userMobile || "N/A",
+                    contactNo: maskContactNumber(stored.userMobile || "N/A"), // Mask contact number
                     company: policyInfo?.name || "N/A",
                     memberNo: apiData.employeeNumber,
                     empCategory: apiData.employeeCategory,
-                    dateOfBirth: formatDate(apiData.dateOfBirth),
+                    dateOfBirth: maskDateOfBirth(formatDate(apiData.dateOfBirth)), // Mask date of birth
                     effectiveDate: formatDate(apiData.effectiveDate),
                     policyPeriod: policyPeriod,
                     opdLimits: {

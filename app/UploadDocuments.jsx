@@ -419,48 +419,51 @@ const UploadDocuments = ({ route }) => {
     return true;
   };
 
+ 
   const handleAddDocument = async () => {
-    if (!selectedDocumentType) {
-      Alert.alert("Validation Error", "Please select a document type");
-      return;
-    }
-
     if (uploadedDocuments.length === 0) {
       Alert.alert("Validation Error", "Please upload at least one document");
       return;
     }
 
-    if (!validateAmount(amount)) {
-      if (selectedDocumentType === "bill") {
-        Alert.alert(
-          "Validation Error",
-          "Please enter a valid amount greater than 0 for Bill type"
-        );
-      } else {
-        Alert.alert("Validation Error", "Please enter a valid amount");
+    const invalidDocuments = uploadedDocuments.filter(doc => {
+      if (!doc.documentType) {
+        return true;
       }
+
+      if (doc.documentType === "bill") {
+        const amount = parseFloat(doc.amount);
+        if (isNaN(amount) || amount <= 0) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    if (invalidDocuments.length > 0) {
+      Alert.alert(
+        "Validation Error", 
+        "Some uploaded documents have invalid information. Please check and re-upload if necessary."
+      );
       return;
     }
 
+    // Create document info from uploaded documents
     const documentInfo = {
       patientData,
-      documentType: selectedDocumentType,
-      amount: formatAmountForDisplay(amount),
-      documentDate: formatDate(documentDate),
       documents: uploadedDocuments,
     };
 
     console.log("Document submission data:", documentInfo);
 
     try {
-      
-
       // Show success alert and navigate on OK
       Alert.alert("Success", "Document submitted successfully!", [
         {
           text: "OK",
           onPress: () => {
-            navigation.navigate("EditClaimIntimation", {
+            navigation.navigate("EditClaimIntimation1", {
               submittedData: documentInfo,
             });
           },
@@ -793,24 +796,16 @@ const UploadDocuments = ({ route }) => {
                       </TouchableOpacity>
                     )}
                     <View style={styles.documentInfo}>
-                      <Text style={styles.documentName} numberOfLines={1}>
-                        {doc.name}
-                      </Text>
-                      {/* <Text style={styles.documentType}>
+                      
+                      <Text style={styles.documentType}>
                         Type: {doc.documentType ? doc.documentType.charAt(0).toUpperCase() + doc.documentType.slice(1) : 'Unknown'}
-                      </Text> */}
+                      </Text>
                       <Text style={styles.documentAmount}>
                         Rs {doc.amount || "0.00"}
                       </Text>
                       <Text style={styles.documentDate}>Date: {doc.date}</Text>
                     </View>
                     <View style={styles.actionButtons}>
-                      {/* <TouchableOpacity
-                        onPress={() => handleEditDocument(doc)}
-                        style={styles.editButton}
-                      >
-                        <Ionicons name="create-outline" size={20} color="#00C4CC" />
-                      </TouchableOpacity> */}
                       <TouchableOpacity
                         onPress={() => handleRemoveDocument(doc.id)}
                         style={styles.deleteButton}
@@ -1282,7 +1277,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#00C4CC",
     borderRadius: 15,
     paddingVertical: 18,
-    marginVertical: 30,
+    marginVertical: 30 ,
     shadowColor: "#00C4CC",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
