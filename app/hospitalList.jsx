@@ -1,7 +1,9 @@
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Linking,
@@ -9,11 +11,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  Alert,
+  View
 } from 'react-native';
-import axios from 'axios';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -375,9 +374,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     transform: [{ translateY: -10 }],
   },
-  activeIndicatorVisible: {
-    height: 20,
-  },
+  // activeIndicatorVisible: {
+  //   height: 20,
+  // },
   contentArea: {
     flex: 1,
     paddingHorizontal: 15,

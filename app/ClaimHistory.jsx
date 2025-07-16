@@ -2,23 +2,62 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import ClaimHistory1 from './ClaimHistory1'; // detail screen
 
 const ClaimHistory = ({ onClose, availableHeight }) => {
+  const {
+    policyNo: paramPolicyNo = '',
+    memberNo: paramMemberNo = '',
+  } = useLocalSearchParams();
+
   const [claimData, setClaimData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialising, setInitialising] = useState(true);
+  const [policyNo, setPolicyNo] = useState('');
+  const [memberNo, setMemberNo] = useState('');
   const [showDetailView, setShowDetailView] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState(null);
+  const [apiError, setApiError] = useState(null);
 
-  // Replace with dynamic values if needed
-  const policyNo = "G/010/SHE/19410/22";
-  const memberNo = "1722";
-
+  // Initialize policy and member numbers from SecureStore or params
   useEffect(() => {
+    (async () => {
+      try {
+        const [storedPolicy, storedMember] = await Promise.all([
+          SecureStore.getItemAsync('selected_policy_number'),
+          SecureStore.getItemAsync('selected_member_number'),
+        ]);
+        setPolicyNo(storedPolicy || paramPolicyNo);
+        setMemberNo(storedMember || paramMemberNo);
+      } catch (err) {
+        console.warn('SecureStore read failed:', err);
+        setPolicyNo(paramPolicyNo);
+        setMemberNo(paramMemberNo);
+      } finally {
+        setInitialising(false);
+      }
+    })();
+  }, [paramPolicyNo, paramMemberNo]);
+
+  // Fetch claim history when policy and member numbers are available
+  useEffect(() => {
+    if (initialising || !policyNo || !memberNo) return;
+
     const fetchClaimHistory = async () => {
       try {
-        const response = await axios.get(`http://203.115.11.229:1002/api/ClaimHistoryCon?policy_no=${policyNo}&member_no=${memberNo}`);
+        setLoading(true);
+        setApiError(null);
+
+        const url = `http://203.115.11.229:1002/api/ClaimHistoryCon`;
+        const params = { policy_no: policyNo, member_no: memberNo };
+
+        console.log('GET', url, params); // for debugging
+
+        const response = await axios.get(url, { params });
+        
         if (Array.isArray(response.data)) {
           setClaimData(response.data);
         } else {
@@ -26,14 +65,15 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         }
       } catch (error) {
         console.error("Error fetching claim history:", error);
-        Alert.alert("Error", "Failed to fetch claim history.");
+        setApiError('Failed to fetch claim history. Please try again later.');
+        setClaimData([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchClaimHistory();
-  }, []);
+  }, [initialising, policyNo, memberNo]);
 
   const getStatusColor = (status) => {
     if (status?.toLowerCase().includes('reject')) return '#FF6B6B';
@@ -88,6 +128,15 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     </View>
   );
 
+  // Show loading while initializing
+  if (initialising) {
+    return (
+      <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.centeredContainer}>
+        <ActivityIndicator size="large" color="#17ABB7" />
+      </LinearGradient>
+    );
+  }
+
   if (showDetailView && selectedClaim) {
     return <ClaimHistory1 onClose={handleBackFromDetail} claimData={selectedClaim} />;
   }
@@ -104,9 +153,20 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Policy Info Card */}
+        <View style={styles.policyCard}>
+          <Text style={styles.policyTitle}>Claim History For :</Text>
+          <Text style={styles.policyNumber}>{policyNo}</Text>
+          <Text style={styles.memberInfo}>Member No: {memberNo}</Text>
+        </View>
+
         {/* Loading Spinner */}
         {loading ? (
-          <ActivityIndicator size="large" color="#17ABB7" />
+          <ActivityIndicator size="large" color="#17ABB7" style={{ marginTop: 20 }} />
+        ) : apiError ? (
+          <Text style={styles.error}>{apiError}</Text>
+        ) : claimData.length === 0 ? (
+          <Text style={styles.empty}>No claim records found.</Text>
         ) : (
           <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {claimData.map(renderClaimCard)}
@@ -123,6 +183,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
+  },
+  centeredContainer: {
+    flex: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -143,6 +210,31 @@ const styles = StyleSheet.create({
     color: '#13646D',
     textAlign: 'left',
     flex: 1,
+  },
+  policyCard: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  policyTitle: {
+    fontSize: 18,
+    color: '#13646D',
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  policyNumber: {
+    fontSize: 18,
+    color: '#13646D',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  memberInfo: {
+    fontSize: 14,
+    color: '#13646D',
+    fontStyle: 'italic',
   },
   scrollContainer: {
     flex: 1,
@@ -203,6 +295,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#13646D',
+    fontSize: 16,
+  },
+  error: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#D32F2F',
+    fontSize: 16,
   },
 });
 

@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
   ScrollView,
@@ -9,8 +10,8 @@ import {
   View,
   Alert,
 } from "react-native";
-import Icon from "react-native-vector-icons/FontAwesome";
 import * as SecureStore from "expo-secure-store";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PolicyMemberDetails() {
   const router = useRouter();
@@ -218,6 +219,7 @@ export default function PolicyMemberDetails() {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
       });
 
@@ -225,7 +227,12 @@ export default function PolicyMemberDetails() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        throw new Error("Empty response from server");
+      }
+
+      const data = JSON.parse(responseText);
       return data;
     } catch (err) {
       console.error("Error fetching member details:", err);
@@ -233,88 +240,94 @@ export default function PolicyMemberDetails() {
     }
   };
 
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Initialize data function
+  const initializeData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Load stored data first
-        const stored = await loadStoredData();
-        if (!stored) {
-          setLoading(false);
-          return;
-        }
-
-        // Fetch policy info for company name
-        const policyInfo = await fetchPolicyInfo(stored.policyNumber);
-
-        // Fetch policy dates
-        const policyDatesData = await fetchPolicyDates(
-          stored.policyNumber,
-          stored.userNic
-        );
-        setPolicyDates(policyDatesData);
-
-        // Fetch member details from API
-        const apiData = await fetchMemberDetails(
-          stored.policyNumber,
-          stored.memberNumber
-        );
-
-        // Format policy period using fetched dates or fallback to effective date
-        const policyPeriod = policyDatesData
-          ? formatPolicyPeriod(
-              policyDatesData.policyStartDate,
-              policyDatesData.policyEndDate
-            )
-          : { from: formatDate(apiData.effectiveDate), to: "N/A" };
-
-        // Transform API data to match component structure with masking
-        const transformedData = {
-          policyNumber: stored.policyNumber,
-          memberName: apiData.memberName,
-          contactNo: maskContactNumber(stored.userMobile || "N/A"), // Mask contact number
-          company: policyInfo?.name || "N/A",
-          memberNo: apiData.employeeNumber,
-          empCategory: apiData.employeeCategory,
-          dateOfBirth: maskDateOfBirth(formatDate(apiData.dateOfBirth)), // Mask date of birth
-          effectiveDate: formatDate(apiData.effectiveDate),
-          policyPeriod: policyPeriod,
-          opdLimits: {
-            yearLimit: formatCurrency(apiData.outdoorYearLimit),
-            eventLimit: formatCurrency(apiData.outdoorEventLimit),
-          },
-          indoorLimits: {
-            yearLimit: formatCurrency(apiData.indoorYearLimit),
-            eventLimit: formatCurrency(apiData.indoorEventLimit),
-          },
-          nic: apiData.nic || "N/A",
-          address:
-            [apiData.address1, apiData.address2, apiData.address3]
-              .filter((addr) => addr && addr.trim())
-              .join(", ") || "N/A",
-        };
-
-        setMemberDetails(transformedData);
-      } catch (err) {
-        console.error("Error initializing data:", err);
-        setError(err.message);
-        Alert.alert(
-          "Error",
-          "Failed to load member details. Please try again.",
-          [{ text: "OK" }]
-        );
-      } finally {
+      // Load stored data first
+      const stored = await loadStoredData();
+      if (!stored) {
         setLoading(false);
+        return;
       }
-    };
 
+      // Fetch policy info for company name
+      const policyInfo = await fetchPolicyInfo(stored.policyNumber);
+
+      // Fetch policy dates
+      const policyDatesData = await fetchPolicyDates(
+        stored.policyNumber,
+        stored.userNic
+      );
+      setPolicyDates(policyDatesData);
+
+      // Fetch member details from API
+      const apiData = await fetchMemberDetails(
+        stored.policyNumber,
+        stored.memberNumber
+      );
+
+      // Format policy period using fetched dates or fallback to effective date
+      const policyPeriod = policyDatesData
+        ? formatPolicyPeriod(
+            policyDatesData.policyStartDate,
+            policyDatesData.policyEndDate
+          )
+        : { from: formatDate(apiData.effectiveDate), to: "N/A" };
+
+      // Transform API data to match component structure with masking
+      const transformedData = {
+        policyNumber: stored.policyNumber,
+        memberName: apiData.memberName,
+        contactNo: maskContactNumber(stored.userMobile || "N/A"), // Mask contact number
+        company: policyInfo?.name || "N/A",
+        memberNo: apiData.employeeNumber,
+        empCategory: apiData.employeeCategory,
+        dateOfBirth: maskDateOfBirth(formatDate(apiData.dateOfBirth)), // Mask date of birth
+        effectiveDate: formatDate(apiData.effectiveDate),
+        policyPeriod: policyPeriod,
+        opdLimits: {
+          yearLimit: formatCurrency(apiData.outdoorYearLimit),
+          eventLimit: formatCurrency(apiData.outdoorEventLimit),
+        },
+        indoorLimits: {
+          yearLimit: formatCurrency(apiData.indoorYearLimit),
+          eventLimit: formatCurrency(apiData.indoorEventLimit),
+        },
+        nic: apiData.nic || "N/A",
+        address:
+          [apiData.address1, apiData.address2, apiData.address3]
+            .filter((addr) => addr && addr.trim())
+            .join(", ") || "N/A",
+      };
+
+      setMemberDetails(transformedData);
+    } catch (err) {
+      console.error("Error initializing data:", err);
+      setError(err.message);
+      Alert.alert(
+        "Error",
+        "Failed to load member details. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     initializeData();
   }, []);
 
   const handleBackPress = () => {
     router.back();
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    initializeData();
   };
 
   if (loading) {
@@ -332,74 +345,7 @@ export default function PolicyMemberDetails() {
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>Error: {error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              setError(null);
-              setLoading(true);
-              // Re-run the initialization
-              const initializeData = async () => {
-                try {
-                  const stored = await loadStoredData();
-                  if (!stored) {
-                    setLoading(false);
-                    return;
-                  }
-
-                  const policyInfo = await fetchPolicyInfo(stored.policyNumber);
-                  const policyDatesData = await fetchPolicyDates(
-                    stored.policyNumber,
-                    stored.userNic
-                  );
-                  setPolicyDates(policyDatesData);
-
-                  const apiData = await fetchMemberDetails(
-                    stored.policyNumber,
-                    stored.memberNumber
-                  );
-
-                  const policyPeriod = policyDatesData
-                    ? formatPolicyPeriod(
-                        policyDatesData.policyStartDate,
-                        policyDatesData.policyEndDate
-                      )
-                    : { from: formatDate(apiData.effectiveDate), to: "N/A" };
-
-                  const transformedData = {
-                    policyNumber: stored.policyNumber,
-                    memberName: apiData.memberName,
-                    contactNo: maskContactNumber(stored.userMobile || "N/A"), // Mask contact number
-                    company: policyInfo?.name || "N/A",
-                    memberNo: apiData.employeeNumber,
-                    empCategory: apiData.employeeCategory,
-                    dateOfBirth: maskDateOfBirth(formatDate(apiData.dateOfBirth)), // Mask date of birth
-                    effectiveDate: formatDate(apiData.effectiveDate),
-                    policyPeriod: policyPeriod,
-                    opdLimits: {
-                      yearLimit: formatCurrency(apiData.outdoorYearLimit),
-                      eventLimit: formatCurrency(apiData.outdoorEventLimit),
-                    },
-                    indoorLimits: {
-                      yearLimit: formatCurrency(apiData.indoorYearLimit),
-                      eventLimit: formatCurrency(apiData.indoorEventLimit),
-                    },
-                    nic: apiData.nic || "N/A",
-                    address:
-                      [apiData.address1, apiData.address2, apiData.address3]
-                        .filter((addr) => addr && addr.trim())
-                        .join(", ") || "N/A",
-                  };
-
-                  setMemberDetails(transformedData);
-                } catch (err) {
-                  setError(err.message);
-                } finally {
-                  setLoading(false);
-                }
-              };
-              initializeData();
-            }}
-          >
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -418,21 +364,15 @@ export default function PolicyMemberDetails() {
   }
 
   return (
+    <SafeAreaView style={styles.safeArea}>
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            onPress={handleBackPress}
-            style={styles.backButton}
-            activeOpacity={0.1}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name="arrow-left" size={20} color="#13515C" />
-          </TouchableOpacity>
-          <Text style={styles.headerText}>Policy Details</Text>
-          <View style={styles.headerRight} />
-        </View>
+      <View style={styles.header1}>
+        <TouchableOpacity onPress={handleBackPress}>
+          <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle1}>Policy Details</Text>
+        <View style={{ width: 24 }} />
       </View>
 
       {/* Body */}
@@ -517,12 +457,32 @@ export default function PolicyMemberDetails() {
         </View>
       </ScrollView>
     </LinearGradient>
+    </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "black",
+  },
   container: {
     flex: 1,
+  },
+  header1: {
+    // marginTop:20,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 20,
+    backgroundColor: "transparent",
+  },
+  headerTitle1: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D7D",
+    flex: 1,
+    textAlign: "center",
   },
   header: {
     backgroundColor: "rgba(255, 255, 255, 0.9)",
@@ -536,6 +496,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+ 
   headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
