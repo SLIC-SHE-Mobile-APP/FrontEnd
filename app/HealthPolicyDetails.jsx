@@ -253,7 +253,7 @@ const HealthPolicyDetails = () => {
         },
         "Hospitals List": {
           minHeight: 650,
-          maxHeight: availableHeight * 0.95,
+          maxHeight: 457 ,
           preferredRatio: 0.9,
           contentBased: true,
         },

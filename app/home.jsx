@@ -981,7 +981,7 @@ export default function PolicyHome() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
@@ -1341,7 +1341,7 @@ export default function PolicyHome() {
           </Animated.View>
         </Modal>
       </LinearGradient>
-    </SafeAreaView>
+    // {/* </SafeAreaView> */}
   );
 }
 
@@ -1366,6 +1366,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginLeft: 10,
+    marginTop:10
   },
   logoRow: {
     alignItems: "center",
@@ -1404,7 +1405,7 @@ const styles = StyleSheet.create({
   userSection: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "left",
+    justifyContent: "right",
     flexDirection: "row",
     alignItems: "center",
   },
@@ -1639,10 +1640,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   typeIcon: {
     width: 30,

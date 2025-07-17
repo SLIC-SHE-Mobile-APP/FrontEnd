@@ -64,55 +64,6 @@ const UploadDocuments = ({ route }) => {
     },
   ]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadHeader = async () => {
-      if (!memberNo) return;
-
-      try {
-        const response = await fetch(
-          `http://203.115.11.229:1002/api/UploadedDocumentsCon/${memberNo}`
-        );
-        if (!response.ok) throw new Error("HTTP " + response.status);
-        const data = await response.json();
-
-        if (!isMounted) return;
-        setPatientData(data); 
-
-        // store clmSeqNo in SecureStore
-        if (data.clmSeqNo) {
-          await SecureStore.setItemAsync("clmSeqNo", data.clmSeqNo);
-        }
-      } catch (err) {
-        console.error("Failed to load header:", err);
-        Alert.alert("Error", "Unable to load patient information");
-      }
-    };
-    loadHeader();
-    return () => {
-      isMounted = false;
-    };
-  }, [memberNo]);
-
-  useEffect(() => {
-    const fetchStoredClmSeqNo = async () => {
-      try {
-        const clmSeqNo = await SecureStore.getItemAsync("clmSeqNo");
-        console.log("📦 Stored clmSeqNo (session sequence number):", clmSeqNo);
-      } catch (error) {
-        console.error("❌ Error fetching clmSeqNo from SecureStore:", error);
-      }
-    };
-  
-    fetchStoredClmSeqNo();
-  }, []);
-
- 
-
-  useEffect(() => {
-    console.log("Patient Data received:", patientData);
-  }, [patientData]);
-
   const documentTypes = [
     { id: "bill", label: "Bill", icon: "receipt-outline" },
     { id: "prescription", label: "Prescription", icon: "medical-outline" },
@@ -273,6 +224,18 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleBrowseFiles = async () => {
+    // Add validation for document type
+    if (!selectedDocumentType) {
+      Alert.alert("Validation Error", "Please select a document type first");
+      return;
+    }
+
+    // Add validation for bill amount
+    if (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
+      Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
+      return;
+    }
+
     if (!canAddMoreDocuments()) {
       Alert.alert(
         "Document Limit",
@@ -310,7 +273,7 @@ const UploadDocuments = ({ route }) => {
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
 
-        // ADD THESE RESET LINES:
+        // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
@@ -324,6 +287,18 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleTakePhoto = async () => {
+    // Add validation for document type
+    if (!selectedDocumentType) {
+      Alert.alert("Validation Error", "Please select a document type first");
+      return;
+    }
+
+    // Add validation for bill amount
+    if (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
+      Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
+      return;
+    }
+
     if (!canAddMoreDocuments()) {
       Alert.alert(
         "Document Limit",
@@ -344,7 +319,7 @@ const UploadDocuments = ({ route }) => {
 
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Removed cropping
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -370,7 +345,7 @@ const UploadDocuments = ({ route }) => {
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
 
-        // ADD THESE RESET LINES:
+        // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
@@ -380,6 +355,7 @@ const UploadDocuments = ({ route }) => {
       Alert.alert("Error", "Failed to take photo");
     }
   };
+
 
   const handleRemoveDocument = (documentId) => {
     Alert.alert(
@@ -661,9 +637,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.textInput,
                 !isAmountEditable() && styles.textInputDisabled,
-                !validateAmount(amount) &&
-                amount !== "" &&
-                styles.textInputError,
+                selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.textInputError,
               ]}
               placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
               placeholderTextColor="#B0B0B0"
@@ -678,8 +652,10 @@ const UploadDocuments = ({ route }) => {
                 Amount is automatically set to 0.00 for {selectedDocumentType}
               </Text>
             ) : selectedDocumentType === "bill" ? (
-              <Text style={styles.helpText}>
-                Amount is required for Bill type
+              <Text style={[styles.helpText, (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.errorText]}>
+                {(!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+                  ? "Amount is required and must be greater than 0 for Bill type"
+                  : "Amount is required for Bill type"}
               </Text>
             ) : null}
           </View>
@@ -751,77 +727,87 @@ const UploadDocuments = ({ route }) => {
 
           {/* Document Upload Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Document</Text>
-            <Text style={styles.sectionSubtitle}>
-              Allowed formats: JPG, JPEG, TIFF, PNG
-            </Text>
-
-            {/* Upload instruction based on document type */}
             {selectedDocumentType && (
-              <Text
-                style={[
-                  styles.sectionSubtitle,
-                  selectedDocumentType === "bill"
-                    ? styles.limitWarning
-                    : styles.limitInfo,
-                ]}
-              >
-                {getUploadInstructionText()}
-              </Text>
-            )}
-
-            <View style={styles.uploadContainer}>
-              <View style={styles.uploadArea}>
-                <Ionicons
-                  name="cloud-upload-outline"
-                  size={40}
-                  color="#00C4CC"
-                />
-                <Text style={styles.uploadText}>
-                  Upload your documents here
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Document</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Allowed formats: JPG, JPEG, TIFF, PNG
                 </Text>
 
-                <View style={styles.uploadButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.uploadButton,
-                      !canAddMoreDocuments() && styles.uploadButtonDisabled,
-                    ]}
-                    onPress={handleBrowseFiles}
-                    disabled={!canAddMoreDocuments()}
-                  >
-                    <Text
-                      style={[
-                        styles.uploadButtonText,
-                        !canAddMoreDocuments() &&
-                        styles.uploadButtonTextDisabled,
-                      ]}
-                    >
-                      Browse files
-                    </Text>
-                  </TouchableOpacity>
+                {/* Upload instruction based on document type */}
+                <Text
+                  style={[
+                    styles.sectionSubtitle,
+                    selectedDocumentType === "bill"
+                      ? styles.limitWarning
+                      : styles.limitInfo,
+                  ]}
+                >
+                  {getUploadInstructionText()}
+                </Text>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.uploadButton,
-                      !canAddMoreDocuments() && styles.uploadButtonDisabled,
-                    ]}
-                    onPress={handleTakePhoto}
-                    disabled={!canAddMoreDocuments()}
-                  >
-                    <Text
-                      style={[
-                        styles.uploadButtonText,
-                        !canAddMoreDocuments() &&
-                        styles.uploadButtonTextDisabled,
-                      ]}
-                    >
-                      Take Photo
+                <View style={styles.uploadContainer}>
+                  <View style={styles.uploadArea}>
+                    <Ionicons
+                      name="cloud-upload-outline"
+                      size={40}
+                      color="#00C4CC"
+                    />
+                    <Text style={styles.uploadText}>
+                      Upload your documents here
                     </Text>
-                  </TouchableOpacity>
+
+                    <View style={styles.uploadButtons}>
+                      <TouchableOpacity
+                        style={[
+                          styles.uploadButton,
+                          (!canAddMoreDocuments() ||
+                            (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                          styles.uploadButtonDisabled,
+                        ]}
+                        onPress={handleBrowseFiles}
+                        disabled={!canAddMoreDocuments() ||
+                          (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
+                      >
+                        <Text
+                          style={[
+                            styles.uploadButtonText,
+                            (!canAddMoreDocuments() ||
+                              (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
+                          ]}
+                        >
+                          Browse files
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.uploadButton,
+                          (!canAddMoreDocuments() ||
+                            (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                          styles.uploadButtonDisabled,
+                        ]}
+                        onPress={handleTakePhoto}
+                        disabled={!canAddMoreDocuments() ||
+                          (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
+                      >
+                        <Text
+                          style={[
+                            styles.uploadButtonText,
+                            (!canAddMoreDocuments() ||
+                              (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
+                          ]}
+                        >
+                          Take Photo
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
           </View>
 
           {/* Uploaded Documents List - Show after document type selection */}
