@@ -1,5 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,7 +21,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import * as SecureStore from 'expo-secure-store';
+import { API_BASE_URL } from '../constants/index.js';
 
 function LoginRequestOTPContent() {
   const [nic, setNIC] = useState("");
@@ -135,7 +136,7 @@ function LoginRequestOTPContent() {
   const checkAvailability = async (nicNumber, mobileNumber) => {
     try {
       const response = await fetch(
-        "http://203.115.11.229:1002/api/LoginNicMnumber/CheckAvailability",
+        `${API_BASE_URL}/LoginNicMnumber/CheckAvailability`,
         {
           method: "POST",
           headers: {
