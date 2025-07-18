@@ -5,6 +5,8 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -19,7 +21,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -43,19 +44,20 @@ const UploadDocuments = ({ route }) => {
   const [editingDocument, setEditingDocument] = useState(null);
   const [editAmount, setEditAmount] = useState("");
   const [editDocumentType, setEditDocumentType] = useState("");
-
+  const [documentTypes, setDocumentTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Sample images with local image sources
   const [sampleImages] = useState([
     {
       id: 1,
       source: require("../assets/images/sample1.jpg"),
-      description: "Prescription Sample",
+      description: "Medical Bill Sample",
     },
     {
       id: 2,
       source: require("../assets/images/sample2.jpg"),
-      description: "Medical Bill Sample",
+      description: "Prescription Sample",
     },
     {
       id: 3,
@@ -64,20 +66,70 @@ const UploadDocuments = ({ route }) => {
     },
   ]);
 
-  const documentTypes = [
-    { id: "bill", label: "Bill", icon: "receipt-outline" },
-    { id: "prescription", label: "Prescription", icon: "medical-outline" },
-    { id: "diagnosis", label: "Diagnosis", icon: "document-text-outline" },
-    { id: "other", label: "Other", icon: "folder-outline" },
-  ];
+  // Fetch document types from API
+  useEffect(() => {
+    const fetchDocumentTypes = async () => {
+      try {
+        setLoading(true);
+        // You can make this dynamic based on request type if needed
+        const response = await fetch('http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch document types');
+        }
+
+        const data = await response.json();
+
+        // Transform API response to match the expected format
+        const transformedDocumentTypes = data.map(doc => ({
+          id: doc.docId,
+          label: doc.docDesc,
+          icon: getIconForDocType(doc.docDesc)
+        }));
+
+        setDocumentTypes(transformedDocumentTypes);
+      } catch (error) {
+        console.error('Error fetching document types:', error);
+        Alert.alert('Error', 'Failed to load document types. Please try again.');
+
+        // Fallback to hardcoded types if API fails
+        setDocumentTypes([
+          { id: "O01", label: "BILL", icon: "receipt-outline" },
+          { id: "O02", label: "PRESCRIPTION", icon: "medical-outline" },
+          { id: "O03", label: "DIAGNOSIS CARD", icon: "document-text-outline" },
+          { id: "O04", label: "OTHER", icon: "folder-outline" },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDocumentTypes();
+  }, []);
+
+  // Helper function to get appropriate icon for document type
+  const getIconForDocType = (docDesc) => {
+    switch (docDesc.toUpperCase()) {
+      case 'BILL':
+        return 'receipt-outline';
+      case 'PRESCRIPTION':
+        return 'medical-outline';
+      case 'DIAGNOSIS CARD':
+        return 'document-text-outline';
+      case 'OTHER':
+        return 'folder-outline';
+      default:
+        return 'document-outline';
+    }
+  };
 
   const handleDocumentTypeSelect = (type) => {
     setSelectedDocumentType(type);
 
     // Set amount based on document type
-    if (type === "prescription" || type === "diagnosis") {
+    if (type === "O02" || type === "O03") { // PRESCRIPTION or DIAGNOSIS CARD
       setAmount("0.00");
-    } else if (type === "bill") {
+    } else if (type === "O01") { // BILL
       setAmount(""); // Clear amount for bill type so user can enter
     } else {
       setAmount(""); // Clear for other types
@@ -106,10 +158,7 @@ const UploadDocuments = ({ route }) => {
 
   const handleAmountChange = (text) => {
     // If document type is prescription or diagnosis, don't allow editing
-    if (
-      selectedDocumentType === "prescription" ||
-      selectedDocumentType === "diagnosis"
-    ) {
+    if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return;
     }
 
@@ -135,12 +184,72 @@ const UploadDocuments = ({ route }) => {
     setAmount(formattedAmount);
   };
 
+  // Add image compression function
+  const compressImage = async (imageUri) => {
+    try {
+      // Get file info to check size
+      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      const fileSizeInMB = fileInfo.size / (1024 * 1024);
+
+      console.log(`Original image size: ${fileSizeInMB.toFixed(2)} MB`);
+
+      // If image is already less than 1MB, return as is
+      if (fileSizeInMB < 1) {
+        console.log('Image is already under 1MB, no compression needed');
+        return imageUri;
+      }
+
+      // If image is larger than 5MB, show error
+      if (fileSizeInMB > 5) {
+        Alert.alert(
+          'File Too Large',
+          'Image size cannot exceed 5MB. Please select a smaller image.'
+        );
+        return null;
+      }
+
+      // Compress image to target 1MB
+      let compress = 0.8; // Start with 80% quality
+
+      // Calculate compression based on file size
+      if (fileSizeInMB > 3) {
+        compress = 0.3;
+      } else if (fileSizeInMB > 2) {
+        compress = 0.5;
+      } else if (fileSizeInMB > 1.5) {
+        compress = 0.7;
+      }
+
+      const compressedImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          // Resize if image is too large
+          { resize: { width: 1200 } } // Resize to max width of 1200px
+        ],
+        {
+          compress: compress,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: false,
+        }
+      );
+
+      // Check compressed file size
+      const compressedFileInfo = await FileSystem.getInfoAsync(compressedImage.uri);
+      const compressedSizeInMB = compressedFileInfo.size / (1024 * 1024);
+
+      console.log(`Compressed image size: ${compressedSizeInMB.toFixed(2)} MB`);
+
+      return compressedImage.uri;
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      Alert.alert('Error', 'Failed to compress image. Please try again.');
+      return null;
+    }
+  };
+
   const handleEditAmountChange = (text) => {
     // If document type is prescription or diagnosis, don't allow editing
-    if (
-      editDocumentType === "prescription" ||
-      editDocumentType === "diagnosis"
-    ) {
+    if (editDocumentType === "O02" || editDocumentType === "O03") {
       return;
     }
 
@@ -168,15 +277,12 @@ const UploadDocuments = ({ route }) => {
 
   const validateAmount = (amountString) => {
     // For prescription and diagnosis, 0.00 is valid
-    if (
-      selectedDocumentType === "prescription" ||
-      selectedDocumentType === "diagnosis"
-    ) {
+    if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return true;
     }
 
     // For bill type, amount must be greater than 0
-    if (selectedDocumentType === "bill") {
+    if (selectedDocumentType === "O01") {
       if (!amountString || amountString.trim() === "") {
         return false;
       }
@@ -213,10 +319,10 @@ const UploadDocuments = ({ route }) => {
 
   // FIXED: Check if maximum documents reached based on document type
   const canAddMoreDocuments = () => {
-    if (selectedDocumentType === "bill") {
+    if (selectedDocumentType === "O01") { // BILL
       // Count only bill-type documents
       const billDocuments = uploadedDocuments.filter(
-        (doc) => doc.documentType === "bill"
+        (doc) => doc.documentType === "O01"
       );
       return billDocuments.length < 1; // Only 1 bill document allowed
     }
@@ -229,13 +335,13 @@ const UploadDocuments = ({ route }) => {
       Alert.alert("Validation Error", "Please select a document type first");
       return;
     }
-
+  
     // Add validation for bill amount
-    if (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
+    if (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
       Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
       return;
     }
-
+  
     if (!canAddMoreDocuments()) {
       Alert.alert(
         "Document Limit",
@@ -243,28 +349,40 @@ const UploadDocuments = ({ route }) => {
       );
       return;
     }
-
+  
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/*", "application/pdf", "image/jpeg", "image/png"],
         copyToCacheDirectory: true,
       });
-
+  
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-
+        
+        let finalUri = file.uri;
+        
+        // If it's an image, compress it
+        if (file.mimeType && file.mimeType.startsWith('image/')) {
+         
+          
+          const compressedUri = await compressImage(file.uri);
+          if (!compressedUri) {
+            return; // Compression failed or file too large
+          }
+          finalUri = compressedUri;
+        }
+  
+        // Get document type label for custom name
+        const docTypeLabel = documentTypes.find(type => type.id === selectedDocumentType)?.label || selectedDocumentType;
+  
         // Generate custom name based on document type
         const fileExtension = file.name.split(".").pop();
-        const customName = selectedDocumentType
-          ? `${selectedDocumentType.charAt(0).toUpperCase() +
-          selectedDocumentType.slice(1)
-          }.${fileExtension}`
-          : file.name;
-
+        const customName = `${docTypeLabel}.${fileExtension}`;
+  
         const newDocument = {
           id: Date.now(),
           name: customName,
-          uri: file.uri,
+          uri: finalUri,
           type: file.mimeType,
           size: file.size,
           documentType: selectedDocumentType,
@@ -272,12 +390,12 @@ const UploadDocuments = ({ route }) => {
           date: formatDate(documentDate),
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
-
+  
         // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
-
+  
         Alert.alert("Success", "Document uploaded successfully!");
       }
     } catch (error) {
@@ -292,13 +410,13 @@ const UploadDocuments = ({ route }) => {
       Alert.alert("Validation Error", "Please select a document type first");
       return;
     }
-
+  
     // Add validation for bill amount
-    if (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
+    if (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
       Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
       return;
     }
-
+  
     if (!canAddMoreDocuments()) {
       Alert.alert(
         "Document Limit",
@@ -306,7 +424,7 @@ const UploadDocuments = ({ route }) => {
       );
       return;
     }
-
+  
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
@@ -316,27 +434,37 @@ const UploadDocuments = ({ route }) => {
         );
         return;
       }
-
+  
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         quality: 0.8,
       });
-
+  
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const photo = result.assets[0];
-
+        
+        Alert.alert(
+          "Processing Image",
+          "Please wait while we optimize your image..."
+        );
+        
+        // Compress the captured photo
+        const compressedUri = await compressImage(photo.uri);
+        if (!compressedUri) {
+          return; // Compression failed or file too large
+        }
+  
+        // Get document type label for custom name
+        const docTypeLabel = documentTypes.find(type => type.id === selectedDocumentType)?.label || selectedDocumentType;
+  
         // Generate custom name based on document type
-        const customName = selectedDocumentType
-          ? `${selectedDocumentType.charAt(0).toUpperCase() +
-          selectedDocumentType.slice(1)
-          }.jpg`
-          : `Photo_${Date.now()}.jpg`;
-
+        const customName = `${docTypeLabel}.jpg`;
+  
         const newDocument = {
           id: Date.now(),
           name: customName,
-          uri: photo.uri,
+          uri: compressedUri,
           type: "image/jpeg",
           size: photo.fileSize || 0,
           documentType: selectedDocumentType,
@@ -344,18 +472,19 @@ const UploadDocuments = ({ route }) => {
           date: formatDate(documentDate),
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
-
+  
         // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
+        
+        Alert.alert("Success", "Photo captured and uploaded successfully!");
       }
     } catch (error) {
       console.error("Error taking photo:", error);
       Alert.alert("Error", "Failed to take photo");
     }
   };
-
 
   const handleRemoveDocument = (documentId) => {
     Alert.alert(
@@ -379,7 +508,7 @@ const UploadDocuments = ({ route }) => {
 
   const handleSaveEdit = () => {
     if (!validateEditAmount(editAmount)) {
-      if (editDocumentType === "bill") {
+      if (editDocumentType === "O01") {
         Alert.alert(
           "Validation Error",
           "Please enter a valid amount greater than 0 for Bill type"
@@ -407,15 +536,12 @@ const UploadDocuments = ({ route }) => {
 
   const validateEditAmount = (amountString) => {
     // For prescription and diagnosis, 0.00 is valid
-    if (
-      editDocumentType === "prescription" ||
-      editDocumentType === "diagnosis"
-    ) {
+    if (editDocumentType === "O02" || editDocumentType === "O03") {
       return true;
     }
 
     // For bill type, amount must be greater than 0
-    if (editDocumentType === "bill") {
+    if (editDocumentType === "O01") {
       if (!amountString || amountString.trim() === "") {
         return false;
       }
@@ -441,7 +567,6 @@ const UploadDocuments = ({ route }) => {
     return true;
   };
 
-
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
       Alert.alert("Validation Error", "Please upload at least one document");
@@ -453,7 +578,7 @@ const UploadDocuments = ({ route }) => {
         return true;
       }
 
-      if (doc.documentType === "bill") {
+      if (doc.documentType === "O01") {
         const amount = parseFloat(doc.amount);
         if (isNaN(amount) || amount <= 0) {
           return true;
@@ -530,9 +655,9 @@ const UploadDocuments = ({ route }) => {
 
   // FIXED: Get upload instruction text based on document type
   const getUploadInstructionText = () => {
-    if (selectedDocumentType === "bill") {
+    if (selectedDocumentType === "O01") {
       const billDocuments = uploadedDocuments.filter(
-        (doc) => doc.documentType === "bill"
+        (doc) => doc.documentType === "O01"
       );
       return `You can upload only 1 document for Bill type (${billDocuments.length}/1 uploaded)`;
     }
@@ -544,20 +669,30 @@ const UploadDocuments = ({ route }) => {
 
   // Check if amount field should be editable
   const isAmountEditable = () => {
-    return (
-      selectedDocumentType !== "prescription" &&
-      selectedDocumentType !== "diagnosis"
-    );
+    return selectedDocumentType !== "O02" && selectedDocumentType !== "O03";
   };
 
   const isEditAmountEditable = () => {
-    return (
-      editDocumentType !== "prescription" && editDocumentType !== "diagnosis"
-    );
+    return editDocumentType !== "O02" && editDocumentType !== "O03";
   };
 
+  // Get document type label by ID
+  const getDocumentTypeLabel = (docId) => {
+    const docType = documentTypes.find(type => type.id === docId);
+    return docType ? docType.label : docId;
+  };
+
+  if (loading) {
+    return (
+        <LinearGradient colors={["#FAFAFA", "#6DD3D3"]} style={[styles.gradient]}>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading document types...</Text>
+          </View>
+        </LinearGradient>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FAFAFA", "#6DD3D3"]} style={[styles.gradient]}>
         {/* Header */}
         <View style={styles.header}>
@@ -629,7 +764,7 @@ const UploadDocuments = ({ route }) => {
           <View style={styles.section}>
             <Text style={styles.inputLabel}>
               Amount{" "}
-              {selectedDocumentType === "bill" && (
+              {selectedDocumentType === "O01" && (
                 <Text style={styles.requiredAsterisk}>*</Text>
               )}
             </Text>
@@ -637,7 +772,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.textInput,
                 !isAmountEditable() && styles.textInputDisabled,
-                selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.textInputError,
+                selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.textInputError,
               ]}
               placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
               placeholderTextColor="#B0B0B0"
@@ -646,12 +781,11 @@ const UploadDocuments = ({ route }) => {
               keyboardType="decimal-pad"
               editable={isAmountEditable()}
             />
-            {selectedDocumentType === "prescription" ||
-              selectedDocumentType === "diagnosis" ? (
+            {selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
               <Text style={styles.helpText}>
-                Amount is automatically set to 0.00 for {selectedDocumentType}
+                Amount is automatically set to 0.00 for {getDocumentTypeLabel(selectedDocumentType)}
               </Text>
-            ) : selectedDocumentType === "bill" ? (
+            ) : selectedDocumentType === "O01" ? (
               <Text style={[styles.helpText, (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.errorText]}>
                 {(!amount || amount.trim() === "" || parseFloat(amount) <= 0)
                   ? "Amount is required and must be greater than 0 for Bill type"
@@ -738,7 +872,7 @@ const UploadDocuments = ({ route }) => {
                 <Text
                   style={[
                     styles.sectionSubtitle,
-                    selectedDocumentType === "bill"
+                    selectedDocumentType === "O01"
                       ? styles.limitWarning
                       : styles.limitInfo,
                   ]}
@@ -762,18 +896,18 @@ const UploadDocuments = ({ route }) => {
                         style={[
                           styles.uploadButton,
                           (!canAddMoreDocuments() ||
-                            (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                            (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
                           styles.uploadButtonDisabled,
                         ]}
                         onPress={handleBrowseFiles}
                         disabled={!canAddMoreDocuments() ||
-                          (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
+                          (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
                       >
                         <Text
                           style={[
                             styles.uploadButtonText,
                             (!canAddMoreDocuments() ||
-                              (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                              (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
                             styles.uploadButtonTextDisabled,
                           ]}
                         >
@@ -785,18 +919,18 @@ const UploadDocuments = ({ route }) => {
                         style={[
                           styles.uploadButton,
                           (!canAddMoreDocuments() ||
-                            (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                            (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
                           styles.uploadButtonDisabled,
                         ]}
                         onPress={handleTakePhoto}
                         disabled={!canAddMoreDocuments() ||
-                          (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
+                          (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
                       >
                         <Text
                           style={[
                             styles.uploadButtonText,
                             (!canAddMoreDocuments() ||
-                              (selectedDocumentType === "bill" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
+                              (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
                             styles.uploadButtonTextDisabled,
                           ]}
                         >
@@ -817,43 +951,33 @@ const UploadDocuments = ({ route }) => {
               <View style={styles.uploadedDocuments}>
                 {uploadedDocuments.map((doc) => (
                   <View key={doc.id} style={styles.documentItem}>
+                    {/* Show image thumbnail if it's an image */}
                     {doc.type?.startsWith("image/") && (
-                      <TouchableOpacity
-                        onPress={() => handleDocumentImagePress(doc)}
-                      >
-                        <Image
-                          source={{ uri: doc.uri }}
-                          style={styles.documentThumbnail}
-                        />
+                      <TouchableOpacity onPress={() => handleDocumentImagePress(doc)}>
+                        <Image source={{ uri: doc.uri }} style={styles.documentThumbnail} />
                       </TouchableOpacity>
                     )}
-                    <View style={styles.documentInfo}>
 
+                    <View style={styles.documentInfo}>
                       <Text style={styles.documentType}>
-                        Type: {doc.documentType ? doc.documentType.charAt(0).toUpperCase() + doc.documentType.slice(1) : 'Unknown'}
+                        Type: {getDocumentTypeLabel(doc.documentType)}
                       </Text>
-                      <Text style={styles.documentAmount}>
-                        Rs {doc.amount || "0.00"}
-                      </Text>
+                      <Text style={styles.documentAmount}>Rs {doc.amount || "0.00"}</Text>
                       <Text style={styles.documentDate}>Date: {doc.date}</Text>
                     </View>
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity
-                        onPress={() => handleRemoveDocument(doc.id)}
-                        style={styles.deleteButton}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={28}
-                          color="#FF6B6B"
-                        />
-                      </TouchableOpacity>
-                    </View>
+
+                    <TouchableOpacity
+                      onPress={() => handleRemoveDocument(doc.id)}
+                      style={styles.deleteButton}
+                    >
+                      <Ionicons name="trash-outline" size={28} color="#FF6B6B" />
+                    </TouchableOpacity>
                   </View>
                 ))}
               </View>
             </View>
           )}
+
 
           {/* Add Document Button */}
           <TouchableOpacity
@@ -982,15 +1106,10 @@ const UploadDocuments = ({ route }) => {
           </View>
         </Modal>
       </LinearGradient>
-    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "black",
-  },
   gradient: {
     flex: 1,
     backgroundColor: "#6DD3D3",
@@ -1004,6 +1123,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
+    marginTop:20,
     paddingTop: 20,
     paddingBottom: 20,
   },

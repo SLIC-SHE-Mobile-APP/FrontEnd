@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router'; // ✅ Correct import
+import { useRouter } from 'expo-router'; 
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,

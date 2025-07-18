@@ -1,24 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
-import * as ImageManipulator from "expo-image-manipulator";
-import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import * as FileSystem from "expo-file-system";
 
 const { width, height } = Dimensions.get("window");
 
@@ -1200,7 +1187,6 @@ const PendingRequirement1 = () => {
   // Show loading indicator while loading data
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
           style={[styles.container, styles.loadingContainer]}
@@ -1208,22 +1194,32 @@ const PendingRequirement1 = () => {
           <ActivityIndicator size="large" color="#00ADBB" />
           <Text style={styles.loadingText}>Loading requirement data...</Text>
         </LinearGradient>
+    );
+  }
+
+  // Show error if no data
+  if (!requirementData) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <LinearGradient
+          colors={["#FFFFFF", "#6DD3D3"]}
+          style={styles.container}
+        >
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Error loading requirement data</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={loadRequirementData}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
 
-  // Log render information
-  logWithTimestamp("=== COMPONENT RENDERING ===", {
-    hasRequirementData: !!requirementData,
-    documentsCount: requirementData.documents?.length || 0,
-    requiredDocumentsCount: requirementData.requiredDocuments?.length || 0,
-    uploadedDocumentsCount: uploadedDocuments.length,
-    selectedDocument,
-    selectedDocumentCode,
-  });
-
   return (
-    <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -1493,11 +1489,21 @@ const PendingRequirement1 = () => {
           </View>
         </Modal>
       </LinearGradient>
-    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  documentCodeText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  modalItemCode: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+    marginTop: 2,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: "black",

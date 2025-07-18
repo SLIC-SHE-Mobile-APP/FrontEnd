@@ -13,7 +13,6 @@ import {
   View,
   Image,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 
 const EditClaimIntimation = ({ route }) => {
@@ -675,7 +674,6 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -1108,15 +1106,11 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </Modal>
       </LinearGradient>
-    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "black",
-  },
+  
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",

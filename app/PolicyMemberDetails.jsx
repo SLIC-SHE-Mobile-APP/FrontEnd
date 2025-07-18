@@ -11,7 +11,6 @@ import {
   Alert,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PolicyMemberDetails() {
   const router = useRouter();
@@ -364,7 +363,6 @@ export default function PolicyMemberDetails() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header1}>
@@ -457,19 +455,15 @@ export default function PolicyMemberDetails() {
         </View>
       </ScrollView>
     </LinearGradient>
-    </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "black",
-  },
+ 
   container: {
     flex: 1,
   },
   header1: {
-    // marginTop:20,
+    marginTop:20,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,

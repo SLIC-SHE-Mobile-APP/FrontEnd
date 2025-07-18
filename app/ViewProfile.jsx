@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Animated, Dimensions, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
-import {  SafeAreaView } from 'react-native-safe-area-context';
 const { width, height } = Dimensions.get('window');
 
 export default function ViewProfile() {
@@ -38,7 +37,6 @@ export default function ViewProfile() {
   };
 
   return (
-    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
       <LinearGradient
         colors={['#FFFFFF', '#6DD3D3']}
         style={styles.container}
@@ -98,7 +96,7 @@ export default function ViewProfile() {
             ))}
           </View>
         </Animated.View>
-      </LinearGradient></SafeAreaView>
+      </LinearGradient>
   );
 }
 

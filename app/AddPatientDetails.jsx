@@ -1,3 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,9 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 
 const AddPatientDetails = ({ onClose }) => {
   const router = useRouter();
@@ -55,7 +55,7 @@ const AddPatientDetails = ({ onClose }) => {
   const [patientName, setPatientName] = useState('');
   const [relationship, setRelationship] = useState('');
   const [illness, setIllness] = useState('');
-  const [selectedClaimType, setSelectedClaimType] = useState('outdoor');
+  const [selectedClaimType, setSelectedClaimType] = useState('Outdoor');
   const [patientNameError, setPatientNameError] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [memberList, setMemberList] = useState([]);
@@ -109,6 +109,26 @@ const AddPatientDetails = ({ onClose }) => {
     };
   }, [initialising, policyNo, memberNo, selectedMember, members]);
 
+  // Function to store patient details in SecureStore
+  const storePatientDetails = async (claimType, name, illnessDesc, clmSeqNo = null) => {
+    try {
+      const storePromises = [
+        SecureStore.setItemAsync('stored_claim_type', claimType),
+        SecureStore.setItemAsync('stored_patient_name', name),
+        SecureStore.setItemAsync('stored_illness_description', illnessDesc),
+      ];
+      
+      if (clmSeqNo) {
+        storePromises.push(SecureStore.setItemAsync('stored_claim_seq_no', clmSeqNo));
+      }
+      
+      await Promise.all(storePromises);
+      console.log('Patient details stored successfully in SecureStore');
+    } catch (error) {
+      console.warn('Failed to store patient details:', error);
+    }
+  };
+
   const validatePatientName = (name) => {
     if (!name.trim()) return 'Patient name is required';
     if (name.trim().length < 2) return 'Patient name must be at least 2 characters';
@@ -124,6 +144,16 @@ const AddPatientDetails = ({ onClose }) => {
       Alert.alert('Validation Error', nameError);
       return;
     }
+
+    // Console.log the three details
+    console.log('=== PATIENT DETAILS ===');
+    console.log('Claim Type:', selectedClaimType);
+    console.log('Patient Name:', patientName.trim());
+    console.log('Illness Description:', illness);
+    console.log('=======================');
+
+    // Store the details in SecureStore
+    await storePatientDetails(selectedClaimType, patientName.trim(), illness);
 
     const payload = {
       policyNo,
@@ -155,6 +185,24 @@ const AddPatientDetails = ({ onClose }) => {
       }
 
       const data = await res.json();
+      
+      // Fetch claim details using member number and store clmSeqNo
+      const memberNumber = await SecureStore.getItemAsync('selected_member_number');
+      if (memberNumber) {
+        try {
+          const claimDetailsRes = await fetch(`http://203.115.11.229:1002/api/UploadedDocumentsCon/${memberNumber}`);
+          if (claimDetailsRes.ok) {
+            const claimDetails = await claimDetailsRes.json();
+            if (claimDetails.clmSeqNo) {
+              await SecureStore.setItemAsync('stored_claim_seq_no', claimDetails.clmSeqNo);
+              console.log('Claim Sequence Number stored:', claimDetails.clmSeqNo);
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch or store claim details:', error);
+        }
+      }
+      
       if (onClose) onClose();
       router.push({
         pathname: '/UploadDocuments',
@@ -327,6 +375,7 @@ const AddPatientDetails = ({ onClose }) => {
     </View>
   );
 };
+
 /* ------------------------------------------------------------------
    Styles
 ------------------------------------------------------------------ */
