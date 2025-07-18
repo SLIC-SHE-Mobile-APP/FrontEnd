@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Modal,
-  Image,
-  ActivityIndicator,
-  SafeAreaView,
-  Dimensions, // Add this import
-} from 'react-native';
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator"; // Add this import
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useState } from "react";
+import * as ImageManipulator from "expo-image-manipulator";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -1200,323 +1200,304 @@ const PendingRequirement1 = () => {
   // Show loading indicator while loading data
   if (loading) {
     return (
-      <LinearGradient
-        colors={["#FFFFFF", "#6DD3D3"]}
-        style={[styles.container, styles.loadingContainer]}
-      >
-        <ActivityIndicator size="large" color="#00ADBB" />
-        <Text style={styles.loadingText}>Loading requirement data...</Text>
-      </LinearGradient>
-    );
-  }
-
-  // Show error if no data
-  if (!requirementData) {
-    return (
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
-          style={styles.container}
+          style={[styles.container, styles.loadingContainer]}
         >
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Error loading requirement data</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadRequirementData}
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
+          <ActivityIndicator size="large" color="#00ADBB" />
+          <Text style={styles.loadingText}>Loading requirement data...</Text>
         </LinearGradient>
       </SafeAreaView>
     );
   }
 
+  // Log render information
+  logWithTimestamp("=== COMPONENT RENDERING ===", {
+    hasRequirementData: !!requirementData,
+    documentsCount: requirementData.documents?.length || 0,
+    requiredDocumentsCount: requirementData.requiredDocuments?.length || 0,
+    uploadedDocumentsCount: uploadedDocuments.length,
+    selectedDocument,
+    selectedDocumentCode,
+  });
+
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#13646D" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pending Requirement</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      {/* ScrollView with content */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Claim Info - Only show claim number and date */}
-        <View style={styles.claimCard}>
-          <View style={styles.claimRow}>
-            <Text style={styles.claimLabel}>Claim Number</Text>
-            <Text style={styles.claimColon}>:</Text>
-            <Text style={styles.claimValue}>
-              {requirementData.claimNumber}
-            </Text>
-          </View>
-          <View style={styles.claimRow}>
-            <Text style={styles.claimLabel}>Required Date</Text>
-            <Text style={styles.claimColon}>:</Text>
-            <Text style={styles.claimValue}>
-              {requirementData.requiredDate}
-            </Text>
-          </View>
+    <SafeAreaView style={styles.safeArea}>
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleClose} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#13646D" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Pending Requirement</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.documentSection}>
-          <Text style={styles.documentTitle}>Document Upload</Text>
-
-          {/* Document Selection Dropdown */}
-          <View style={styles.dropdownContainer}>
-            <Text style={styles.dropdownLabel}>
-              Select Required Document:
-            </Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => {
-                logWithTimestamp("=== DROPDOWN OPENED ===", {
-                  documentsAvailable: requirementData.documents?.length || 0,
-                  requiredDocumentsAvailable:
-                    requirementData.requiredDocuments?.length || 0,
-                });
-                setIsDropdownOpen(true);
-              }}
-            >
-              <Text style={styles.dropdownText}>
-                {selectedDocument || "Choose document type..."}
+        {/* ScrollView with content */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Claim Info - Only show claim number and date */}
+          <View style={styles.claimCard}>
+            <View style={styles.claimRow}>
+              <Text style={styles.claimLabel}>Claim Number</Text>
+              <Text style={styles.claimColon}>:</Text>
+              <Text style={styles.claimValue}>
+                {requirementData.claimNumber}
               </Text>
-              <Ionicons name="chevron-down" size={20} color="#00ADBB" />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.allowedFormats}>
-            Allowed formats: {allowedFormats.join(", ")}
-          </Text>
-
-          <View style={styles.uploadArea}>
-            <View style={styles.uploadIcon}>
-              <Ionicons
-                name="cloud-upload-outline"
-                size={40}
-                color="#00ADBB"
-              />
             </View>
+            <View style={styles.claimRow}>
+              <Text style={styles.claimLabel}>Required Date</Text>
+              <Text style={styles.claimColon}>:</Text>
+              <Text style={styles.claimValue}>
+                {requirementData.requiredDate}
+              </Text>
+            </View>
+          </View>
 
-            <View style={styles.uploadButtons}>
+          <View style={styles.documentSection}>
+            <Text style={styles.documentTitle}>Document Upload</Text>
+
+            {/* Document Selection Dropdown */}
+            <View style={styles.dropdownContainer}>
+              <Text style={styles.dropdownLabel}>
+                Select Required Document:
+              </Text>
               <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={handleBrowseFiles}
+                style={styles.dropdown}
+                onPress={() => {
+                  logWithTimestamp("=== DROPDOWN OPENED ===", {
+                    documentsAvailable: requirementData.documents?.length || 0,
+                    requiredDocumentsAvailable:
+                      requirementData.requiredDocuments?.length || 0,
+                  });
+                  setIsDropdownOpen(true);
+                }}
               >
-                <Text style={styles.uploadButtonText}>Browse files</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={handleTakePhoto}
-              >
-                <Text style={styles.uploadButtonText}>Take Photo</Text>
+                <Text style={styles.dropdownText}>
+                  {selectedDocument || "Choose document type..."}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#00ADBB" />
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+            <Text style={styles.allowedFormats}>
+              Allowed formats: {allowedFormats.join(", ")}
+            </Text>
 
-        {/* Pending Documents Table */}
-        <View style={styles.uploadedSection}>
-          <Text style={styles.uploadedTitle}>Pending Documents</Text>
-          <View style={styles.documentsTable}>
-            <View style={styles.tableHeader}>
-              <View style={styles.headerDescriptionCell}>
-                <Text style={styles.headerCellText}>Description</Text>
+            <View style={styles.uploadArea}>
+              <View style={styles.uploadIcon}>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={40}
+                  color="#00ADBB"
+                />
               </View>
-              <View style={styles.headerImageCell}>
-                <Text style={styles.headerCellText}>View Image</Text>
-              </View>
-              <View style={styles.headerDeleteCell}>
-                <Text style={styles.headerCellText}>Action</Text>
+
+              <View style={styles.uploadButtons}>
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={handleBrowseFiles}
+                >
+                  <Text style={styles.uploadButtonText}>Browse files</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={handleTakePhoto}
+                >
+                  <Text style={styles.uploadButtonText}>Take Photo</Text>
+                </TouchableOpacity>
               </View>
             </View>
-
-            {loadingDocuments ? (
-              <View style={styles.emptyRow}>
-                <ActivityIndicator size="small" color="#00ADBB" />
-                <Text style={styles.emptyText}>
-                  Loading pending documents...
-                </Text>
-              </View>
-            ) : pendingDocuments.length > 0 ? (
-              pendingDocuments.map((doc, i) => renderPendingDocument(doc, i))
-            ) : (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>
-                  No pending documents found
-                </Text>
-              </View>
-            )}
           </View>
-        </View>
 
-        {/* Submit Button */}
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Pending Documents Table */}
+          <View style={styles.uploadedSection}>
+            <Text style={styles.uploadedTitle}>Pending Documents</Text>
+            <View style={styles.documentsTable}>
+              <View style={styles.tableHeader}>
+                <View style={styles.headerDescriptionCell}>
+                  <Text style={styles.headerCellText}>Description</Text>
+                </View>
+                <View style={styles.headerImageCell}>
+                  <Text style={styles.headerCellText}>View Image</Text>
+                </View>
+                <View style={styles.headerDeleteCell}>
+                  <Text style={styles.headerCellText}>Action</Text>
+                </View>
+              </View>
 
-      {/* Dropdown Modal */}
-      <Modal
-        visible={isDropdownOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => {
-          logWithTimestamp("=== DROPDOWN CLOSED ===", "Modal closed");
-          setIsDropdownOpen(false);
-        }}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => {
-            logWithTimestamp(
-              "=== DROPDOWN OVERLAY PRESSED ===",
-              "Closing dropdown"
-            );
+              {loadingDocuments ? (
+                <View style={styles.emptyRow}>
+                  <ActivityIndicator size="small" color="#00ADBB" />
+                  <Text style={styles.emptyText}>
+                    Loading pending documents...
+                  </Text>
+                </View>
+              ) : pendingDocuments.length > 0 ? (
+                pendingDocuments.map((doc, i) => renderPendingDocument(doc, i))
+              ) : (
+                <View style={styles.emptyRow}>
+                  <Text style={styles.emptyText}>
+                    No pending documents found
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <Text style={styles.submitButtonText}>Submit</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Dropdown Modal */}
+        <Modal
+          visible={isDropdownOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => {
+            logWithTimestamp("=== DROPDOWN CLOSED ===", "Modal closed");
             setIsDropdownOpen(false);
           }}
         >
-          <View style={styles.modalContent}>
-            {(() => {
-              logWithTimestamp("=== DROPDOWN MODAL RENDERING ===", {
-                documentsLength: requirementData.documents?.length || 0,
-                requiredDocumentsLength:
-                  requirementData.requiredDocuments?.length || 0,
-                documents: requirementData.documents,
-                requiredDocuments: requirementData.requiredDocuments,
-              });
-              return null;
-            })()}
-
-            {requirementData.documents && requirementData.documents.length > 0
-              ? requirementData.documents.map((doc, index) => {
-                logWithTimestamp(
-                  `=== RENDERING DOCUMENT OPTION ${index} ===`,
-                  doc
-                );
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => handleDocumentSelection(doc)}
-                  >
-                    <Text style={styles.modalItemText}>
-                      {doc.description}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })
-              : pendingDocuments.length > 0
-                ? pendingDocuments.map((doc, index) => {
-                  logWithTimestamp(
-                    `=== RENDERING PENDING DOCUMENT OPTION ${index} ===`,
-                    doc
-                  );
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.modalItem}
-                      onPress={() => {
-                        logWithTimestamp(
-                          "=== PENDING DOCUMENT SELECTED ===",
-                          doc
-                        );
-                        setSelectedDocument(doc.DocDescription);
-                        setSelectedDocumentCode(doc.DocCode);
-                        setIsDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={styles.modalItemText}>
-                        {doc.DocDescription}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-                : // Fallback to requiredDocuments if both arrays are empty
-                requirementData.requiredDocuments.map((doc, index) => {
-                  logWithTimestamp(
-                    `=== RENDERING REQUIRED DOCUMENT OPTION ${index} ===`,
-                    doc
-                  );
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.modalItem}
-                      onPress={() => {
-                        logWithTimestamp(
-                          "=== FALLBACK DOCUMENT SELECTED ===",
-                          doc
-                        );
-                        setSelectedDocument(doc);
-                        setSelectedDocumentCode("");
-                        setIsDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={styles.modalItemText}>{doc}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Image Preview Modal */}
-      <Modal
-        visible={isDocumentImageModalOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleCloseDocumentImageModal}
-      >
-        <View style={styles.imageModalOverlay}>
           <TouchableOpacity
-            style={styles.imageModalCloseButton}
-            onPress={handleCloseDocumentImageModal}
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              logWithTimestamp(
+                "=== DROPDOWN OVERLAY PRESSED ===",
+                "Closing dropdown"
+              );
+              setIsDropdownOpen(false);
+            }}
           >
-            <Ionicons name="close" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
+            <View style={styles.modalContent}>
+              {(() => {
+                logWithTimestamp("=== DROPDOWN MODAL RENDERING ===", {
+                  documentsLength: requirementData.documents?.length || 0,
+                  requiredDocumentsLength:
+                    requirementData.requiredDocuments?.length || 0,
+                  documents: requirementData.documents,
+                  requiredDocuments: requirementData.requiredDocuments,
+                });
+                return null;
+              })()}
 
-          <View style={styles.imageModalContent}>
-            {documentImageUrl && (
-              <Image
-                source={{ uri: documentImageUrl }}
-                style={styles.previewImage}
-                resizeMode="contain"
-                onError={(error) => {
-                  logWithTimestamp(
-                    "=== DOCUMENT IMAGE LOAD ERROR ===",
-                    error
-                  );
-                  Alert.alert("Error", "Failed to load document image");
-                }}
-              />
-            )}
+              {requirementData.documents && requirementData.documents.length > 0
+                ? requirementData.documents.map((doc, index) => {
+                    logWithTimestamp(
+                      `=== RENDERING DOCUMENT OPTION ${index} ===`,
+                      doc
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.modalItem}
+                        onPress={() => handleDocumentSelection(doc)}
+                      >
+                        <Text style={styles.modalItemText}>
+                          {doc.description}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                : pendingDocuments.length > 0
+                ? pendingDocuments.map((doc, index) => {
+                    logWithTimestamp(
+                      `=== RENDERING PENDING DOCUMENT OPTION ${index} ===`,
+                      doc
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.modalItem}
+                        onPress={() => {
+                          logWithTimestamp(
+                            "=== PENDING DOCUMENT SELECTED ===",
+                            doc
+                          );
+                          setSelectedDocument(doc.DocDescription);
+                          setSelectedDocumentCode(doc.DocCode);
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.modalItemText}>
+                          {doc.DocDescription}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                : // Fallback to requiredDocuments if both arrays are empty
+                  requirementData.requiredDocuments.map((doc, index) => {
+                    logWithTimestamp(
+                      `=== RENDERING REQUIRED DOCUMENT OPTION ${index} ===`,
+                      doc
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.modalItem}
+                        onPress={() => {
+                          logWithTimestamp(
+                            "=== FALLBACK DOCUMENT SELECTED ===",
+                            doc
+                          );
+                          setSelectedDocument(doc);
+                          setSelectedDocumentCode("");
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.modalItemText}>{doc}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Image Preview Modal */}
+        <Modal
+          visible={isDocumentImageModalOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleCloseDocumentImageModal}
+        >
+          <View style={styles.imageModalOverlay}>
+            <TouchableOpacity
+              style={styles.imageModalCloseButton}
+              onPress={handleCloseDocumentImageModal}
+            >
+              <Ionicons name="close" size={30} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.imageModalContent}>
+              {documentImageUrl && (
+                <Image
+                  source={{ uri: documentImageUrl }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                  onError={(error) => {
+                    logWithTimestamp(
+                      "=== DOCUMENT IMAGE LOAD ERROR ===",
+                      error
+                    );
+                    Alert.alert("Error", "Failed to load document image");
+                  }}
+                />
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
-    </LinearGradient>
+        </Modal>
+      </LinearGradient>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  documentCodeText: {
-    fontSize: 12,
-    color: "#666",
-    fontStyle: "italic",
-  },
-  modalItemCode: {
-    fontSize: 12,
-    color: "#666",
-    fontStyle: "italic",
-    marginTop: 2,
-  },
   safeArea: {
     flex: 1,
     backgroundColor: "black",
