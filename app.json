@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SLIC SHE Mobile",
+    "name": "SLIC SHE MOBILE",
     "slug": "SLIC-SHE-Application",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,12 +16,13 @@
         "foregroundImage": "./assets/images/general.jpg",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.SLICSHEApplication"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/general.jpg"
     },
     "plugins": [
       "expo-router",
@@ -29,7 +30,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/general.jpg",
-          "imageWidth": 200,
+          "imageWidth": 150,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
