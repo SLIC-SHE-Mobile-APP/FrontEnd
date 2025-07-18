@@ -14,7 +14,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const EditClaimIntimation1 = ({ route }) => {
     const navigation = useNavigation();
@@ -731,7 +730,6 @@ const EditClaimIntimation1 = ({ route }) => {
 
 
     return (
-        <SafeAreaView style={styles.safeArea}>
             <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
                 {/* Header */}
                 <View style={styles.header}>
@@ -1200,15 +1198,11 @@ const EditClaimIntimation1 = ({ route }) => {
                     </View>
                 </Modal>
             </LinearGradient>
-        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: "black",
-    },
+   
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF",

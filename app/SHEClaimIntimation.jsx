@@ -304,6 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F7F8',
   },
   header: {
+    marginTop:20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

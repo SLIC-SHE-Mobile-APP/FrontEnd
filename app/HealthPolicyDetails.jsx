@@ -15,7 +15,6 @@ import {
   ActivityIndicator,
 } from "react-native";
 import {
-  SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -497,7 +496,6 @@ const HealthPolicyDetails = () => {
   // Show loading screen
   if (loading) {
     return (
-      <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
           style={styles.container}
@@ -507,14 +505,12 @@ const HealthPolicyDetails = () => {
             <Text style={styles.loadingText}>Loading policy details...</Text>
           </View>
         </LinearGradient>
-      </SafeAreaView>
     );
   }
 
   // Show error screen
   if (error) {
     return (
-      <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
           style={styles.container}
@@ -534,12 +530,10 @@ const HealthPolicyDetails = () => {
             </TouchableOpacity>
           </View>
         </LinearGradient>
-      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ backgroundColor: "black", flex: 1 }}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         {/* Fixed Header Section */}
         <View style={styles.headerContainer}>
@@ -622,7 +616,6 @@ const HealthPolicyDetails = () => {
           </View>
         </Modal>
       </LinearGradient>
-    </SafeAreaView>
   );
 };
 
@@ -653,6 +646,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
+    marginTop:20,
     paddingHorizontal: 15,
   },
   headerRow: {

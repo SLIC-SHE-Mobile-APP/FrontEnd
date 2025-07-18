@@ -1,13 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState, useEffect } from "react";
-import {Alert,Image,SafeAreaView,ScrollView,StyleSheet,Text,TouchableOpacity,View,Modal,Dimensions,ActivityIndicator,
-} from "react-native";
 import * as SecureStore from "expo-secure-store";
-import * as FileSystem from "expo-file-system";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView, StyleSheet, Text, TouchableOpacity, View,
+} from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -804,7 +810,6 @@ const handleDeleteDocument = async (documentId) => {
   // Show loading while data is being loaded
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
           style={styles.container}
@@ -817,14 +822,12 @@ const handleDeleteDocument = async (documentId) => {
             )}
           </View>
         </LinearGradient>
-      </SafeAreaView>
     );
   }
 
   // Show error if no data
   if (!requirementData) {
     return (
-      <SafeAreaView style={styles.safeArea}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
           style={styles.container}
@@ -839,12 +842,10 @@ const handleDeleteDocument = async (documentId) => {
             </TouchableOpacity>
           </View>
         </LinearGradient>
-      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -1063,7 +1064,6 @@ const handleDeleteDocument = async (documentId) => {
           </View>
         </Modal>
       </LinearGradient>
-    </SafeAreaView>
   );
 };
 
@@ -1078,10 +1078,6 @@ const styles = StyleSheet.create({
     color: "#666",
     fontStyle: "italic",
     marginTop: 2,
-  },
-  safeArea: {
-    flex: 1,
-    backgroundColor: "black",
   },
   container: {
     flex: 1,
