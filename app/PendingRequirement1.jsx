@@ -5,15 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView, StyleSheet, Text, TouchableOpacity, View,
-} from "react-native";
+import * as FileSystem from "expo-file-system";
 
 const { width, height } = Dimensions.get("window");
 
@@ -22,225 +14,151 @@ const PendingRequirement1 = () => {
   const [selectedDocument, setSelectedDocument] = useState("");
   const [selectedDocumentCode, setSelectedDocumentCode] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [requirementData, setRequirementData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [loadingExistingDocuments, setLoadingExistingDocuments] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [requirementData, setRequirementData] = useState({
+    claimNumber: "G/010/12334/525",
+    requiredDocuments: ["Prescription"],
+    requiredDate: "12/05/2025",
+    requirementId: "1",
+    polNo: null,
+    trnsNo: null,
+    originalReqDate: null,
+    documents: [],
+  });
+  const [pendingDocuments, setPendingDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState(null);
+  const [documentImageUrl, setDocumentImageUrl] = useState("");
+  const [isDocumentImageModalOpen, setIsDocumentImageModalOpen] =
+    useState(false);
 
   // Get requirement data from route params
   const params = useLocalSearchParams();
 
-  // Base API URL
-  const BASE_API_URL = "http://203.115.11.229:1002/api";
-
-  // Document options with codes and descriptions
-  const documentOptions = [
-    {
-      code: "DOC301",
-      description: "Need certified copy of pregnancy report",
-    },
-    {
-      code: "DOC302",
-      description: "Need completed claim form with Doctor's part.",
-    },
-    {
-      code: "DOC303",
-      description: "Need completed claims form with employee's signature",
-    },
-    {
-      code: "DOC304",
-      description: "Need original diagnosis card with doctor's seal",
-    },
-    {
-      code: "DOC305",
-      description: "Need original payment receipts",
-    },
-    {
-      code: "DOC306",
-      description: "Need original final detail bill",
-    },
-  ];
-
-  useEffect(() => {
-    loadRequirementData();
-  }, []);
-
-  // Load existing documents from API
-  const loadExistingDocuments = async (polNo, clmNo) => {
-    if (!polNo || !clmNo) {
-      console.log("Missing polNo or clmNo, skipping document loading");
-      return;
-    }
-
-    try {
-      setLoadingExistingDocuments(true);
-      console.log("=== LOADING EXISTING DOCUMENTS ===");
-      console.log("Policy Number:", polNo);
-      console.log("Claim Number:", clmNo);
-
-      const response = await fetch(
-        `${BASE_API_URL}/UploadDocumentRespo/documents?polNo=${polNo}&clmNo=${clmNo}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const existingDocuments = await response.json();
-      console.log("Existing Documents Response:", existingDocuments);
-
-      if (existingDocuments && existingDocuments.length > 0) {
-        // Transform API response to match our document format
-        const transformedDocuments = existingDocuments.map((doc, index) => {
-          // Find matching document description
-          const matchingDoc = documentOptions.find(opt => opt.code === doc.docCode);
-          const description = matchingDoc ? matchingDoc.description : `Document ${doc.docCode}`;
-
-          // Create data URI from base64
-          const imageUri = `data:image/jpeg;base64,${doc.docContent}`;
-
-          return {
-            id: `existing_${doc.docCode}_${doc.seqNo}`,
-            name: `${doc.docCode}_${doc.seqNo}.jpg`,
-            uri: imageUri,
-            type: "image/jpeg",
-            size: 0, // Size not available from API
-            documentType: description,
-            documentCode: doc.docCode,
-            claimNumber: doc.claimNo,
-            seqNo: doc.seqNo,
-            uploaded: true,
-            isExisting: true, // Flag to identify existing documents
-            uploadedAt: new Date().toISOString(),
-          };
-        });
-
-        console.log("Transformed Documents:", transformedDocuments);
-        setUploadedDocuments(transformedDocuments);
-      } else {
-        console.log("No existing documents found");
-      }
-
-      console.log("===================================");
-    } catch (error) {
-      console.error("Error loading existing documents:", error);
-      // Don't show alert for this error, just log it
-    } finally {
-      setLoadingExistingDocuments(false);
-    }
+  // Enhanced logging function
+  const logWithTimestamp = (label, data) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${label}:`, data);
   };
-
-  const deleteDocumentFromAPI = async (polNo, claimNo, docCode, seqNo) => {
-  try {
-    console.log("=== DELETING DOCUMENT FROM API ===");
-    console.log("Policy Number:", polNo);
-    console.log("Claim Number:", claimNo);
-    console.log("Document Code:", docCode);
-    console.log("Sequence Number:", seqNo);
-
-    const requestBody = {
-      polNo: polNo,
-      claimNo: claimNo,
-      docCode: docCode,
-      seqNo: parseInt(seqNo)
-    };
-
-    console.log("Request Body:", JSON.stringify(requestBody));
-
-    const response = await fetch(
-      `${BASE_API_URL}/UploadPendingDocumentCon/delete`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
-
-    console.log("Response Status:", response.status);
-    console.log("Response Headers:", response.headers);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Delete error response:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log("Delete Response:", result);
-    console.log("==================================");
-    
-    return result;
-  } catch (error) {
-    console.error("Error deleting document:", error);
-    throw error;
-  }
-};
-
 
   const loadRequirementData = async () => {
     try {
       setLoading(true);
+      logWithTimestamp("=== STARTING DATA LOAD PROCESS ===", {
+        dataSource: params?.dataSource,
+      });
 
       // Check if data should be loaded from SecureStore
       if (params?.dataSource === "securestore") {
-        // Load from SecureStore and log everything
-        console.log("=== LOADING DATA FROM SECURESTORE ===");
+        logWithTimestamp(
+          "=== LOADING DATA FROM SECURESTORE ===",
+          "Starting SecureStore retrieval"
+        );
 
+        // Load all data from SecureStore with detailed logging
         const claimNumber = await SecureStore.getItemAsync(
           "current_claim_number"
         );
-        console.log("Claim Number:", claimNumber);
+        logWithTimestamp("SecureStore - Claim Number", {
+          raw: claimNumber,
+          type: typeof claimNumber,
+          length: claimNumber?.length,
+        });
 
         const polNo = await SecureStore.getItemAsync("current_pol_no");
-        console.log("Policy Number:", polNo);
+        logWithTimestamp("SecureStore - Policy Number", {
+          raw: polNo,
+          type: typeof polNo,
+          length: polNo?.length,
+        });
 
         const trnsNo = await SecureStore.getItemAsync("current_trns_no");
-        console.log("Transaction Number:", trnsNo);
+        logWithTimestamp("SecureStore - Transaction Number", {
+          raw: trnsNo,
+          type: typeof trnsNo,
+          length: trnsNo?.length,
+        });
 
         const requiredDate = await SecureStore.getItemAsync(
           "current_required_date"
         );
-        console.log("Required Date:", requiredDate);
+        logWithTimestamp("SecureStore - Required Date", {
+          raw: requiredDate,
+          type: typeof requiredDate,
+          length: requiredDate?.length,
+        });
 
         const originalReqDate = await SecureStore.getItemAsync(
           "current_original_req_date"
         );
-        console.log("Original Required Date:", originalReqDate);
+        logWithTimestamp("SecureStore - Original Required Date", {
+          raw: originalReqDate,
+          type: typeof originalReqDate,
+          length: originalReqDate?.length,
+        });
 
         const requirementId = await SecureStore.getItemAsync(
           "current_requirement_id"
         );
-        console.log("Requirement ID:", requirementId);
+        logWithTimestamp("SecureStore - Requirement ID", {
+          raw: requirementId,
+          type: typeof requirementId,
+          length: requirementId?.length,
+        });
 
         const documentsStr = await SecureStore.getItemAsync(
           "current_documents"
         );
-        console.log("Documents String:", documentsStr);
-        const documents = documentsStr ? JSON.parse(documentsStr) : [];
-        console.log("Documents Array:", documents);
+        logWithTimestamp("SecureStore - Documents String", {
+          raw: documentsStr,
+          type: typeof documentsStr,
+          length: documentsStr?.length,
+        });
 
-        // Check if data should be loaded from SecureStore
+        let documents = [];
+        try {
+          documents = documentsStr ? JSON.parse(documentsStr) : [];
+          logWithTimestamp("SecureStore - Documents Parsed", {
+            parsed: documents,
+            type: typeof documents,
+            isArray: Array.isArray(documents),
+            length: documents?.length,
+            firstItem: documents[0],
+          });
+        } catch (parseError) {
+          logWithTimestamp("SecureStore - Documents Parse Error", parseError);
+        }
+
         const requiredDocumentsStr = await SecureStore.getItemAsync(
           "current_required_documents"
         );
-        console.log("Required Documents String:", requiredDocumentsStr);
-        const requiredDocuments = requiredDocumentsStr
-          ? JSON.parse(requiredDocumentsStr)
-          : documentOptions; // Use full document options as fallback
-        console.log("Required Documents Array:", requiredDocuments);
-        console.log("Required Documents Type:", typeof requiredDocuments[0]);
+        logWithTimestamp("SecureStore - Required Documents String", {
+          raw: requiredDocumentsStr,
+          type: typeof requiredDocumentsStr,
+          length: requiredDocumentsStr?.length,
+        });
 
-        // Log all data together
+        let requiredDocuments = [];
+        try {
+          requiredDocuments = requiredDocumentsStr
+            ? JSON.parse(requiredDocumentsStr)
+            : [];
+          logWithTimestamp("SecureStore - Required Documents Parsed", {
+            parsed: requiredDocuments,
+            type: typeof requiredDocuments,
+            isArray: Array.isArray(requiredDocuments),
+            length: requiredDocuments?.length,
+            firstItemType: typeof requiredDocuments[0],
+            firstItem: requiredDocuments[0],
+          });
+        } catch (parseError) {
+          logWithTimestamp(
+            "SecureStore - Required Documents Parse Error",
+            parseError
+          );
+        }
+
+        // Comprehensive SecureStore data summary
         const allSecureStoreData = {
           claimNumber,
           polNo,
@@ -249,11 +167,15 @@ const PendingRequirement1 = () => {
           originalReqDate,
           requirementId,
           documents,
+          requiredDocuments,
         };
-        console.log("=== ALL SECURESTORE DATA ===");
-        console.log(JSON.stringify(allSecureStoreData, null, 2));
+        logWithTimestamp(
+          "=== COMPLETE SECURESTORE DATA SUMMARY ===",
+          allSecureStoreData
+        );
 
-        const requirementDataObj = {
+        // Set the requirement data
+        const newRequirementData = {
           claimNumber: claimNumber || params?.claimNumber,
           polNo: polNo,
           trnsNo: trnsNo,
@@ -264,242 +186,406 @@ const PendingRequirement1 = () => {
           documents: documents,
         };
 
-        setRequirementData(requirementDataObj);
-
-        // Load existing documents after setting requirement data
-        await loadExistingDocuments(polNo, claimNumber);
+        logWithTimestamp(
+          "=== FINAL REQUIREMENT DATA (SecureStore) ===",
+          newRequirementData
+        );
+        setRequirementData(newRequirementData);
       } else {
         // Load from params (fallback)
-        console.log("=== LOADING DATA FROM PARAMS ===");
-        console.log("Route Params:", params);
+        logWithTimestamp(
+          "=== LOADING DATA FROM PARAMS ===",
+          "Starting params retrieval"
+        );
+        logWithTimestamp("Raw Route Params", params);
 
-        const requiredDocuments = params?.requiredDocuments
-          ? JSON.parse(params.requiredDocuments)
-          : documentOptions; // Use full document options as fallback
-
-        console.log("Required Documents from params:", requiredDocuments);
-        console.log("Required Documents Type:", typeof requiredDocuments[0]);
+        let requiredDocuments = [];
+        try {
+          requiredDocuments = params?.requiredDocuments
+            ? JSON.parse(params.requiredDocuments)
+            : [];
+          logWithTimestamp("Params - Required Documents Parsed", {
+            parsed: requiredDocuments,
+            type: typeof requiredDocuments,
+            isArray: Array.isArray(requiredDocuments),
+            length: requiredDocuments?.length,
+            firstItemType: typeof requiredDocuments[0],
+            firstItem: requiredDocuments[0],
+          });
+        } catch (parseError) {
+          logWithTimestamp(
+            "Params - Required Documents Parse Error",
+            parseError
+          );
+        }
 
         const paramsData = {
           claimNumber: params?.claimNumber,
-          polNo: params?.polNo,
           requiredDocuments: requiredDocuments,
           requiredDate: params?.requiredDate,
           requirementId: params?.requirementId,
         };
-        console.log("Params Data:", paramsData);
+        logWithTimestamp("=== PARAMS DATA SUMMARY ===", paramsData);
 
-        setRequirementData(paramsData);
-
-        // Load existing documents after setting requirement data
-        await loadExistingDocuments(params?.polNo, params?.claimNumber);
+        setRequirementData((prevData) => {
+          const updatedData = { ...prevData, ...paramsData };
+          logWithTimestamp(
+            "=== FINAL REQUIREMENT DATA (Params) ===",
+            updatedData
+          );
+          return updatedData;
+        });
       }
     } catch (error) {
+      logWithTimestamp("=== DATA LOAD ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
       console.error("Error loading requirement data:", error);
       Alert.alert("Error", "Failed to load requirement data");
     } finally {
       setLoading(false);
+      logWithTimestamp(
+        "=== DATA LOAD PROCESS COMPLETED ===",
+        "Loading finished"
+      );
     }
   };
 
-  // Function to get max sequence number from API
-  const getMaxSeqNo = async (claimNo, docCode) => {
+  const fetchPendingDocuments = async () => {
     try {
-      console.log("=== GETTING MAX SEQ NO ===");
-      console.log("Claim Number:", claimNo);
-      console.log("Document Code:", docCode);
+      setLoadingDocuments(true);
+      logWithTimestamp("=== FETCHING PENDING DOCUMENTS ===", {
+        polNo: requirementData.polNo,
+        clmNo: requirementData.claimNumber,
+      });
 
+      const cacheBuster = Date.now();
       const response = await fetch(
-        `${BASE_API_URL}/UploadPendingDocument/max-seqno?clmNo=${claimNo}&doc=${docCode}`,
+        `http://203.115.11.229:1002/api/UploadDocumentRespo/pending-documents?polNo=${encodeURIComponent(
+          requirementData.polNo
+        )}&clmNo=${encodeURIComponent(
+          requirementData.claimNumber
+        )}&t=${cacheBuster}`,
         {
-          method: "GET",
           headers: {
-            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
           },
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        logWithTimestamp("=== PENDING DOCUMENTS RESPONSE ===", data);
+        setPendingDocuments(data);
+      } else {
+        logWithTimestamp("=== PENDING DOCUMENTS ERROR ===", {
+          status: response.status,
+          statusText: response.statusText,
+        });
       }
-
-      const data = await response.json();
-      console.log("Max Seq No Response:", data);
-      console.log("========================");
-
-      return data.maxSeqNo;
     } catch (error) {
-      console.error("Error getting max seq no:", error);
-      throw error;
+      logWithTimestamp("=== PENDING DOCUMENTS FETCH ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
+      console.error("Error fetching pending documents:", error);
+    } finally {
+      setLoadingDocuments(false);
     }
   };
 
-  // Function to convert file to base64
-  const convertToBase64 = async (uri) => {
+  const fetchDocumentViewInfo = async (polNo, clmNo, docCode, seqNo) => {
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return base64;
-    } catch (error) {
-      console.error("Error converting file to base64:", error);
-      throw error;
-    }
-  };
-
-  // Alternative function to upload document as file object
-  const uploadDocumentToAPI = async (polNo, claimNo, docCode, seqNo, fileUri, fileName, mimeType) => {
-    try {
-      console.log("=== UPLOADING DOCUMENT TO API ===");
-      console.log("Policy Number:", polNo);
-      console.log("Claim Number:", claimNo);
-      console.log("Document Code:", docCode);
-      console.log("Sequence Number:", seqNo);
-      console.log("File URI:", fileUri);
-      console.log("File Name:", fileName);
-      console.log("MIME Type:", mimeType);
-
-      const formData = new FormData();
-      formData.append('PolNo', polNo);
-      formData.append('ClaimNo', claimNo);
-      formData.append('DocCode', docCode);
-      formData.append('SeqNo', seqNo.toString());
-      
-      // Upload as file object instead of base64
-      formData.append('DocContent', {
-        uri: fileUri,
-        type: mimeType,
-        name: fileName,
+      logWithTimestamp("=== FETCHING DOCUMENT VIEW INFO ===", {
+        polNo,
+        clmNo,
+        docCode,
+        seqNo,
       });
 
+      // Enhanced cache busting with multiple parameters
+      const cacheBuster = `${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
       const response = await fetch(
-        `${BASE_API_URL}/UploadPendingDocument/upload`,
+        `http://203.115.11.229:1002/api/UploadDocumentRespo/view-info?polNo=${encodeURIComponent(
+          polNo
+        )}&clmNo=${encodeURIComponent(clmNo)}&docCode=${encodeURIComponent(
+          docCode
+        )}&seqNo=${seqNo}&t=${cacheBuster}`,
         {
-          method: 'POST',
-          body: formData,
+          // Enhanced cache control headers
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            Pragma: "no-cache",
+            Expires: "0",
+            "If-Modified-Since": "0",
+          },
         }
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Upload error response:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
+      if (response.ok) {
+        const data = await response.json();
+        logWithTimestamp("=== DOCUMENT VIEW INFO RESPONSE ===", data);
 
-      const result = await response.json();
-      console.log("Upload Response:", result);
-      console.log("================================");
-      
-      return result;
+        // Enhanced cache busting for the returned URL
+        const viewUrl = data.viewUrl;
+        const separator = viewUrl.includes("?") ? "&" : "?";
+        const urlWithCacheBuster = `${viewUrl}${separator}t=${cacheBuster}&doc=${docCode}&seq=${seqNo}`;
+
+        return urlWithCacheBuster;
+      } else {
+        logWithTimestamp("=== DOCUMENT VIEW INFO ERROR ===", {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return null;
+      }
     } catch (error) {
-      console.error("Error uploading document:", error);
-      throw error;
+      logWithTimestamp("=== DOCUMENT VIEW INFO FETCH ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
+      console.error("Error fetching document view info:", error);
+      return null;
     }
   };
 
-  const processDocumentUpload = async (documentData) => {
-    try {
-      setUploadingDocument(true);
-      
-      const { claimNumber, polNo } = requirementData;
-      const { documentCode, uri, name, type } = documentData;
+  const handleDocumentImageClick = async (document) => {
+    logWithTimestamp("=== DOCUMENT IMAGE CLICKED ===", document);
 
-      // Step 1: Get max sequence number
-      const maxSeqNo = await getMaxSeqNo(claimNumber, documentCode);
-      const nextSeqNo = maxSeqNo + 1;
+    // Clear previous state immediately
+    setDocumentImageUrl("");
+    setViewingDocument(null);
+    setIsDocumentImageModalOpen(false);
 
-      // Step 2: Upload document as file object (no base64 conversion needed)
-      await uploadDocumentToAPI(
-        polNo,
-        claimNumber,
-        documentCode,
-        nextSeqNo,
-        uri,
-        name,
-        type
+    // Small delay to ensure state is cleared
+    setTimeout(async () => {
+      const viewUrl = await fetchDocumentViewInfo(
+        document.PolNo,
+        document.ClaimNo,
+        document.DocCode,
+        document.SeqNo
       );
 
-      // Step 3: Update document with sequence number
-      const updatedDocument = {
-        ...documentData,
-        seqNo: nextSeqNo,
-        uploaded: true,
-        uploadedAt: new Date().toISOString(),
-      };
+      if (viewUrl) {
+        logWithTimestamp("=== SETTING NEW DOCUMENT IMAGE URL ===", {
+          viewUrl,
+          document: document,
+        });
 
-      return updatedDocument;
+        setDocumentImageUrl(viewUrl);
+        setViewingDocument(document);
+        setIsDocumentImageModalOpen(true);
+      } else {
+        Alert.alert("Error", "Failed to load document image");
+      }
+    }, 100);
+  };
+
+  const handleDeletePendingDocument = async (document) => {
+    try {
+      logWithTimestamp("=== DELETE PENDING DOCUMENT INITIATED ===", document);
+
+      Alert.alert(
+        "Delete Document",
+        "Are you sure you want to delete this document?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setLoadingDocuments(true);
+
+                const requestBody = {
+                  polNo: document.PolNo,
+                  claimNo: document.ClaimNo,
+                  docCode: document.DocCode,
+                  seqNo: document.SeqNo,
+                };
+
+                logWithTimestamp("=== DELETE API REQUEST ===", requestBody);
+
+                const response = await fetch(
+                  "http://203.115.11.229:1002/api/UploadPendingDocumentCon/delete",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      // Add cache busting headers for delete request
+                      "Cache-Control": "no-cache, no-store, must-revalidate",
+                      Pragma: "no-cache",
+                    },
+                    body: JSON.stringify(requestBody),
+                  }
+                );
+
+                logWithTimestamp("=== DELETE API RESPONSE ===", {
+                  status: response.status,
+                  statusText: response.statusText,
+                });
+
+                if (response.ok) {
+                  const responseData = await response.json();
+                  logWithTimestamp("=== DELETE API SUCCESS ===", responseData);
+
+                  // Clear any cached image URL if it matches the deleted document
+                  if (
+                    viewingDocument &&
+                    viewingDocument.DocCode === document.DocCode &&
+                    viewingDocument.SeqNo === document.SeqNo
+                  ) {
+                    handleCloseDocumentImageModal();
+                  }
+
+                  // Remove the document from the local state
+                  setPendingDocuments((prevDocs) =>
+                    prevDocs.filter(
+                      (doc) =>
+                        !(
+                          doc.DocCode === document.DocCode &&
+                          doc.SeqNo === document.SeqNo
+                        )
+                    )
+                  );
+
+                  // Refresh pending documents to ensure consistency
+                  await fetchPendingDocuments();
+
+                  Alert.alert("Success", "Document deleted successfully!");
+                } else {
+                  const errorData = await response.text();
+                  logWithTimestamp("=== DELETE API ERROR ===", {
+                    status: response.status,
+                    error: errorData,
+                  });
+                  Alert.alert(
+                    "Error",
+                    "Failed to delete document. Please try again."
+                  );
+                }
+              } catch (error) {
+                logWithTimestamp("=== DELETE API EXCEPTION ===", {
+                  error: error.message,
+                  stack: error.stack,
+                });
+                Alert.alert(
+                  "Error",
+                  "Failed to delete document. Please check your connection."
+                );
+              } finally {
+                setLoadingDocuments(false);
+              }
+            },
+          },
+        ]
+      );
     } catch (error) {
-      console.error("Error processing document upload:", error);
-      throw error;
-    } finally {
-      setUploadingDocument(false);
+      logWithTimestamp("=== DELETE PENDING DOCUMENT ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
+      console.error("Error deleting pending document:", error);
     }
   };
 
+  const handleCloseDocumentImageModal = () => {
+    logWithTimestamp("=== CLOSING DOCUMENT IMAGE MODAL ===", {
+      currentUrl: documentImageUrl,
+      viewingDocument: viewingDocument,
+    });
+
+    setIsDocumentImageModalOpen(false);
+    setDocumentImageUrl("");
+    setViewingDocument(null);
+
+    // Force garbage collection of the image URL
+    setTimeout(() => {
+      setDocumentImageUrl("");
+    }, 100);
+  };
+
+  const renderPendingDocument = (document, index) => (
+    <View
+      key={`${document.DocCode}-${document.SeqNo}`}
+      style={styles.documentRow}
+    >
+      <View style={styles.documentDescriptionCell}>
+        <Text style={styles.documentCellText}>{document.DocDescription}</Text>
+      </View>
+      <View style={styles.documentImageCell}>
+        <TouchableOpacity onPress={() => handleDocumentImageClick(document)}>
+          <Ionicons name="image-outline" size={30} color="#00ADBB" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.documentDeleteCell}>
+        <TouchableOpacity onPress={() => handleDeletePendingDocument(document)}>
+          <Ionicons name="trash" size={20} color="#D32F2F" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  useEffect(() => {
+    if (requirementData.polNo && requirementData.claimNumber) {
+      fetchPendingDocuments();
+    }
+  }, [requirementData.polNo, requirementData.claimNumber]);
+
+  // Load data when component mounts
+  useEffect(() => {
+    logWithTimestamp("=== COMPONENT MOUNTED ===", "Starting data load");
+    loadRequirementData();
+  }, []);
+
+  // Enhanced logging for state changes
+  useEffect(() => {
+    logWithTimestamp("=== REQUIREMENT DATA STATE CHANGED ===", requirementData);
+  }, [requirementData]);
+
+  useEffect(() => {
+    logWithTimestamp("=== SELECTED DOCUMENT CHANGED ===", {
+      selectedDocument,
+      selectedDocumentCode,
+      timestamp: new Date().toISOString(),
+    });
+  }, [selectedDocument, selectedDocumentCode]);
+
+  useEffect(() => {
+    logWithTimestamp("=== UPLOADED DOCUMENTS CHANGED ===", {
+      count: uploadedDocuments.length,
+      documents: uploadedDocuments.map((doc) => ({
+        id: doc.id,
+        name: doc.name,
+        documentType: doc.documentType,
+        documentCode: doc.documentCode,
+        type: doc.type,
+        size: doc.size,
+      })),
+    });
+  }, [uploadedDocuments]);
+
   const handleClose = () => {
+    logWithTimestamp("=== HANDLE CLOSE CALLED ===", "Navigating back");
     router.back();
   };
 
   const allowedFormats = ["JPG", "JPEG", "TIFF", "PNG"];
 
-  const handleImagePress = (imageUri) => {
-    setSelectedImage(imageUri);
-    setIsImageModalOpen(true);
-  };
-
-  const handleCloseImageModal = () => {
-    setIsImageModalOpen(false);
-    setSelectedImage(null);
-  };
-
-  // Modified function to handle document selection
-  const handleDocumentSelection = (documentOption) => {
-    // Handle different data formats
-    let selectedDesc, selectedCode;
-
-    if (typeof documentOption === "string") {
-      // If it's just a string, find the matching option from documentOptions
-      const matchedOption = documentOptions.find(
-        (opt) =>
-          opt.description
-            .toLowerCase()
-            .includes(documentOption.toLowerCase()) ||
-          documentOption.toLowerCase().includes(opt.description.toLowerCase())
-      );
-
-      if (matchedOption) {
-        selectedDesc = matchedOption.description;
-        selectedCode = matchedOption.code;
-      } else {
-        // If no match found, use the string as description and generate a code
-        selectedDesc = documentOption;
-        selectedCode = "CUSTOM_" + Date.now();
-      }
-    } else if (documentOption.description && documentOption.code) {
-      // If it's an object with description and code
-      selectedDesc = documentOption.description;
-      selectedCode = documentOption.code;
-    } else {
-      // Fallback - use the first available option
-      selectedDesc = documentOptions[0].description;
-      selectedCode = documentOptions[0].code;
-    }
-
-    setSelectedDocument(selectedDesc);
-    setSelectedDocumentCode(selectedCode);
-    setIsDropdownOpen(false);
-
-    // Log the selected document code and claim number
-    console.log("=== DOCUMENT SELECTION ===");
-    console.log("Selected Document Code:", selectedCode);
-    console.log("Selected Document Description:", selectedDesc);
-    console.log("Claim Number:", requirementData?.claimNumber);
-    console.log("Original documentOption:", documentOption);
-    console.log("==========================");
-  };
-
   const handleBrowseFiles = async () => {
+    logWithTimestamp("=== BROWSE FILES INITIATED ===", {
+      selectedDocument,
+      selectedDocumentCode,
+    });
+
     if (!selectedDocument) {
+      logWithTimestamp("=== BROWSE FILES ERROR ===", "No document selected");
       Alert.alert(
         "Select Document",
         "Please select a required document first."
@@ -508,56 +594,100 @@ const PendingRequirement1 = () => {
     }
 
     try {
+      setLoading(true);
+      logWithTimestamp(
+        "=== DOCUMENT PICKER LAUNCHING ===",
+        "Opening document picker"
+      );
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/jpeg", "image/jpg", "image/png", "image/tiff"],
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: false,
+      });
+
+      logWithTimestamp("=== DOCUMENT PICKER RESULT ===", {
+        canceled: result.canceled,
+        assets: result.assets,
+        assetsCount: result.assets?.length,
       });
 
       if (!result.canceled && result.assets?.length > 0) {
         const file = result.assets[0];
-        const newDocument = {
-          id: Date.now().toString(),
+        logWithTimestamp("=== SELECTED FILE DETAILS ===", {
           name: file.name,
           uri: file.uri,
-          type: file.mimeType,
+          mimeType: file.mimeType,
           size: file.size,
-          documentType: selectedDocument,
-          documentCode: selectedDocumentCode,
-          claimNumber: requirementData?.claimNumber,
-          uploaded: false,
-        };
+        });
 
-        try {
-          // Process upload (get seq no and upload to API)
-          const uploadedDocument = await processDocumentUpload(newDocument);
+        // Check and resize image if needed
+        const processedImageUri = await resizeImageIfNeeded(
+          file.uri,
+          file.size
+        );
+        if (!processedImageUri) {
+          // Image was too large or processing failed
+          return;
+        }
 
-          setUploadedDocuments((prev) => [...prev, uploadedDocument]);
-
-          // Log the document with code and claim number
-          console.log("=== DOCUMENT UPLOADED ===");
-          console.log("Document Code:", selectedDocumentCode);
-          console.log("Claim Number:", requirementData?.claimNumber);
-          console.log("Document Details:", uploadedDocument);
-          console.log("Sequence Number:", uploadedDocument.seqNo);
-          console.log("========================");
-
-          Alert.alert("Success", "Document uploaded successfully!");
-        } catch (uploadError) {
-          console.error("Upload failed:", uploadError);
+        // Get max sequence number
+        const maxSeqNo = await getMaxSeqNo(
+          requirementData.claimNumber,
+          selectedDocumentCode
+        );
+        if (maxSeqNo === null) {
           Alert.alert(
-            "Upload Error",
-            "Failed to upload document to server. Please try again."
+            "Error",
+            "Failed to get sequence number. Please try again."
+          );
+          return;
+        }
+
+        const newSeqNo = maxSeqNo + 1;
+        logWithTimestamp("=== NEW SEQ NO ===", { maxSeqNo, newSeqNo });
+
+        // Upload to API with processed image
+        const uploadResult = await uploadDocumentToAPI(
+          requirementData.polNo,
+          requirementData.claimNumber,
+          selectedDocumentCode,
+          newSeqNo,
+          processedImageUri,
+          file.name,
+          file.mimeType
+        );
+
+        if (uploadResult.success) {
+          // Only refresh pending documents - don't store locally
+          await fetchPendingDocuments();
+          Alert.alert("Success", "Document uploaded successfully!");
+        } else {
+          Alert.alert(
+            "Error",
+            `Failed to upload document: ${uploadResult.error}`
           );
         }
       }
     } catch (error) {
+      logWithTimestamp("=== BROWSE FILES ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
       console.error("Error picking document:", error);
-      Alert.alert("Error", "Failed to pick document");
+      Alert.alert("Error", "Failed to upload document. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Replace the handleTakePhoto function
   const handleTakePhoto = async () => {
+    logWithTimestamp("=== TAKE PHOTO INITIATED ===", {
+      selectedDocument,
+      selectedDocumentCode,
+    });
+
     if (!selectedDocument) {
+      logWithTimestamp("=== TAKE PHOTO ERROR ===", "No document selected");
       Alert.alert(
         "Select Document",
         "Please select a required document first."
@@ -566,8 +696,19 @@ const PendingRequirement1 = () => {
     }
 
     try {
+      setLoading(true);
+      logWithTimestamp(
+        "=== REQUESTING CAMERA PERMISSION ===",
+        "Requesting permission"
+      );
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      logWithTimestamp("=== CAMERA PERMISSION RESULT ===", { status });
+
       if (status !== "granted") {
+        logWithTimestamp(
+          "=== CAMERA PERMISSION DENIED ===",
+          "Permission not granted"
+        );
         Alert.alert(
           "Permission needed",
           "Camera permission is required to take photos"
@@ -575,162 +716,199 @@ const PendingRequirement1 = () => {
         return;
       }
 
+      logWithTimestamp("=== LAUNCHING CAMERA ===", "Opening camera");
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
         quality: 0.8,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
 
+      logWithTimestamp("=== CAMERA RESULT ===", {
+        canceled: result.canceled,
+        assets: result.assets,
+        assetsCount: result.assets?.length,
+      });
+
       if (!result.canceled && result.assets?.length > 0) {
         const photo = result.assets[0];
-        const newDocument = {
-          id: Date.now().toString(),
-          name: `${selectedDocumentCode}_${Date.now()}.jpg`,
+        logWithTimestamp("=== CAPTURED PHOTO DETAILS ===", {
           uri: photo.uri,
-          type: "image/jpeg",
-          size: photo.fileSize || 0,
-          documentType: selectedDocument,
-          documentCode: selectedDocumentCode,
-          claimNumber: requirementData?.claimNumber,
-          uploaded: false,
-        };
+          fileSize: photo.fileSize,
+          width: photo.width,
+          height: photo.height,
+        });
 
-        try {
-          // Process upload (get seq no and upload to API)
-          const uploadedDocument = await processDocumentUpload(newDocument);
+        // Check and resize image if needed
+        const processedImageUri = await resizeImageIfNeeded(
+          photo.uri,
+          photo.fileSize
+        );
+        if (!processedImageUri) {
+          // Image was too large or processing failed
+          return;
+        }
 
-          setUploadedDocuments((prev) => [...prev, uploadedDocument]);
-
-          // Log the document with code and claim number
-          console.log("=== PHOTO TAKEN ===");
-          console.log("Document Code:", selectedDocumentCode);
-          console.log("Claim Number:", requirementData?.claimNumber);
-          console.log("Document Details:", uploadedDocument);
-          console.log("Sequence Number:", uploadedDocument.seqNo);
-          console.log("==================");
-
-          Alert.alert("Success", "Photo uploaded successfully!");
-        } catch (uploadError) {
-          console.error("Upload failed:", uploadError);
+        // Get max sequence number
+        const maxSeqNo = await getMaxSeqNo(
+          requirementData.claimNumber,
+          selectedDocumentCode
+        );
+        if (maxSeqNo === null) {
           Alert.alert(
-            "Upload Error",
-            "Failed to upload photo to server. Please try again."
+            "Error",
+            "Failed to get sequence number. Please try again."
           );
+          return;
+        }
+
+        const newSeqNo = maxSeqNo + 1;
+        const fileName = `${selectedDocument}_${Date.now()}.jpg`;
+        logWithTimestamp("=== NEW SEQ NO ===", {
+          maxSeqNo,
+          newSeqNo,
+          fileName,
+        });
+
+        // Upload to API with processed image
+        const uploadResult = await uploadDocumentToAPI(
+          requirementData.polNo,
+          requirementData.claimNumber,
+          selectedDocumentCode,
+          newSeqNo,
+          processedImageUri,
+          fileName,
+          "image/jpeg"
+        );
+
+        if (uploadResult.success) {
+          // Only refresh pending documents - don't store locally
+          await fetchPendingDocuments();
+          Alert.alert("Success", "Photo uploaded successfully!");
+        } else {
+          Alert.alert("Error", `Failed to upload photo: ${uploadResult.error}`);
         }
       }
     } catch (error) {
+      logWithTimestamp("=== TAKE PHOTO ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
       console.error("Error taking photo:", error);
-      Alert.alert("Error", "Failed to take photo");
+      Alert.alert("Error", "Failed to upload photo. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-const handleDeleteDocument = async (documentId) => {
-  const document = uploadedDocuments.find(doc => doc.id === documentId);
-  
-  if (!document) {
-    Alert.alert("Error", "Document not found");
-    return;
-  }
+  const getMaxSeqNo = async (claimNo, docCode) => {
+    try {
+      logWithTimestamp("=== FETCHING MAX SEQ NO ===", {
+        claimNo,
+        docCode,
+      });
 
-  console.log("=== ATTEMPTING TO DELETE DOCUMENT ===");
-  console.log("Document ID:", documentId);
-  console.log("Document Details:", document);
-  console.log("Is Existing:", document.isExisting);
-  console.log("Is Uploaded:", document.uploaded);
-  console.log("Sequence Number:", document.seqNo);
-  console.log("Document Code:", document.documentCode);
-  console.log("=====================================");
+      const response = await fetch(
+        `http://203.115.11.229:1002/api/UploadPendingDocument/max-seqno?clmNo=${encodeURIComponent(
+          claimNo
+        )}&doc=${encodeURIComponent(docCode)}`
+      );
 
-  // Check if it's an existing document that came from API
-  if (document?.isExisting) {
-    Alert.alert(
-      "Delete Document",
-      "Are you sure you want to delete this document?",
-      [
-        { text: "Cancel", style: "cancel" },
+      if (response.ok) {
+        const data = await response.json();
+        logWithTimestamp("=== MAX SEQ NO RESPONSE ===", data);
+        return data.maxSeqNo;
+      } else {
+        logWithTimestamp("=== MAX SEQ NO ERROR ===", {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return null;
+      }
+    } catch (error) {
+      logWithTimestamp("=== MAX SEQ NO FETCH ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
+      console.error("Error fetching max seq no:", error);
+      return null;
+    }
+  };
+
+  const uploadDocumentToAPI = async (
+    polNo,
+    claimNo,
+    docCode,
+    seqNo,
+    fileUri,
+    fileName,
+    mimeType
+  ) => {
+    try {
+      logWithTimestamp("=== UPLOADING DOCUMENT TO API ===", {
+        polNo,
+        claimNo,
+        docCode,
+        seqNo,
+        fileName,
+        mimeType,
+      });
+
+      const formData = new FormData();
+      formData.append("PolNo", polNo);
+      formData.append("ClaimNo", claimNo);
+      formData.append("DocCode", docCode);
+      formData.append("SeqNo", seqNo.toString());
+      formData.append("DocContent", {
+        uri: fileUri,
+        type: mimeType,
+        name: fileName,
+      });
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/UploadPendingDocument/upload",
         {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setUploadingDocument(true);
-              
-              await deleteDocumentFromAPI(
-                requirementData.polNo,
-                requirementData.claimNumber,
-                document.documentCode,
-                document.seqNo
-              );
-
-              // Remove from local state
-              setUploadedDocuments((prev) =>
-                prev.filter((doc) => doc.id !== documentId)
-              );
-
-              Alert.alert("Success", "Document deleted successfully!");
-            } catch (error) {
-              console.error("Delete failed:", error);
-              Alert.alert(
-                "Delete Error",
-                "Failed to delete document from server. Please try again."
-              );
-            } finally {
-              setUploadingDocument(false);
-            }
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
           },
-        },
-      ]
-    );
-    return;
-  }
+        }
+      );
 
-  // For newly uploaded documents
-  Alert.alert(
-    "Delete Document",
-    "Are you sure you want to delete this document?",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            // Only call API if document has been uploaded (has seqNo)
-            if (document.uploaded && document.seqNo) {
-              setUploadingDocument(true);
-              
-              await deleteDocumentFromAPI(
-                requirementData.polNo,
-                requirementData.claimNumber,
-                document.documentCode,
-                document.seqNo
-              );
-            }
+      logWithTimestamp("=== UPLOAD API RESPONSE ===", {
+        status: response.status,
+        statusText: response.statusText,
+      });
 
-            // Remove from local state
-            setUploadedDocuments((prev) =>
-              prev.filter((doc) => doc.id !== documentId)
-            );
+      if (response.ok) {
+        const responseData = await response.json();
+        logWithTimestamp("=== UPLOAD API SUCCESS ===", responseData);
+        return { success: true, data: responseData };
+      } else {
+        const errorData = await response.text();
+        logWithTimestamp("=== UPLOAD API ERROR ===", {
+          status: response.status,
+          error: errorData,
+        });
+        return { success: false, error: errorData };
+      }
+    } catch (error) {
+      logWithTimestamp("=== UPLOAD API EXCEPTION ===", {
+        error: error.message,
+        stack: error.stack,
+      });
+      return { success: false, error: error.message };
+    }
+  };
 
-            Alert.alert("Success", "Document deleted successfully!");
-          } catch (error) {
-            console.error("Delete failed:", error);
-            Alert.alert(
-              "Delete Error",
-              "Failed to delete document from server. Please try again."
-            );
-          } finally {
-            setUploadingDocument(false);
-          }
-        },
-      },
-    ]
-  );
-};
+  const handleSubmit = async () => {
+    logWithTimestamp("=== SUBMIT INITIATED ===", {
+      documentCount: pendingDocuments.length,
+      documents: pendingDocuments,
+    });
 
-
-  const handleSubmit = () => {
-    if (uploadedDocuments.length === 0) {
+    if (pendingDocuments.length === 0) {
+      logWithTimestamp("=== SUBMIT ERROR ===", "No documents uploaded");
       Alert.alert(
         "No Documents",
         "Please upload at least one document before submitting."
@@ -738,89 +916,283 @@ const handleDeleteDocument = async (documentId) => {
       return;
     }
 
-    // Check if all documents are uploaded
-    const pendingUploads = uploadedDocuments.filter((doc) => !doc.uploaded);
-    if (pendingUploads.length > 0) {
-      Alert.alert(
-        "Upload Pending",
-        "Some documents are still being uploaded. Please wait for all uploads to complete."
-      );
-      return;
-    }
-
-    // Log all documents with their codes and claim numbers before submission
-    console.log("=== SUBMITTING DOCUMENTS ===");
-    console.log("Claim Number:", requirementData?.claimNumber);
-    console.log("Total Documents:", uploadedDocuments.length);
-    uploadedDocuments.forEach((doc, index) => {
-      console.log(`Document ${index + 1}:`, {
-        code: doc.documentCode,
-        description: doc.documentType,
-        claimNumber: doc.claimNumber,
-        fileName: doc.name,
-        seqNo: doc.seqNo,
-        uploaded: doc.uploaded,
-        isExisting: doc.isExisting || false,
+    // Enhanced logging for submitted documents
+    logWithTimestamp(
+      "=== SUBMITTING DOCUMENTS DETAILED ===",
+      "Processing documents for submission"
+    );
+    pendingDocuments.forEach((doc, index) => {
+      logWithTimestamp(`=== DOCUMENT ${index + 1} SUBMISSION DATA ===`, {
+        documentType: doc.DocDescription,
+        documentCode: doc.DocCode,
+        docNo: doc.DocNo,
+        seqNo: doc.SeqNo,
+        polNo: doc.PolNo,
+        claimNo: doc.ClaimNo,
       });
     });
-    console.log("============================");
+
+    // Summary of submission
+    const submissionSummary = {
+      totalDocuments: pendingDocuments.length,
+      documentTypes: [
+        ...new Set(pendingDocuments.map((doc) => doc.DocDescription)),
+      ],
+      documentCodes: [...new Set(pendingDocuments.map((doc) => doc.DocCode))],
+      claimNumber: requirementData.claimNumber,
+      requirementId: requirementData.requirementId,
+    };
+    logWithTimestamp("=== SUBMISSION SUMMARY ===", submissionSummary);
 
     Alert.alert(
       "Submit Documents",
-      `Are you sure you want to submit ${uploadedDocuments.length} document(s)?`,
+      `Are you sure you want to submit ${pendingDocuments.length} document(s)?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Submit",
-          onPress: () => {
-            Alert.alert("Submitted", "Documents submitted successfully!", [
-              { text: "OK", onPress: handleClose },
-            ]);
+          onPress: async () => {
+            try {
+              setLoading(true);
+              logWithTimestamp(
+                "=== SUBMIT CONFIRMED ===",
+                "Starting API calls"
+              );
+
+              // Get unique document codes from pending documents
+              const uniqueDocCodes = [
+                ...new Set(pendingDocuments.map((doc) => doc.DocCode)),
+              ];
+
+              logWithTimestamp("=== UNIQUE DOC CODES ===", {
+                codes: uniqueDocCodes,
+                totalCodes: uniqueDocCodes.length,
+              });
+
+              // Call the SubmitDocs API for each unique document code
+              const submitPromises = uniqueDocCodes.map(async (docCode) => {
+                const requestBody = {
+                  claimNo: requirementData.claimNumber,
+                  docCode: docCode,
+                  polNo: requirementData.polNo,
+                };
+
+                logWithTimestamp("=== SUBMIT DOCS API REQUEST ===", {
+                  docCode,
+                  requestBody,
+                });
+
+                const response = await fetch(
+                  "http://203.115.11.229:1002/api/DocumentLog/SubmitDocs",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Cache-Control": "no-cache, no-store, must-revalidate",
+                      Pragma: "no-cache",
+                    },
+                    body: JSON.stringify(requestBody),
+                  }
+                );
+
+                logWithTimestamp("=== SUBMIT DOCS API RESPONSE ===", {
+                  docCode,
+                  status: response.status,
+                  statusText: response.statusText,
+                });
+
+                if (response.ok) {
+                  const responseData = await response.json();
+                  logWithTimestamp("=== SUBMIT DOCS API SUCCESS ===", {
+                    docCode,
+                    responseData,
+                  });
+                  return { success: true, docCode, data: responseData };
+                } else {
+                  const errorData = await response.text();
+                  logWithTimestamp("=== SUBMIT DOCS API ERROR ===", {
+                    docCode,
+                    status: response.status,
+                    error: errorData,
+                  });
+                  return { success: false, docCode, error: errorData };
+                }
+              });
+
+              // Wait for all API calls to complete
+              const results = await Promise.all(submitPromises);
+
+              logWithTimestamp("=== ALL SUBMIT RESULTS ===", results);
+
+              // Check if all submissions were successful
+              const successfulSubmissions = results.filter(
+                (result) => result.success
+              );
+              const failedSubmissions = results.filter(
+                (result) => !result.success
+              );
+
+              if (failedSubmissions.length === 0) {
+                // All submissions successful
+                logWithTimestamp("=== ALL SUBMISSIONS SUCCESSFUL ===", {
+                  successCount: successfulSubmissions.length,
+                  totalCount: results.length,
+                });
+
+                // Refresh pending documents to reflect the changes
+                await fetchPendingDocuments();
+
+                Alert.alert(
+                  "Success",
+                  `All ${successfulSubmissions.length} document type(s) submitted successfully!`,
+                  [{ text: "OK", onPress: handleClose }]
+                );
+              } else {
+                // Some submissions failed
+                logWithTimestamp("=== SOME SUBMISSIONS FAILED ===", {
+                  successCount: successfulSubmissions.length,
+                  failedCount: failedSubmissions.length,
+                  failedDocCodes: failedSubmissions.map((f) => f.docCode),
+                });
+
+                const failedDocCodes = failedSubmissions
+                  .map((f) => f.docCode)
+                  .join(", ");
+                Alert.alert(
+                  "Partial Success",
+                  `${successfulSubmissions.length} document type(s) submitted successfully.\n\nFailed to submit: ${failedDocCodes}\n\nPlease try again for the failed documents.`
+                );
+
+                // Refresh pending documents to show current state
+                await fetchPendingDocuments();
+              }
+            } catch (error) {
+              logWithTimestamp("=== SUBMIT API EXCEPTION ===", {
+                error: error.message,
+                stack: error.stack,
+              });
+              Alert.alert(
+                "Error",
+                "Failed to submit documents. Please check your connection and try again."
+              );
+            } finally {
+              setLoading(false);
+            }
           },
         },
       ]
     );
   };
 
-  const renderUploadedDocument = (document, index) => (
-    <View key={document.id} style={styles.documentRow}>
-      <View style={styles.documentDescriptionCell}>
-        <Text style={styles.documentCellText}>{document.documentType}</Text>
-      </View>
-      <View style={styles.documentImageCell}>
-        <TouchableOpacity onPress={() => handleImagePress(document.uri)}>
-          <Image source={{ uri: document.uri }} style={styles.documentImage} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.documentDeleteCell}>
-        <TouchableOpacity 
-          onPress={() => handleDeleteDocument(document.id)}
-          style={document.isExisting ? styles.deleteButtonDisabled : null}
-        >
-          <Ionicons 
-            name="trash" 
-            size={20} 
-            color={document.isExisting ? "#999" : "#D32F2F"} 
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const resizeImageIfNeeded = async (imageUri, originalSize) => {
+    try {
+      logWithTimestamp("=== CHECKING IMAGE SIZE ===", {
+        originalSize,
+        originalSizeMB: (originalSize / (1024 * 1024)).toFixed(2),
+      });
 
-  // Show loading while data is being loaded
+      // Check if image is larger than 5MB
+      if (originalSize > 5 * 1024 * 1024) {
+        logWithTimestamp(
+          "=== IMAGE TOO LARGE ===",
+          "Image size exceeds 5MB limit"
+        );
+        Alert.alert(
+          "Image Too Large",
+          "The selected image is larger than 5MB. Please select a smaller image."
+        );
+        return null;
+      }
+
+      // If image is larger than 1MB, resize it
+      if (originalSize > 1 * 1024 * 1024) {
+        logWithTimestamp(
+          "=== RESIZING IMAGE ===",
+          "Image size > 1MB, resizing..."
+        );
+
+        // Calculate compression ratio to get under 1MB
+        let compressionRatio = (1 * 1024 * 1024) / originalSize;
+        // Add some buffer to ensure we stay under 1MB
+        compressionRatio = Math.min(compressionRatio * 0.8, 0.8);
+
+        logWithTimestamp("=== COMPRESSION RATIO ===", { compressionRatio });
+
+        const resizedImage = await ImageManipulator.manipulateAsync(
+          imageUri,
+          [
+            // Optionally resize dimensions if needed
+            { resize: { width: 1920 } }, // Resize to max width of 1920px
+          ],
+          {
+            compress: compressionRatio,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: false,
+          }
+        );
+
+        logWithTimestamp("=== IMAGE RESIZED ===", {
+          originalUri: imageUri,
+          resizedUri: resizedImage.uri,
+          estimatedNewSize: "Will be checked after processing",
+        });
+
+        return resizedImage.uri;
+      }
+
+      // Image is already under 1MB, no resizing needed
+      logWithTimestamp("=== IMAGE SIZE OK ===", "Image size is acceptable");
+      return imageUri;
+    } catch (error) {
+      logWithTimestamp("=== IMAGE RESIZE ERROR ===", {
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  };
+
+  const handleDocumentSelection = (document) => {
+    logWithTimestamp("=== DOCUMENT SELECTION INITIATED ===", {
+      selectedDocument: document,
+      type: typeof document,
+      hasDescription: !!document.description,
+      hasCode: !!document.code,
+    });
+
+    if (document.description) {
+      logWithTimestamp("=== DOCUMENT SELECTION (WITH CODE) ===", {
+        description: document.description,
+        code: document.code,
+        fullDocument: document,
+      });
+      setSelectedDocument(document.description);
+      setSelectedDocumentCode(document.code);
+    } else {
+      logWithTimestamp("=== DOCUMENT SELECTION (WITHOUT CODE) ===", {
+        document: document,
+        type: typeof document,
+      });
+      setSelectedDocument(document);
+      setSelectedDocumentCode("");
+    }
+
+    setIsDropdownOpen(false);
+    logWithTimestamp("=== DOCUMENT SELECTION COMPLETED ===", {
+      selectedDocument: document.description || document,
+      selectedDocumentCode: document.code || "",
+    });
+  };
+
+  // Show loading indicator while loading data
   if (loading) {
     return (
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
-          style={styles.container}
+          style={[styles.container, styles.loadingContainer]}
         >
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00ADBB" />
-            <Text style={styles.loadingText}>Loading requirement data...</Text>
-            {loadingExistingDocuments && (
-              <Text style={styles.loadingText}>Loading existing documents...</Text>
-            )}
-          </View>
+          <ActivityIndicator size="large" color="#00ADBB" />
+          <Text style={styles.loadingText}>Loading requirement data...</Text>
         </LinearGradient>
     );
   }
@@ -828,6 +1200,7 @@ const handleDeleteDocument = async (documentId) => {
   // Show error if no data
   if (!requirementData) {
     return (
+      <SafeAreaView style={styles.safeArea}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
           style={styles.container}
@@ -842,6 +1215,7 @@ const handleDeleteDocument = async (documentId) => {
             </TouchableOpacity>
           </View>
         </LinearGradient>
+      </SafeAreaView>
     );
   }
 
@@ -853,24 +1227,15 @@ const handleDeleteDocument = async (documentId) => {
             <Ionicons name="arrow-back" size={24} color="#13646D" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pending Requirement</Text>
+          <View style={styles.headerSpacer} />
         </View>
-
-        {/* Loading overlay for document upload */}
-        {uploadingDocument && (
-          <View style={styles.uploadingOverlay}>
-            <View style={styles.uploadingContainer}>
-              <ActivityIndicator size="large" color="#00ADBB" />
-              <Text style={styles.uploadingText}>Uploading document...</Text>
-            </View>
-          </View>
-        )}
 
         {/* ScrollView with content */}
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* Claim Info - Show all available data */}
+          {/* Claim Info - Only show claim number and date */}
           <View style={styles.claimCard}>
             <View style={styles.claimRow}>
               <Text style={styles.claimLabel}>Claim Number</Text>
@@ -879,20 +1244,6 @@ const handleDeleteDocument = async (documentId) => {
                 {requirementData.claimNumber}
               </Text>
             </View>
-            {requirementData.polNo && (
-              <View style={styles.claimRow}>
-                <Text style={styles.claimLabel}>Policy Number</Text>
-                <Text style={styles.claimColon}>:</Text>
-                <Text style={styles.claimValue}>{requirementData.polNo}</Text>
-              </View>
-            )}
-            {requirementData.trnsNo && (
-              <View style={styles.claimRow}>
-                <Text style={styles.claimLabel}>Transaction Number</Text>
-                <Text style={styles.claimColon}>:</Text>
-                <Text style={styles.claimValue}>{requirementData.trnsNo}</Text>
-              </View>
-            )}
             <View style={styles.claimRow}>
               <Text style={styles.claimLabel}>Required Date</Text>
               <Text style={styles.claimColon}>:</Text>
@@ -912,7 +1263,14 @@ const handleDeleteDocument = async (documentId) => {
               </Text>
               <TouchableOpacity
                 style={styles.dropdown}
-                onPress={() => setIsDropdownOpen(true)}
+                onPress={() => {
+                  logWithTimestamp("=== DROPDOWN OPENED ===", {
+                    documentsAvailable: requirementData.documents?.length || 0,
+                    requiredDocumentsAvailable:
+                      requirementData.requiredDocuments?.length || 0,
+                  });
+                  setIsDropdownOpen(true);
+                }}
               >
                 <Text style={styles.dropdownText}>
                   {selectedDocument || "Choose document type..."}
@@ -935,23 +1293,15 @@ const handleDeleteDocument = async (documentId) => {
 
               <View style={styles.uploadButtons}>
                 <TouchableOpacity
-                  style={[
-                    styles.uploadButton,
-                    uploadingDocument && styles.uploadButtonDisabled,
-                  ]}
+                  style={styles.uploadButton}
                   onPress={handleBrowseFiles}
-                  disabled={uploadingDocument}
                 >
                   <Text style={styles.uploadButtonText}>Browse files</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.uploadButton,
-                    uploadingDocument && styles.uploadButtonDisabled,
-                  ]}
+                  style={styles.uploadButton}
                   onPress={handleTakePhoto}
-                  disabled={uploadingDocument}
                 >
                   <Text style={styles.uploadButtonText}>Take Photo</Text>
                 </TouchableOpacity>
@@ -959,30 +1309,35 @@ const handleDeleteDocument = async (documentId) => {
             </View>
           </View>
 
-          {/* Uploaded Documents Table */}
+          {/* Pending Documents Table */}
           <View style={styles.uploadedSection}>
-            <Text style={styles.uploadedTitle}>Uploaded Documents</Text>
+            <Text style={styles.uploadedTitle}>Pending Documents</Text>
             <View style={styles.documentsTable}>
               <View style={styles.tableHeader}>
                 <View style={styles.headerDescriptionCell}>
                   <Text style={styles.headerCellText}>Description</Text>
                 </View>
                 <View style={styles.headerImageCell}>
-                  <Text style={styles.headerCellText}>Image</Text>
+                  <Text style={styles.headerCellText}>View Image</Text>
                 </View>
                 <View style={styles.headerDeleteCell}>
-                  <Text style={styles.headerCellText}>Delete</Text>
+                  <Text style={styles.headerCellText}>Action</Text>
                 </View>
               </View>
 
-              {uploadedDocuments.length > 0 ? (
-                uploadedDocuments.map((doc, i) =>
-                  renderUploadedDocument(doc, i)
-                )
+              {loadingDocuments ? (
+                <View style={styles.emptyRow}>
+                  <ActivityIndicator size="small" color="#00ADBB" />
+                  <Text style={styles.emptyText}>
+                    Loading pending documents...
+                  </Text>
+                </View>
+              ) : pendingDocuments.length > 0 ? (
+                pendingDocuments.map((doc, i) => renderPendingDocument(doc, i))
               ) : (
                 <View style={styles.emptyRow}>
                   <Text style={styles.emptyText}>
-                    No documents uploaded yet
+                    No pending documents found
                   </Text>
                 </View>
               )}
@@ -990,14 +1345,7 @@ const handleDeleteDocument = async (documentId) => {
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              uploadingDocument && styles.submitButtonDisabled,
-            ]}
-            onPress={handleSubmit}
-            disabled={uploadingDocument}
-          >
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
             <Text style={styles.submitButtonText}>Submit</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1007,57 +1355,134 @@ const handleDeleteDocument = async (documentId) => {
           visible={isDropdownOpen}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setIsDropdownOpen(false)}
+          onRequestClose={() => {
+            logWithTimestamp("=== DROPDOWN CLOSED ===", "Modal closed");
+            setIsDropdownOpen(false);
+          }}
         >
           <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
-            onPress={() => setIsDropdownOpen(false)}
+            onPress={() => {
+              logWithTimestamp(
+                "=== DROPDOWN OVERLAY PRESSED ===",
+                "Closing dropdown"
+              );
+              setIsDropdownOpen(false);
+            }}
           >
             <View style={styles.modalContent}>
-              {(requirementData.requiredDocuments.length > 0
-                ? requirementData.requiredDocuments
-                : documentOptions
-              ).map((doc, index) => {
-                // Handle different data formats for display
-                const displayText =
-                  typeof doc === "string" ? doc : doc.description || doc;
+              {(() => {
+                logWithTimestamp("=== DROPDOWN MODAL RENDERING ===", {
+                  documentsLength: requirementData.documents?.length || 0,
+                  requiredDocumentsLength:
+                    requirementData.requiredDocuments?.length || 0,
+                  documents: requirementData.documents,
+                  requiredDocuments: requirementData.requiredDocuments,
+                });
+                return null;
+              })()}
 
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => handleDocumentSelection(doc)}
-                  >
-                    <Text style={styles.modalItemText}>{displayText}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {requirementData.documents && requirementData.documents.length > 0
+                ? requirementData.documents.map((doc, index) => {
+                    logWithTimestamp(
+                      `=== RENDERING DOCUMENT OPTION ${index} ===`,
+                      doc
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.modalItem}
+                        onPress={() => handleDocumentSelection(doc)}
+                      >
+                        <Text style={styles.modalItemText}>
+                          {doc.description}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                : pendingDocuments.length > 0
+                ? pendingDocuments.map((doc, index) => {
+                    logWithTimestamp(
+                      `=== RENDERING PENDING DOCUMENT OPTION ${index} ===`,
+                      doc
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.modalItem}
+                        onPress={() => {
+                          logWithTimestamp(
+                            "=== PENDING DOCUMENT SELECTED ===",
+                            doc
+                          );
+                          setSelectedDocument(doc.DocDescription);
+                          setSelectedDocumentCode(doc.DocCode);
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.modalItemText}>
+                          {doc.DocDescription}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                : // Fallback to requiredDocuments if both arrays are empty
+                  requirementData.requiredDocuments.map((doc, index) => {
+                    logWithTimestamp(
+                      `=== RENDERING REQUIRED DOCUMENT OPTION ${index} ===`,
+                      doc
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.modalItem}
+                        onPress={() => {
+                          logWithTimestamp(
+                            "=== FALLBACK DOCUMENT SELECTED ===",
+                            doc
+                          );
+                          setSelectedDocument(doc);
+                          setSelectedDocumentCode("");
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.modalItemText}>{doc}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
             </View>
           </TouchableOpacity>
         </Modal>
 
         {/* Image Preview Modal */}
         <Modal
-          visible={isImageModalOpen}
+          visible={isDocumentImageModalOpen}
           transparent={true}
           animationType="fade"
-          onRequestClose={handleCloseImageModal}
+          onRequestClose={handleCloseDocumentImageModal}
         >
           <View style={styles.imageModalOverlay}>
             <TouchableOpacity
               style={styles.imageModalCloseButton}
-              onPress={handleCloseImageModal}
+              onPress={handleCloseDocumentImageModal}
             >
               <Ionicons name="close" size={30} color="#FFFFFF" />
             </TouchableOpacity>
 
             <View style={styles.imageModalContent}>
-              {selectedImage && (
+              {documentImageUrl && (
                 <Image
-                  source={{ uri: selectedImage }}
+                  source={{ uri: documentImageUrl }}
                   style={styles.previewImage}
                   resizeMode="contain"
+                  onError={(error) => {
+                    logWithTimestamp(
+                      "=== DOCUMENT IMAGE LOAD ERROR ===",
+                      error
+                    );
+                    Alert.alert("Error", "Failed to load document image");
+                  }}
                 />
               )}
             </View>
@@ -1079,8 +1504,22 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginTop: 2,
   },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "black",
+  },
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#13646D",
+    fontWeight: "500",
   },
   header: {
     flexDirection: "row",
