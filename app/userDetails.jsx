@@ -51,7 +51,7 @@ export default function UserDetailsScreen() {
 
         <View style={styles.profileSection}>
           <Image
-            source={require('@/assets/images/default-avatar.png')}
+            source={require('@/assets/images/defaultavatar.png')}
             style={styles.avatar}
           />
           <ThemedText style={styles.userName}>Mr. Sanjeewa De Silva</ThemedText>

@@ -60,7 +60,7 @@ export default function ViewProfile() {
           <View style={styles.profileImageSection}>
             <View style={styles.avatarContainer}>
               <Image
-                source={require('@/assets/images/default-avatar.png')}
+                source={require('@/assets/images/defaultavatar.png')}
                 style={styles.avatar}
               />
             </View>
