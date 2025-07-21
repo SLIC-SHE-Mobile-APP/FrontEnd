@@ -1,8 +1,10 @@
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Modal,
@@ -10,15 +12,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Alert,
-  ActivityIndicator,
+  View
 } from "react-native";
 import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL } from '../constants/index.js';
 
 // Import your separate page components
 import BankDetailsSum from "./BankDetailsSum";
@@ -93,7 +93,7 @@ const HealthPolicyDetails = () => {
   const fetchPolicyInfo = async (policyNumber) => {
     try {
       const response = await fetch(
-        `http://203.115.11.229:1002/api/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
+        `${API_BASE_URL}/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
         {
           method: "GET",
           headers: {
@@ -132,7 +132,7 @@ const HealthPolicyDetails = () => {
   const fetchEmployeeInfo = async (policyNumber, memberNumber) => {
     try {
       const response = await fetch(
-        `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`,
         {
           method: "GET",
           headers: {

@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL } from '../constants/index.js';
 
 export default function PolicyMemberDetails() {
   const router = useRouter();
@@ -83,7 +84,7 @@ export default function PolicyMemberDetails() {
   const fetchPolicyInfo = async (policyNumber) => {
     try {
       const response = await fetch(
-        `http://203.115.11.229:1002/api/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
+        `${API_BASE_URL}/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
         {
           method: "GET",
           headers: {
@@ -122,7 +123,7 @@ export default function PolicyMemberDetails() {
   const fetchPolicyDates = async (policyNumber, userNic) => {
     try {
       const response = await fetch(
-        `http://203.115.11.229:1002/api/HomePagePoliciesLoad/GetPoliciesByNic?nicNumber=${userNic}`,
+        `${API_BASE_URL}/HomePagePoliciesLoad/GetPoliciesByNic?nicNumber=${userNic}`,
         {
           method: "POST",
           headers: {
@@ -212,7 +213,7 @@ export default function PolicyMemberDetails() {
   // Function to fetch member details from API
   const fetchMemberDetails = async (policyNo, memberNo) => {
     try {
-      const apiUrl = `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNo}&memberNo=${memberNo}`;
+      const apiUrl = `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNo}&memberNo=${memberNo}`;
 
       const response = await fetch(apiUrl, {
         method: "GET",

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import PendingIntimations from './PendingIntimations';
-import AddPatientDetails from './AddPatientDetails'; // Import the new page
+import AddPatientDetails from './AddPatientDetails'; 
 
 const { height: screenHeight } = Dimensions.get('window');
 

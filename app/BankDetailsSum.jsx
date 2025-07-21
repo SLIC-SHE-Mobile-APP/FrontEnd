@@ -12,6 +12,7 @@ import {
   Alert,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL } from '../constants/index.js';
 
 const BankDetailsSum = ({ onClose }) => {
   const [bankDetails, setBankDetails] = useState(null);
@@ -95,7 +96,7 @@ const BankDetailsSum = ({ onClose }) => {
       });
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/BankDetails?policyNo=${policyNumber}&memberNo=${memberNumber}`
+         `${API_BASE_URL}/BankDetails?policyNo=${policyNumber}&memberNo=${memberNumber}`
       );
 
       if (!response.ok) {
@@ -141,7 +142,7 @@ const BankDetailsSum = ({ onClose }) => {
       });
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/LoginNicMnumber/CheckAvailability",
+         `${API_BASE_URL}/LoginNicMnumber/CheckAvailability`,
         {
           method: "POST",
           headers: {

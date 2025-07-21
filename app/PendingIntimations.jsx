@@ -1,17 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState, useEffect } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL } from '../constants/index.js';
 
 const PendingIntimations = ({ onClose, onEditClaim }) => {
   const navigation = useNavigation();
@@ -56,7 +57,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         setError(null);
 
         const response = await fetch(
-          `http://203.115.11.229:1002/api/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
+          `${API_BASE_URL}/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
         );
 
         if (!response.ok) {
@@ -148,7 +149,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       setError(null); // Clear previous errors
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
+        `${API_BASE_URL}/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
       );
 
       if (!response.ok) {
@@ -271,7 +272,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       setLoading(true);
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/DeleteClaim/DeleteClaim",
+        `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
         {
           method: "POST",
           headers: {

@@ -14,6 +14,7 @@ import {
   Image,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL } from '../constants/index.js';
 
 const EditClaimIntimation = ({ route }) => {
   const navigation = useNavigation();
@@ -90,7 +91,7 @@ const EditClaimIntimation = ({ route }) => {
       console.log("Fetching documents for referenceNo:", referenceNo);
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/ClaimDocuments/${referenceNo}`,
+         `${API_BASE_URL}/api/ClaimDocuments/${referenceNo}`,
         {
           method: "GET",
           headers: {
@@ -268,7 +269,7 @@ const EditClaimIntimation = ({ route }) => {
       };
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/ClaimAmount/GetClaimAmount",
+        `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
         {
           method: "POST",
           headers: {
@@ -395,7 +396,7 @@ const EditClaimIntimation = ({ route }) => {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`
+        `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`
       );
 
       if (!response.ok) {
