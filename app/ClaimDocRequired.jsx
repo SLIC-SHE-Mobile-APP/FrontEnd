@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import axios from 'axios';
+import { API_BASE_URL } from '../constants/index.js';
 
 const ClaimDocRequired = ({ onClose }) => {
   const [expandedSection, setExpandedSection] = useState(null);
@@ -30,9 +31,9 @@ const ClaimDocRequired = ({ onClose }) => {
     setError('');
     try {
       const [opdRes, specRes, hospRes] = await Promise.all([
-        axios.get('http://203.115.11.229:1002/api/ClaimDocumentsCon/Outpatient'),
-        axios.get('http://203.115.11.229:1002/api/ClaimDocumentsCon/Spectacles'),
-        axios.get('http://203.115.11.229:1002/api/ClaimDocumentsCon/Hospitalization'),
+        axios.get( `${API_BASE_URL}/ClaimDocumentsCon/Outpatient`),
+        axios.get( `${API_BASE_URL}/ClaimDocumentsCon/Spectacles`),
+        axios.get( `${API_BASE_URL}/ClaimDocumentsCon/Hospitalization`),
       ]);
 
       setDocuments({

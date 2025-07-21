@@ -13,6 +13,7 @@ import {
   Alert,
 } from "react-native";
 import axios from "axios";
+import { API_BASE_URL } from '../constants/index.js';
 
 const ClaimHistory1 = ({ onClose, claimData }) => {
   const [documents, setDocuments] = useState([]);
@@ -24,7 +25,7 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
     const fetchDocuments = async () => {
       try {
         const response = await axios.get(
-          `http://203.115.11.229:1002/api/UploadedDocumentCon/${claimData.seqNo}`
+          `${API_BASE_URL}/UploadedDocumentCon/${claimData.seqNo}`
         );
         if (Array.isArray(response.data)) {
           setDocuments(response.data);

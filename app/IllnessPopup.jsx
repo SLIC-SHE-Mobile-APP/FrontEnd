@@ -51,7 +51,7 @@ const IllnessPopup = ({ visible, onClose }) => {
 
   const handleNext = () => {
     console.log('Navigating to illnessDetails...');
-    router.replace('/illnessDetails'); // ✅ Replace so this page is removed from stack
+    router.replace('/illnessDetails'); // Replace so this page is removed from stack
   };
 
   return (

@@ -14,6 +14,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { API_BASE_URL } from '../constants/index.js';
 
 const EditClaimIntimation1 = ({ route }) => {
     const navigation = useNavigation();
@@ -31,8 +32,8 @@ const EditClaimIntimation1 = ({ route }) => {
     // State for claim details
     const [claimDetails, setClaimDetails] = useState({
         referenceNo: claim?.referenceNo || "M000428",
-        enteredBy: "Loading...", 
-        status: "Submission for Approval Pending", 
+        enteredBy: "Loading...",
+        status: "Submission for Approval Pending",
         claimType: claim?.claimType || "Out-door",
         createdOn: claim?.createdOn || "24-12-2020",
     });
@@ -78,7 +79,7 @@ const EditClaimIntimation1 = ({ route }) => {
         amount: "",
     });
 
-   
+
     const formatDate = (dateString) => {
         try {
             const date = new Date(dateString);
@@ -99,7 +100,7 @@ const EditClaimIntimation1 = ({ route }) => {
             console.log("Fetching documents for referenceNo:", referenceNo);
 
             const response = await fetch(
-                `http://203.115.11.229:1002/api/ClaimDocuments/${referenceNo}`,
+                `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
                 {
                     method: "GET",
                     headers: {
@@ -277,7 +278,7 @@ const EditClaimIntimation1 = ({ route }) => {
             };
 
             const response = await fetch(
-                "http://203.115.11.229:1002/api/ClaimAmount/GetClaimAmount",
+                `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
                 {
                     method: "POST",
                     headers: {
@@ -404,7 +405,7 @@ const EditClaimIntimation1 = ({ route }) => {
             }
 
             const response = await fetch(
-                `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`
+                `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`
             );
 
             if (!response.ok) {
@@ -730,479 +731,479 @@ const EditClaimIntimation1 = ({ route }) => {
 
 
     return (
-            <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
+        <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={styles.scrollContainer}>
+                {/* Claim Details Section - Read Only */}
+                <View style={styles.claimDetailsSection}>
+                    <TouchableOpacity
+                        style={styles.claimDeleteButton}
+                        onPress={handleDeleteClaim}
+                    >
+                        <Ionicons name="trash-outline" size={28} color="#2E7D7D" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
-                    <View style={{ width: 24 }} />
-                </View>
 
-                <ScrollView contentContainerStyle={styles.scrollContainer}>
-                    {/* Claim Details Section - Read Only */}
-                    <View style={styles.claimDetailsSection}>
-                        <TouchableOpacity
-                            style={styles.claimDeleteButton}
-                            onPress={handleDeleteClaim}
-                        >
-                            <Ionicons name="trash-outline" size={28} color="#2E7D7D" />
-                        </TouchableOpacity>
-
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Reference No</Text>
-                            <Text style={styles.colon}>:</Text>
-                            <Text style={styles.detailValue}>{claimDetails.referenceNo}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Entered By</Text>
-                            <Text style={styles.colon}>:</Text>
-                            <Text style={styles.detailValue}>
-                                {loading ? "Loading..." : claimDetails.enteredBy}
-                            </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Status</Text>
-                            <Text style={styles.colon}>:</Text>
-                            <Text style={styles.detailValue}>{claimDetails.status}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Claim Type</Text>
-                            <Text style={styles.colon}>:</Text>
-                            <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Created on</Text>
-                            <Text style={styles.colon}>:</Text>
-                            <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
-                        </View>
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Reference No</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.detailValue}>{claimDetails.referenceNo}</Text>
                     </View>
-
-                    {/* Beneficiaries Title - Full Width */}
-                    <View style={styles.beneficiariesTitleContainer}>
-                        <Text style={styles.beneficiariesTitle}>
-                            Beneficiaries for Claim
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Entered By</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.detailValue}>
+                            {loading ? "Loading..." : claimDetails.enteredBy}
                         </Text>
                     </View>
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Status</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.detailValue}>{claimDetails.status}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Claim Type</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Created on</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
+                    </View>
+                </View>
 
-                    {/* Beneficiaries Section */}
-                    <View style={styles.beneficiariesSection}>
-                        {beneficiaries.length > 0 ? (
-                            beneficiaries.map((beneficiary) => (
-                                <View key={beneficiary.id} style={styles.beneficiaryCard}>
-                                    <View style={styles.beneficiaryContent}>
-                                        <View style={styles.beneficiaryRow}>
-                                            <Text style={styles.beneficiaryLabel}>Patient Name</Text>
-                                            <Text style={styles.beneficiaryColon}>:</Text>
-                                            <Text style={styles.beneficiaryValue}>
-                                                {beneficiary.name}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.beneficiaryRow}>
-                                            <Text style={styles.beneficiaryLabel}>Relationship</Text>
-                                            <Text style={styles.beneficiaryColon}>:</Text>
-                                            <Text style={styles.beneficiaryValue}>
-                                                {beneficiary.relationship}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.beneficiaryRow}>
-                                            <Text style={styles.beneficiaryLabel}>Illness</Text>
-                                            <Text style={styles.beneficiaryColon}>:</Text>
-                                            <Text style={styles.beneficiaryValue}>
-                                                {beneficiary.illness}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.beneficiaryRow}>
-                                            <Text style={styles.beneficiaryLabel}>Amount</Text>
-                                            <Text style={styles.beneficiaryColon}>:</Text>
-                                            <Text style={styles.beneficiaryValue}>
-                                                {beneficiary.amount}
-                                            </Text>
-                                        </View>
+                {/* Beneficiaries Title - Full Width */}
+                <View style={styles.beneficiariesTitleContainer}>
+                    <Text style={styles.beneficiariesTitle}>
+                        Beneficiaries for Claim
+                    </Text>
+                </View>
+
+                {/* Beneficiaries Section */}
+                <View style={styles.beneficiariesSection}>
+                    {beneficiaries.length > 0 ? (
+                        beneficiaries.map((beneficiary) => (
+                            <View key={beneficiary.id} style={styles.beneficiaryCard}>
+                                <View style={styles.beneficiaryContent}>
+                                    <View style={styles.beneficiaryRow}>
+                                        <Text style={styles.beneficiaryLabel}>Patient Name</Text>
+                                        <Text style={styles.beneficiaryColon}>:</Text>
+                                        <Text style={styles.beneficiaryValue}>
+                                            {beneficiary.name}
+                                        </Text>
                                     </View>
-                                    <View style={styles.beneficiaryActionIcons}>
-                                        <TouchableOpacity
-                                            style={styles.beneficiaryIconButton}
-                                            onPress={() => handleEditBeneficiary(beneficiary)}
-                                        >
-                                            <Ionicons name="create-outline" size={28} color="#2E7D7D" />
-                                        </TouchableOpacity>
+                                    <View style={styles.beneficiaryRow}>
+                                        <Text style={styles.beneficiaryLabel}>Relationship</Text>
+                                        <Text style={styles.beneficiaryColon}>:</Text>
+                                        <Text style={styles.beneficiaryValue}>
+                                            {beneficiary.relationship}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.beneficiaryRow}>
+                                        <Text style={styles.beneficiaryLabel}>Illness</Text>
+                                        <Text style={styles.beneficiaryColon}>:</Text>
+                                        <Text style={styles.beneficiaryValue}>
+                                            {beneficiary.illness}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.beneficiaryRow}>
+                                        <Text style={styles.beneficiaryLabel}>Amount</Text>
+                                        <Text style={styles.beneficiaryColon}>:</Text>
+                                        <Text style={styles.beneficiaryValue}>
+                                            {beneficiary.amount}
+                                        </Text>
                                     </View>
                                 </View>
-
-                            ))
-                        ) : (
-                            <View style={styles.noBeneficiariesContainer}>
-                                <Text style={styles.noBeneficiariesText}>
-                                    No beneficiaries found. Please add a beneficiary.
-                                </Text>
-                            </View>
-                        )}
-
-                        <TouchableOpacity
-                            style={styles.addBeneficiaryButton}
-                            onPress={handleNavigateToUploadDocuments}
-                        >
-                            <Text style={styles.addBeneficiaryText}>Add More Documents</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Documents Section */}
-                    <View style={styles.documentsSection}>
-                        {documentsLoading ? (
-                            <View style={styles.loadingContainer}>
-                                <Text style={styles.loadingText}>Loading documents...</Text>
-                            </View>
-                        ) : documents.length > 0 ? (
-                            documents.map((document) => (
-                                <View key={document.id} style={styles.documentCard}>
-                                    {renderDocumentImage(document)}
-                                    <View style={styles.documentContent}>
-                                        <View style={styles.documentRow}>
-                                            <Text style={styles.documentLabel}>Document Type</Text>
-                                            <Text style={styles.documentColon}>:</Text>
-                                            <Text style={styles.documentValue}>{document.type}</Text>
-                                        </View>
-                                        <View style={styles.documentRow}>
-                                            <Text style={styles.documentLabel}>Date of Document</Text>
-                                            <Text style={styles.documentColon}>:</Text>
-                                            <Text style={styles.documentValue}>{document.date}</Text>
-                                        </View>
-                                        <View style={styles.documentRow}>
-                                            <Text style={styles.documentLabel}>Amount</Text>
-                                            <Text style={styles.documentColon}>:</Text>
-                                            <Text style={styles.documentValue}>
-                                                {document.amount}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.documentActionIcons}>
-                                        <TouchableOpacity
-                                            style={styles.documentIconButton}
-                                            onPress={() => handleEditDocument(document)}
-                                        >
-                                            <Ionicons name="create-outline" size={16} color="#fff" />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.documentIconButton}
-                                            onPress={() => handleDeleteDocument(document.id)}
-                                        >
-                                            <Ionicons name="trash-outline" size={16} color="#fff" />
-                                        </TouchableOpacity>
-                                    </View>
+                                <View style={styles.beneficiaryActionIcons}>
+                                    <TouchableOpacity
+                                        style={styles.beneficiaryIconButton}
+                                        onPress={() => handleEditBeneficiary(beneficiary)}
+                                    >
+                                        <Ionicons name="create-outline" size={28} color="#2E7D7D" />
+                                    </TouchableOpacity>
                                 </View>
-                            ))
-                        ) : (
-                            <View style={styles.noDocumentsContainer}>
-                                <Text style={styles.noDocumentsText}>No documents found.</Text>
                             </View>
-                        )}
-                    </View>
 
-                    {/* Action Buttons */}
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                            style={styles.submitButton}
-                            onPress={handleSubmitClaim}
-                        >
-                            <Text style={styles.submitButtonText}>Submit Claim</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.submitLaterButton}
-                            onPress={handleSubmitLater}
-                        >
-                            <Text style={styles.submitLaterButtonText}>Submit Later</Text>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
-                {/* Add Beneficiary Modal */}
-                <Modal
-                    visible={isAddBeneficiaryModalVisible}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setAddBeneficiaryModalVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Add Beneficiary</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.name}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({ ...prev, name: value }))
-                                }
-                                placeholder="Enter name"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.relationship}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({
-                                        ...prev,
-                                        relationship: value,
-                                    }))
-                                }
-                                placeholder="Enter relationship"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.illness}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({ ...prev, illness: value }))
-                                }
-                                placeholder="Enter illness"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.amount}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({ ...prev, amount: value }))
-                                }
-                                placeholder="Amount will be set automatically"
-                                keyboardType="numeric"
-                                editable={false}
-                            />
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    onPress={() => setAddBeneficiaryModalVisible(false)}
-                                    style={styles.cancelBtn}
-                                >
-                                    <Text style={styles.cancelText}>Cancel</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleAddBeneficiary}
-                                    style={styles.saveBtn}
-                                >
-                                    <Text style={styles.saveText}>Add</Text>
-                                </TouchableOpacity>
-                            </View>
+                        ))
+                    ) : (
+                        <View style={styles.noBeneficiariesContainer}>
+                            <Text style={styles.noBeneficiariesText}>
+                                No beneficiaries found. Please add a beneficiary.
+                            </Text>
                         </View>
-                    </View>
-                </Modal>
+                    )}
 
-                {/* Edit Beneficiary Modal */}
-                <Modal
-                    visible={isEditBeneficiaryModalVisible}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setEditBeneficiaryModalVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Edit Beneficiary</Text>
+                    <TouchableOpacity
+                        style={styles.addBeneficiaryButton}
+                        onPress={handleNavigateToUploadDocuments}
+                    >
+                        <Text style={styles.addBeneficiaryText}>Add More Documents</Text>
+                    </TouchableOpacity>
+                </View>
 
-                            {/* Member Name Dropdown */}
-                            <Text style={styles.fieldLabel}>Member Name</Text>
+                {/* Documents Section */}
+                <View style={styles.documentsSection}>
+                    {documentsLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <Text style={styles.loadingText}>Loading documents...</Text>
+                        </View>
+                    ) : documents.length > 0 ? (
+                        documents.map((document) => (
+                            <View key={document.id} style={styles.documentCard}>
+                                {renderDocumentImage(document)}
+                                <View style={styles.documentContent}>
+                                    <View style={styles.documentRow}>
+                                        <Text style={styles.documentLabel}>Document Type</Text>
+                                        <Text style={styles.documentColon}>:</Text>
+                                        <Text style={styles.documentValue}>{document.type}</Text>
+                                    </View>
+                                    <View style={styles.documentRow}>
+                                        <Text style={styles.documentLabel}>Date of Document</Text>
+                                        <Text style={styles.documentColon}>:</Text>
+                                        <Text style={styles.documentValue}>{document.date}</Text>
+                                    </View>
+                                    <View style={styles.documentRow}>
+                                        <Text style={styles.documentLabel}>Amount</Text>
+                                        <Text style={styles.documentColon}>:</Text>
+                                        <Text style={styles.documentValue}>
+                                            {document.amount}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.documentActionIcons}>
+                                    <TouchableOpacity
+                                        style={styles.documentIconButton}
+                                        onPress={() => handleEditDocument(document)}
+                                    >
+                                        <Ionicons name="create-outline" size={16} color="#fff" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.documentIconButton}
+                                        onPress={() => handleDeleteDocument(document.id)}
+                                    >
+                                        <Ionicons name="trash-outline" size={16} color="#fff" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))
+                    ) : (
+                        <View style={styles.noDocumentsContainer}>
+                            <Text style={styles.noDocumentsText}>No documents found.</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        style={styles.submitButton}
+                        onPress={handleSubmitClaim}
+                    >
+                        <Text style={styles.submitButtonText}>Submit Claim</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.submitLaterButton}
+                        onPress={handleSubmitLater}
+                    >
+                        <Text style={styles.submitLaterButtonText}>Submit Later</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
+
+            {/* Add Beneficiary Modal */}
+            <Modal
+                visible={isAddBeneficiaryModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setAddBeneficiaryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Add Beneficiary</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newBeneficiary.name}
+                            onChangeText={(value) =>
+                                setNewBeneficiary((prev) => ({ ...prev, name: value }))
+                            }
+                            placeholder="Enter name"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newBeneficiary.relationship}
+                            onChangeText={(value) =>
+                                setNewBeneficiary((prev) => ({
+                                    ...prev,
+                                    relationship: value,
+                                }))
+                            }
+                            placeholder="Enter relationship"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newBeneficiary.illness}
+                            onChangeText={(value) =>
+                                setNewBeneficiary((prev) => ({ ...prev, illness: value }))
+                            }
+                            placeholder="Enter illness"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newBeneficiary.amount}
+                            onChangeText={(value) =>
+                                setNewBeneficiary((prev) => ({ ...prev, amount: value }))
+                            }
+                            placeholder="Amount will be set automatically"
+                            keyboardType="numeric"
+                            editable={false}
+                        />
+                        <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={styles.dropdownButton}
-                                onPress={() => setDropdownVisible(!isDropdownVisible)}
+                                onPress={() => setAddBeneficiaryModalVisible(false)}
+                                style={styles.cancelBtn}
                             >
-                                <Text style={styles.dropdownButtonText}>
-                                    {selectedMember ? selectedMember.name : "Select Member"}
-                                </Text>
-                                <Ionicons
-                                    name={isDropdownVisible ? "chevron-up" : "chevron-down"}
-                                    size={20}
-                                    color="#666"
-                                />
+                                <Text style={styles.cancelText}>Cancel</Text>
                             </TouchableOpacity>
-
-                            {/* Dropdown Options */}
-                            {isDropdownVisible && (
-                                <View style={styles.dropdownOptions}>
-                                    {memberOptions.map((member) => (
-                                        <TouchableOpacity
-                                            key={member.id}
-                                            style={[
-                                                styles.dropdownOption,
-                                                selectedMember?.id === member.id && styles.selectedDropdownOption
-                                            ]}
-                                            onPress={() => handleMemberSelect(member)}
-                                        >
-                                            <Text style={[
-                                                styles.dropdownOptionText,
-                                                selectedMember?.id === member.id && styles.selectedDropdownOptionText
-                                            ]}>
-                                                {member.name} ({member.relationship})
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            )}
-
-                            {/* Illness Field */}
-                            <Text style={styles.fieldLabel}>Illness</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newBeneficiary.illness}
-                                onChangeText={(value) =>
-                                    setNewBeneficiary((prev) => ({ ...prev, illness: value }))
-                                }
-                                placeholder="Enter illness"
-                                multiline
-                                numberOfLines={3}
-                            />
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setEditBeneficiaryModalVisible(false);
-                                        setDropdownVisible(false);
-                                        setSelectedMember(null);
-                                    }}
-                                    style={styles.cancelBtn}
-                                >
-                                    <Text style={styles.cancelText}>Cancel</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleSaveBeneficiaryEdit}
-                                    style={styles.saveBtn}
-                                >
-                                    <Text style={styles.saveText}>Save</Text>
-                                </TouchableOpacity>
-                            </View>
+                            <TouchableOpacity
+                                onPress={handleAddBeneficiary}
+                                style={styles.saveBtn}
+                            >
+                                <Text style={styles.saveText}>Add</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
-                </Modal>
+                </View>
+            </Modal>
 
+            {/* Edit Beneficiary Modal */}
+            <Modal
+                visible={isEditBeneficiaryModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setEditBeneficiaryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Edit Beneficiary</Text>
 
-                {/* Add Document Modal */}
-                <Modal
-                    visible={isAddDocumentModalVisible}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setAddDocumentModalVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Add Document</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newDocument.type}
-                                onChangeText={(value) =>
-                                    setNewDocument((prev) => ({ ...prev, type: value }))
-                                }
-                                placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newDocument.date}
-                                onChangeText={(value) =>
-                                    setNewDocument((prev) => ({ ...prev, date: value }))
-                                }
-                                placeholder="Enter date (DD/MM/YYYY)"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newDocument.amount}
-                                onChangeText={(value) =>
-                                    setNewDocument((prev) => ({ ...prev, amount: value }))
-                                }
-                                placeholder="Enter amount"
-                                keyboardType="numeric"
-                            />
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    onPress={() => setAddDocumentModalVisible(false)}
-                                    style={styles.cancelBtn}
-                                >
-                                    <Text style={styles.cancelText}>Cancel</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleAddDocument}
-                                    style={styles.saveBtn}
-                                >
-                                    <Text style={styles.saveText}>Add</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-
-                {/* Edit Document Modal */}
-                <Modal
-                    visible={isEditDocumentModalVisible}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setEditDocumentModalVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Edit Document</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newDocument.type}
-                                onChangeText={(value) =>
-                                    setNewDocument((prev) => ({ ...prev, type: value }))
-                                }
-                                placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newDocument.date}
-                                onChangeText={(value) =>
-                                    setNewDocument((prev) => ({ ...prev, date: value }))
-                                }
-                                placeholder="Enter date (DD/MM/YYYY)"
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={newDocument.amount}
-                                onChangeText={(value) =>
-                                    setNewDocument((prev) => ({ ...prev, amount: value }))
-                                }
-                                placeholder="Enter amount"
-                                keyboardType="numeric"
-                            />
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    onPress={() => setEditDocumentModalVisible(false)}
-                                    style={styles.cancelBtn}
-                                >
-                                    <Text style={styles.cancelText}>Cancel</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleSaveDocumentEdit}
-                                    style={styles.saveBtn}
-                                >
-                                    <Text style={styles.saveText}>Save</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-                {/* Image Preview Modal */}
-                <Modal
-                    visible={isImageModalVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setImageModalVisible(false)}
-                >
-                    <View style={styles.imageModalOverlay}>
+                        {/* Member Name Dropdown */}
+                        <Text style={styles.fieldLabel}>Member Name</Text>
                         <TouchableOpacity
-                            style={styles.imageModalClose}
-                            onPress={() => setImageModalVisible(false)}
+                            style={styles.dropdownButton}
+                            onPress={() => setDropdownVisible(!isDropdownVisible)}
                         >
-                            <Ionicons name="close" size={30} color="#fff" />
-                        </TouchableOpacity>
-                        {selectedImageUri && (
-                            <Image
-                                source={{ uri: selectedImageUri }}
-                                style={styles.enlargedImage}
-                                resizeMode="contain"
+                            <Text style={styles.dropdownButtonText}>
+                                {selectedMember ? selectedMember.name : "Select Member"}
+                            </Text>
+                            <Ionicons
+                                name={isDropdownVisible ? "chevron-up" : "chevron-down"}
+                                size={20}
+                                color="#666"
                             />
+                        </TouchableOpacity>
+
+                        {/* Dropdown Options */}
+                        {isDropdownVisible && (
+                            <View style={styles.dropdownOptions}>
+                                {memberOptions.map((member) => (
+                                    <TouchableOpacity
+                                        key={member.id}
+                                        style={[
+                                            styles.dropdownOption,
+                                            selectedMember?.id === member.id && styles.selectedDropdownOption
+                                        ]}
+                                        onPress={() => handleMemberSelect(member)}
+                                    >
+                                        <Text style={[
+                                            styles.dropdownOptionText,
+                                            selectedMember?.id === member.id && styles.selectedDropdownOptionText
+                                        ]}>
+                                            {member.name} ({member.relationship})
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         )}
+
+                        {/* Illness Field */}
+                        <Text style={styles.fieldLabel}>Illness</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newBeneficiary.illness}
+                            onChangeText={(value) =>
+                                setNewBeneficiary((prev) => ({ ...prev, illness: value }))
+                            }
+                            placeholder="Enter illness"
+                            multiline
+                            numberOfLines={3}
+                        />
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setEditBeneficiaryModalVisible(false);
+                                    setDropdownVisible(false);
+                                    setSelectedMember(null);
+                                }}
+                                style={styles.cancelBtn}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleSaveBeneficiaryEdit}
+                                style={styles.saveBtn}
+                            >
+                                <Text style={styles.saveText}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </Modal>
-            </LinearGradient>
+                </View>
+            </Modal>
+
+
+            {/* Add Document Modal */}
+            <Modal
+                visible={isAddDocumentModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setAddDocumentModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Add Document</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newDocument.type}
+                            onChangeText={(value) =>
+                                setNewDocument((prev) => ({ ...prev, type: value }))
+                            }
+                            placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newDocument.date}
+                            onChangeText={(value) =>
+                                setNewDocument((prev) => ({ ...prev, date: value }))
+                            }
+                            placeholder="Enter date (DD/MM/YYYY)"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newDocument.amount}
+                            onChangeText={(value) =>
+                                setNewDocument((prev) => ({ ...prev, amount: value }))
+                            }
+                            placeholder="Enter amount"
+                            keyboardType="numeric"
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                onPress={() => setAddDocumentModalVisible(false)}
+                                style={styles.cancelBtn}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleAddDocument}
+                                style={styles.saveBtn}
+                            >
+                                <Text style={styles.saveText}>Add</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Edit Document Modal */}
+            <Modal
+                visible={isEditDocumentModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setEditDocumentModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Edit Document</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newDocument.type}
+                            onChangeText={(value) =>
+                                setNewDocument((prev) => ({ ...prev, type: value }))
+                            }
+                            placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newDocument.date}
+                            onChangeText={(value) =>
+                                setNewDocument((prev) => ({ ...prev, date: value }))
+                            }
+                            placeholder="Enter date (DD/MM/YYYY)"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newDocument.amount}
+                            onChangeText={(value) =>
+                                setNewDocument((prev) => ({ ...prev, amount: value }))
+                            }
+                            placeholder="Enter amount"
+                            keyboardType="numeric"
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                onPress={() => setEditDocumentModalVisible(false)}
+                                style={styles.cancelBtn}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleSaveDocumentEdit}
+                                style={styles.saveBtn}
+                            >
+                                <Text style={styles.saveText}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            {/* Image Preview Modal */}
+            <Modal
+                visible={isImageModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setImageModalVisible(false)}
+            >
+                <View style={styles.imageModalOverlay}>
+                    <TouchableOpacity
+                        style={styles.imageModalClose}
+                        onPress={() => setImageModalVisible(false)}
+                    >
+                        <Ionicons name="close" size={30} color="#fff" />
+                    </TouchableOpacity>
+                    {selectedImageUri && (
+                        <Image
+                            source={{ uri: selectedImageUri }}
+                            style={styles.enlargedImage}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+            </Modal>
+        </LinearGradient>
     );
 };
 
 const styles = StyleSheet.create({
-   
+
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF",

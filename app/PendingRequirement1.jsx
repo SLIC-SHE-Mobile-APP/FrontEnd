@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { API_BASE_URL } from '../constants/index.js';
 
 const { width, height } = Dimensions.get("window");
 
@@ -276,7 +277,7 @@ const PendingRequirement1 = () => {
 
       const cacheBuster = Date.now();
       const response = await fetch(
-        `http://203.115.11.229:1002/api/UploadDocumentRespo/pending-documents?polNo=${encodeURIComponent(
+        `${API_BASE_URL}/UploadDocumentRespo/pending-documents?polNo=${encodeURIComponent(
           requirementData.polNo
         )}&clmNo=${encodeURIComponent(
           requirementData.claimNumber
@@ -325,7 +326,7 @@ const PendingRequirement1 = () => {
         .toString(36)
         .substr(2, 9)}`;
       const response = await fetch(
-        `http://203.115.11.229:1002/api/UploadDocumentRespo/view-info?polNo=${encodeURIComponent(
+        `${API_BASE_URL}/UploadDocumentRespo/view-info?polNo=${encodeURIComponent(
           polNo
         )}&clmNo=${encodeURIComponent(clmNo)}&docCode=${encodeURIComponent(
           docCode
@@ -426,7 +427,7 @@ const PendingRequirement1 = () => {
                 logWithTimestamp("=== DELETE API REQUEST ===", requestBody);
 
                 const response = await fetch(
-                  "http://203.115.11.229:1002/api/UploadPendingDocumentCon/delete",
+                  `${API_BASE_URL}/UploadPendingDocumentCon/delete`,
                   {
                     method: "POST",
                     headers: {
@@ -821,7 +822,7 @@ const PendingRequirement1 = () => {
       });
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/UploadPendingDocument/max-seqno?clmNo=${encodeURIComponent(
+        `${API_BASE_URL}/UploadPendingDocument/max-seqno?clmNo=${encodeURIComponent(
           claimNo
         )}&doc=${encodeURIComponent(docCode)}`
       );
@@ -878,7 +879,7 @@ const PendingRequirement1 = () => {
       });
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/UploadPendingDocument/upload",
+        `${API_BASE_URL}/UploadPendingDocument/upload`,
         {
           method: "POST",
           body: formData,
@@ -996,7 +997,7 @@ const PendingRequirement1 = () => {
                 });
 
                 const response = await fetch(
-                  "http://203.115.11.229:1002/api/DocumentLog/SubmitDocs",
+                  `${API_BASE_URL}/DocumentLog/SubmitDocs`,
                   {
                     method: "POST",
                     headers: {
@@ -1389,24 +1390,24 @@ const PendingRequirement1 = () => {
 
               {requirementData.documents && requirementData.documents.length > 0
                 ? requirementData.documents.map((doc, index) => {
-                    logWithTimestamp(
-                      `=== RENDERING DOCUMENT OPTION ${index} ===`,
-                      doc
-                    );
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.modalItem}
-                        onPress={() => handleDocumentSelection(doc)}
-                      >
-                        <Text style={styles.modalItemText}>
-                          {doc.description}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })
+                  logWithTimestamp(
+                    `=== RENDERING DOCUMENT OPTION ${index} ===`,
+                    doc
+                  );
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.modalItem}
+                      onPress={() => handleDocumentSelection(doc)}
+                    >
+                      <Text style={styles.modalItemText}>
+                        {doc.description}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
                 : pendingDocuments.length > 0
-                ? pendingDocuments.map((doc, index) => {
+                  ? pendingDocuments.map((doc, index) => {
                     logWithTimestamp(
                       `=== RENDERING PENDING DOCUMENT OPTION ${index} ===`,
                       doc
@@ -1431,7 +1432,7 @@ const PendingRequirement1 = () => {
                       </TouchableOpacity>
                     );
                   })
-                : // Fallback to requiredDocuments if both arrays are empty
+                  : // Fallback to requiredDocuments if both arrays are empty
                   requirementData.requiredDocuments.map((doc, index) => {
                     logWithTimestamp(
                       `=== RENDERING REQUIRED DOCUMENT OPTION ${index} ===`,

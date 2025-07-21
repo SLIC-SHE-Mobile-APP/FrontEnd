@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { API_BASE_URL } from '../constants/index.js';
 
 const DependentDetails = ({ onClose }) => {
   const [dependentsData, setDependentsData] = useState([]);
@@ -92,7 +93,7 @@ const DependentDetails = ({ onClose }) => {
       });
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${data.policyNumber}&memberNo=${data.memberNumber}`,
+        `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${data.policyNumber}&memberNo=${data.memberNumber}`,
         {
           method: "GET",
           headers: {

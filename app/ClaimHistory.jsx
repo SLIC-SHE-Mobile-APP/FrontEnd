@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
-import ClaimHistory1 from './ClaimHistory1'; // detail screen
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_BASE_URL } from '../constants/index.js';
+import ClaimHistory1 from './ClaimHistory1';
 
 const ClaimHistory = ({ onClose, availableHeight }) => {
   const {
@@ -51,7 +52,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         setLoading(true);
         setApiError(null);
 
-        const url = `http://203.115.11.229:1002/api/ClaimHistoryCon`;
+        const url = `${API_BASE_URL}/ClaimHistoryCon`;
         const params = { policy_no: policyNo, member_no: memberNo };
 
         console.log('GET', url, params); // for debugging

@@ -24,7 +24,7 @@ import {
 } from "react-native-safe-area-context";
 
 function ForgotPasswordContent() {
-  const [contactMethod, setContactMethod] = useState('email'); // 'email' or 'phone'
+  const [contactMethod, setContactMethod] = useState('email'); 
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [emailError, setEmailError] = useState('');

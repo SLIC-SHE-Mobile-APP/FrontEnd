@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { API_BASE_URL } from '../constants/index.js';
 
 const AddPolicy = () => {
   const [policyNumber, setPolicyNumber] = useState("");
@@ -40,7 +41,7 @@ const AddPolicy = () => {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/ManagePolices/RemovedPoliciesByNic?nic=${storedNic}`,
+        `${API_BASE_URL}/ManagePolices/RemovedPoliciesByNic?nic=${storedNic}`,
         {
           method: "GET",
           headers: {
@@ -75,7 +76,7 @@ const AddPolicy = () => {
       }
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/HomePagePoliciesLoad/GetPoliciesByNic",
+        `${API_BASE_URL}/HomePagePoliciesLoad/GetPoliciesByNic`,
         {
           method: "POST",
           headers: {
@@ -144,7 +145,7 @@ const AddPolicy = () => {
 
       // Call the DELETE API
       const response = await fetch(
-        "http://203.115.11.229:1002/api/ManagePolices/DeletePolicy",
+        `${API_BASE_URL}/ManagePolices/DeletePolicy`,
         {
           method: "POST",
           headers: {
@@ -199,7 +200,7 @@ const AddPolicy = () => {
 
       // Call the API to remove the policy
       const response = await fetch(
-        "http://203.115.11.229:1002/api/DeletePoliciesHome/RemovePolicy",
+        `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
         {
           method: "POST",
           headers: {

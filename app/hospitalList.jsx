@@ -13,17 +13,18 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { API_BASE_URL } from '../constants/index.js';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // API endpoints mapped by category id
 const API_ENDPOINTS = {
-  approved: 'http://203.115.11.229:1002/api/HospitalListAppCon/GetHospitalList',
-  notApproved: 'http://203.115.11.229:1002/api/HospitalListNonAppCon/GetNotApprovedHospitals',
-  dental: 'http://203.115.11.229:1002/api/UnapprovedProviders/dentals',
-  pharmacy: 'http://203.115.11.229:1002/api/UnapprovedProviders/pharmacies',
-  optical: 'http://203.115.11.229:1002/api/UnapprovedProviders/opticians',
-  medical: 'http://203.115.11.229:1002/api/UnapprovedProviders/medicals',
+  approved: `${API_BASE_URL}/HospitalListAppCon/GetHospitalList`,
+  notApproved: `${API_BASE_URL}/HospitalListNonAppCon/GetNotApprovedHospitals`,
+  dental: `${API_BASE_URL}/UnapprovedProviders/dentals`,
+  pharmacy: `${API_BASE_URL}/UnapprovedProviders/pharmacies`,
+  optical: `${API_BASE_URL}/UnapprovedProviders/opticians`,
+  medical: `${API_BASE_URL}/UnapprovedProviders/medicals`,
 };
 
 // Navigation items with icons and titles
@@ -374,9 +375,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     transform: [{ translateY: -10 }],
   },
-  // activeIndicatorVisible: {
-  //   height: 20,
-  // },
   contentArea: {
     flex: 1,
     paddingHorizontal: 15,

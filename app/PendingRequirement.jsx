@@ -12,6 +12,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { API_BASE_URL } from '../constants/index.js';
 
 const PendingRequirement = ({ onClose }) => {
   const [pendingRequirements, setPendingRequirements] = useState([]);
@@ -36,7 +37,7 @@ const PendingRequirement = ({ onClose }) => {
       }
 
       // API call
-      const response = await fetch('http://203.115.11.229:1002/api/DocumentLogCon/GetDocumentLogs', {
+      const response = await fetch(`${API_BASE_URL}/DocumentLogCon/GetDocumentLogs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
