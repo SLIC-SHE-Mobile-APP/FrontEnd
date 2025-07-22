@@ -1226,7 +1226,7 @@ const styles = StyleSheet.create({
     minWidth: 34,
     minHeight: 34,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   headerTitle: {
     fontSize: 18,

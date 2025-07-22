@@ -63,7 +63,7 @@ function LoginContent() {
   }, []);
 
   const makePhoneCall = () => {
-    Linking.openURL('tel:0112252596').catch(err => {
+    Linking.openURL('tel:0112357357').catch(err => {
       console.error('Phone call error:', err);
     });
   };
@@ -222,7 +222,7 @@ function LoginContent() {
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
                 <Text style={styles.contactText}>
-                  Contact Us 011 - 2252596
+                  Contact Us 011 - 2357357
                 </Text>
               </TouchableOpacity>
             </View>
