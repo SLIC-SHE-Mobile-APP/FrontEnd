@@ -89,7 +89,7 @@ function EmailVerificationContent() {
   }, []);
 
   const makePhoneCall = () => {
-    Linking.openURL("tel:0112252596").catch((err) => {
+    Linking.openURL("tel:0112357357").catch((err) => {
       console.error("Phone call error:", err);
     });
   };
@@ -311,7 +311,7 @@ function EmailVerificationContent() {
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>Contact Us 011 - 2252596</Text>
+                <Text style={styles.contactText}>Contact Us 011 - 2357357</Text>
               </TouchableOpacity>
             </View>
           </View>
