@@ -216,6 +216,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   const handleEdit = async (claim) => {
     try {
       await SecureStore.setItemAsync("edit_referenceNo", claim.referenceNo);
+      await SecureStore.setItemAsync("referenNo", claim.referenceNo);
       await SecureStore.setItemAsync("edit_enteredBy", claim.enteredBy); //patient name
       await SecureStore.setItemAsync("edit_relationship", claim.relationship); // relationship
       await SecureStore.setItemAsync("edit_claimType", claim.claimType);

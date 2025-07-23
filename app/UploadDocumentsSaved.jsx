@@ -118,7 +118,7 @@ const UploadDocumentsSaved = ({ route }) => {
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
-        const referenceNo = await SecureStore.getItemAsync("edit_referenceNo");
+        const referenceNo = await SecureStore.getItemAsync("referenNo");
         const nic = await SecureStore.getItemAsync("user_nic");
 
         setStoredReferenceNo(referenceNo || "");
