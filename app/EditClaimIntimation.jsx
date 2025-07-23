@@ -2,10 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState, useEffect } from "react";
-import {
-  Alert,
-  Modal,
-  ScrollView,
+import {Alert,Modal, ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,11 +19,11 @@ const EditClaimIntimation = ({ route }) => {
 
   // State for claim details
   const [claimDetails, setClaimDetails] = useState({
-    referenceNo: claim?.referenceNo || "M000428",
-    enteredBy: "Loading...", // Will be updated from API
-    status: "Submission for Approval Pending", // Hard-coded as specified
-    claimType: claim?.claimType || "Out-door",
-    createdOn: claim?.createdOn || "24-12-2020",
+    referenceNo: claim?.referenceNo,
+    enteredBy: "Loading...",
+    status: "Submission for Approval Pending",
+    claimType: claim?.claimType,
+    createdOn: claim?.createdOn,
   });
 
   // Employee info state
@@ -109,19 +106,10 @@ const EditClaimIntimation = ({ route }) => {
       }
 
       const result = await response.json();
-      console.log("Documents API Response:", result);
 
       if (result.success && result.data && Array.isArray(result.data)) {
         // Transform API data to match component structure
         const transformedDocuments = result.data.map((doc, index) => {
-          console.log(`Processing document ${index}:`, {
-            id: doc.clmMemSeqNo,
-            type: doc.docType,
-            hasImgContent: !!doc.imgContent,
-            imgContentType: typeof doc.imgContent,
-            imgContentLength: doc.imgContent?.length,
-          });
-
           return {
             id: doc.clmMemSeqNo || `doc_${index}`,
             type: doc.docType || "Unknown",
@@ -137,17 +125,7 @@ const EditClaimIntimation = ({ route }) => {
         });
 
         setDocuments(transformedDocuments);
-        console.log(
-          "Transformed documents:",
-          transformedDocuments.map((doc) => ({
-            id: doc.id,
-            type: doc.type,
-            hasImgContent: !!doc.imgContent,
-            imgContentLength: doc.imgContent?.length,
-          }))
-        );
       } else {
-        console.log("No documents found or invalid response structure");
         setDocuments([]);
       }
     } catch (error) {
@@ -174,71 +152,55 @@ const EditClaimIntimation = ({ route }) => {
   // Add this helper function at the top of your component (before the component definition)
   const arrayBufferToBase64 = (buffer) => {
     try {
-      console.log("Converting buffer to base64, buffer type:", typeof buffer);
-      console.log("Buffer value:", buffer);
-
       // If buffer is already a string (base64), return it
       if (typeof buffer === "string") {
-        console.log("Buffer is already a string, length:", buffer.length);
         return buffer;
       }
 
       // If buffer is null or undefined
       if (!buffer) {
-        console.log("Buffer is null or undefined");
         return null;
       }
 
       // If buffer is an array of bytes
       if (Array.isArray(buffer)) {
-        console.log("Buffer is an array, length:", buffer.length);
         const bytes = new Uint8Array(buffer);
         let binary = "";
         for (let i = 0; i < bytes.byteLength; i++) {
           binary += String.fromCharCode(bytes[i]);
         }
         const base64 = btoa(binary);
-        console.log("Converted array to base64, length:", base64.length);
         return base64;
       }
 
       // If buffer is ArrayBuffer or similar
       if (buffer instanceof ArrayBuffer) {
-        console.log("Buffer is ArrayBuffer, byteLength:", buffer.byteLength);
         const bytes = new Uint8Array(buffer);
         let binary = "";
         for (let i = 0; i < bytes.byteLength; i++) {
           binary += String.fromCharCode(bytes[i]);
         }
         const base64 = btoa(binary);
-        console.log("Converted ArrayBuffer to base64, length:", base64.length);
         return base64;
       }
 
       // If buffer is a typed array
       if (buffer.buffer instanceof ArrayBuffer) {
-        console.log("Buffer is typed array, length:", buffer.length);
         let binary = "";
         for (let i = 0; i < buffer.length; i++) {
           binary += String.fromCharCode(buffer[i]);
         }
         const base64 = btoa(binary);
-        console.log("Converted typed array to base64, length:", base64.length);
         return base64;
       }
-
-      console.log("Unknown buffer type, trying JSON.stringify:", typeof buffer);
-      console.log("Buffer constructor:", buffer.constructor.name);
 
       // Last resort: try to convert object to array
       if (typeof buffer === "object" && buffer !== null) {
         const keys = Object.keys(buffer);
-        console.log("Buffer object keys:", keys.slice(0, 10)); // Show first 10 keys
 
         // Check if it's an object with numeric keys (like {0: 255, 1: 216, ...})
         const isNumericKeys = keys.every((key) => !isNaN(key));
         if (isNumericKeys) {
-          console.log("Buffer appears to be an object with numeric keys");
           const array = keys.map((key) => buffer[key]);
           const bytes = new Uint8Array(array);
           let binary = "";
@@ -246,12 +208,10 @@ const EditClaimIntimation = ({ route }) => {
             binary += String.fromCharCode(bytes[i]);
           }
           const base64 = btoa(binary);
-          console.log("Converted object to base64, length:", base64.length);
           return base64;
         }
       }
 
-      console.log("Could not convert buffer to base64");
       return null;
     } catch (error) {
       console.error("Error converting buffer to base64:", error);
@@ -324,23 +284,23 @@ const EditClaimIntimation = ({ route }) => {
       // Update state with retrieved values, fallback to route params or defaults
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: storedReferenceNo || claim?.referenceNo || "M000428",
-        claimType: storedClaimType || claim?.claimType || "Out-door",
-        createdOn: storedCreatedOn || claim?.createdOn || "24-12-2020",
+        referenceNo: storedReferenceNo || claim?.referenceNo,
+        claimType: storedClaimType || claim?.claimType,
+        createdOn: storedCreatedOn || claim?.createdOn,
       }));
 
       // Return the reference number for use in other functions
-      return storedReferenceNo || claim?.referenceNo || "M000428";
+      return storedReferenceNo || claim?.referenceNo;
     } catch (error) {
       console.error("Error retrieving claim details:", error);
       // Fallback to route params or defaults if SecureStore fails
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: claim?.referenceNo || "M000428",
-        claimType: claim?.claimType || "Out-door",
-        createdOn: claim?.createdOn || "24-12-2020",
+        referenceNo: claim?.referenceNo,
+        claimType: claim?.claimType,
+        createdOn: claim?.createdOn,
       }));
-      return claim?.referenceNo || "M000428";
+      return claim?.referenceNo;
     }
   };
 
@@ -390,7 +350,6 @@ const EditClaimIntimation = ({ route }) => {
       );
 
       if (!memberNumber || !policyNumber) {
-        console.log("Missing memberNumber or policyNumber in SecureStore");
         setClaimDetails((prev) => ({ ...prev, enteredBy: "Unknown Member" }));
         return;
       }
@@ -424,12 +383,21 @@ const EditClaimIntimation = ({ route }) => {
   // Store claim details in SecureStore
   const storeClaimDetails = async () => {
     try {
-      await SecureStore.setItemAsync(
-        "edit_referenceNo",
-        claimDetails.referenceNo
-      );
-      await SecureStore.setItemAsync("edit_claimType", claimDetails.claimType);
-      await SecureStore.setItemAsync("edit_createdOn", claimDetails.createdOn);
+      // Method 1: Convert individual values to strings
+      const referenceNo = claimDetails.referenceNo
+        ? String(claimDetails.referenceNo)
+        : "";
+      const claimType = claimDetails.claimType
+        ? String(claimDetails.claimType)
+        : "";
+      const createdOn = claimDetails.createdOn
+        ? String(claimDetails.createdOn)
+        : "";
+
+      await SecureStore.setItemAsync("edit_referenceNo", referenceNo);
+      await SecureStore.setItemAsync("edit_claimType", claimType);
+      await SecureStore.setItemAsync("edit_createdOn", createdOn);
+
     } catch (error) {
       console.error("Error storing claim details:", error);
     }
@@ -455,7 +423,7 @@ const EditClaimIntimation = ({ route }) => {
 
   // Navigate to UploadDocuments page
   const handleNavigateToUploadDocuments = () => {
-    navigation.navigate("UploadDocuments", {
+    navigation.navigate("UploadDocumentsSaved", {
       claim: claim,
       beneficiaries: beneficiaries,
       documents: documents,
@@ -485,13 +453,6 @@ const EditClaimIntimation = ({ route }) => {
       });
       setAddBeneficiaryModalVisible(false);
     }
-  };
-
-  // Edit beneficiary
-  const handleEditBeneficiary = (beneficiary) => {
-    setSelectedBeneficiary(beneficiary);
-    setNewBeneficiary(beneficiary);
-    setEditBeneficiaryModalVisible(true);
   };
 
   // Save beneficiary edit
@@ -606,25 +567,15 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   const renderDocumentImage = (document) => {
-    console.log("=== Rendering document image ===");
-    console.log("Document ID:", document.id);
-    console.log("Document type:", document.type);
-    console.log("Has imgContent:", !!document.imgContent);
-    console.log("ImgContent type:", typeof document.imgContent);
-    console.log("ImgContent length:", document.imgContent?.length);
-
     if (document.imgContent) {
       // Test if it's valid base64
       try {
         const testDecode = atob(document.imgContent.substring(0, 100));
-        console.log("Base64 decode test successful");
       } catch (error) {
         console.error("Base64 decode test failed:", error);
       }
 
       const imageUri = `data:image/jpeg;base64,${document.imgContent}`;
-      console.log("Image URI length:", imageUri.length);
-      console.log("Image URI preview:", imageUri.substring(0, 50) + "...");
 
       return (
         <TouchableOpacity
@@ -638,33 +589,14 @@ const EditClaimIntimation = ({ route }) => {
             source={{ uri: imageUri }}
             style={styles.documentImage}
             resizeMode="cover"
-            onError={(error) => {
-              console.error("❌ Image load error for document:", document.id);
-              console.error("Error details:", error.nativeEvent?.error);
-              console.log("Failed image URI length:", imageUri.length);
-              console.log(
-                "ImgContent first 50 chars:",
-                document.imgContent.substring(0, 50)
-              );
-              console.log("Original imgContent:", document.originalImgContent);
-            }}
-            onLoad={() => {
-              console.log(
-                "✅ Image loaded successfully for document:",
-                document.id
-              );
-            }}
-            onLoadStart={() => {
-              console.log("🔄 Image load started for document:", document.id);
-            }}
-            onLoadEnd={() => {
-              console.log("🏁 Image load ended for document:", document.id);
-            }}
+            onError={(error) => {}}
+            onLoad={() => {}}
+            onLoadStart={() => {}}
+            onLoadEnd={() => {}}
           />
         </TouchableOpacity>
       );
     } else {
-      console.log("No image content for document:", document.id);
       return (
         <View style={styles.documentImagePlaceholder}>
           <Ionicons name="document-outline" size={24} color="#4DD0E1" />
@@ -675,443 +607,438 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
-          <View style={{ width: 24 }} />
-        </View>
+    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Claim Details Section - Read Only */}
-          <View style={styles.claimDetailsSection}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Reference No</Text>
-              <Text style={styles.colon}>:</Text>
-              <Text style={styles.detailValue}>{claimDetails.referenceNo}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Entered By</Text>
-              <Text style={styles.colon}>:</Text>
-              <Text style={styles.detailValue}>
-                {loading ? "Loading..." : claimDetails.enteredBy}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Status</Text>
-              <Text style={styles.colon}>:</Text>
-              <Text style={styles.detailValue}>{claimDetails.status}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Claim Type</Text>
-              <Text style={styles.colon}>:</Text>
-              <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Created on</Text>
-              <Text style={styles.colon}>:</Text>
-              <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
-            </View>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Claim Details Section - Read Only */}
+        <View style={styles.claimDetailsSection}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Reference No</Text>
+            <Text style={styles.colon}>:</Text>
+            <Text style={styles.detailValue}>{claimDetails.referenceNo}</Text>
           </View>
-
-          {/* Beneficiaries Title - Full Width */}
-          <View style={styles.beneficiariesTitleContainer}>
-            <Text style={styles.beneficiariesTitle}>
-              Beneficiaries for Claim
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Entered By</Text>
+            <Text style={styles.colon}>:</Text>
+            <Text style={styles.detailValue}>
+              {loading ? "Loading..." : claimDetails.enteredBy}
             </Text>
           </View>
-
-          {/* Beneficiaries Section */}
-          <View style={styles.beneficiariesSection}>
-            {beneficiaries.length > 0 ? (
-              beneficiaries.map((beneficiary) => (
-                <View key={beneficiary.id} style={styles.beneficiaryCard}>
-                  <View style={styles.beneficiaryContent}>
-                    <View style={styles.beneficiaryRow}>
-                      <Text style={styles.beneficiaryLabel}>Patient Name</Text>
-                      <Text style={styles.beneficiaryColon}>:</Text>
-                      <Text style={styles.beneficiaryValue}>
-                        {beneficiary.name}
-                      </Text>
-                    </View>
-                    <View style={styles.beneficiaryRow}>
-                      <Text style={styles.beneficiaryLabel}>Relationship</Text>
-                      <Text style={styles.beneficiaryColon}>:</Text>
-                      <Text style={styles.beneficiaryValue}>
-                        {beneficiary.relationship}
-                      </Text>
-                    </View>
-                    <View style={styles.beneficiaryRow}>
-                      <Text style={styles.beneficiaryLabel}>Illness</Text>
-                      <Text style={styles.beneficiaryColon}>:</Text>
-                      <Text style={styles.beneficiaryValue}>
-                        {beneficiary.illness}
-                      </Text>
-                    </View>
-                    <View style={styles.beneficiaryRow}>
-                      <Text style={styles.beneficiaryLabel}>Amount</Text>
-                      <Text style={styles.beneficiaryColon}>:</Text>
-                      <Text style={styles.beneficiaryValue}>
-                        {beneficiary.amount}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.beneficiaryActionIcons}></View>
-                </View>
-              ))
-            ) : (
-              <View style={styles.noBeneficiariesContainer}>
-                <Text style={styles.noBeneficiariesText}>
-                  No beneficiaries found. Please add a beneficiary.
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.addBeneficiaryButton}
-              onPress={handleNavigateToUploadDocuments}
-            >
-              <Text style={styles.addBeneficiaryText}>Add More Documents</Text>
-            </TouchableOpacity>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Status</Text>
+            <Text style={styles.colon}>:</Text>
+            <Text style={styles.detailValue}>{claimDetails.status}</Text>
           </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Claim Type</Text>
+            <Text style={styles.colon}>:</Text>
+            <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Created on</Text>
+            <Text style={styles.colon}>:</Text>
+            <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
+          </View>
+        </View>
 
-          {/* Documents Section */}
-          <View style={styles.documentsSection}>
-            {documentsLoading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading documents...</Text>
-              </View>
-            ) : documents.length > 0 ? (
-              documents.map((document) => (
-                <View key={document.id} style={styles.documentCard}>
-                  {renderDocumentImage(document)}
-                  <View style={styles.documentContent}>
-                    <View style={styles.documentRow}>
-                      <Text style={styles.documentLabel}>Document Type</Text>
-                      <Text style={styles.documentColon}>:</Text>
-                      <Text style={styles.documentValue}>{document.type}</Text>
-                    </View>
-                    <View style={styles.documentRow}>
-                      <Text style={styles.documentLabel}>Date of Document</Text>
-                      <Text style={styles.documentColon}>:</Text>
-                      <Text style={styles.documentValue}>{document.date}</Text>
-                    </View>
-                    <View style={styles.documentRow}>
-                      <Text style={styles.documentLabel}>Amount</Text>
-                      <Text style={styles.documentColon}>:</Text>
-                      <Text style={styles.documentValue}>
-                        {document.amount}
-                      </Text>
-                    </View>
+        {/* Beneficiaries Title - Full Width */}
+        <View style={styles.beneficiariesTitleContainer}>
+          <Text style={styles.beneficiariesTitle}>Beneficiaries for Claim</Text>
+        </View>
+
+        {/* Beneficiaries Section */}
+        <View style={styles.beneficiariesSection}>
+          {beneficiaries.length > 0 ? (
+            beneficiaries.map((beneficiary) => (
+              <View key={beneficiary.id} style={styles.beneficiaryCard}>
+                <View style={styles.beneficiaryContent}>
+                  <View style={styles.beneficiaryRow}>
+                    <Text style={styles.beneficiaryLabel}>Patient Name</Text>
+                    <Text style={styles.beneficiaryColon}>:</Text>
+                    <Text style={styles.beneficiaryValue}>
+                      {beneficiary.name}
+                    </Text>
                   </View>
-                  <View style={styles.documentActionIcons}>
-                    <TouchableOpacity
-                      style={styles.documentIconButton}
-                      onPress={() => handleEditDocument(document)}
-                    >
-                      <Ionicons name="create-outline" size={16} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.documentIconButton}
-                      onPress={() => handleDeleteDocument(document.id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#fff" />
-                    </TouchableOpacity>
+                  <View style={styles.beneficiaryRow}>
+                    <Text style={styles.beneficiaryLabel}>Relationship</Text>
+                    <Text style={styles.beneficiaryColon}>:</Text>
+                    <Text style={styles.beneficiaryValue}>
+                      {beneficiary.relationship}
+                    </Text>
+                  </View>
+                  <View style={styles.beneficiaryRow}>
+                    <Text style={styles.beneficiaryLabel}>Illness</Text>
+                    <Text style={styles.beneficiaryColon}>:</Text>
+                    <Text style={styles.beneficiaryValue}>
+                      {beneficiary.illness}
+                    </Text>
+                  </View>
+                  <View style={styles.beneficiaryRow}>
+                    <Text style={styles.beneficiaryLabel}>Amount</Text>
+                    <Text style={styles.beneficiaryColon}>:</Text>
+                    <Text style={styles.beneficiaryValue}>
+                      {beneficiary.amount}
+                    </Text>
                   </View>
                 </View>
-              ))
-            ) : (
-              <View style={styles.noDocumentsContainer}>
-                <Text style={styles.noDocumentsText}>No documents found.</Text>
+                <View style={styles.beneficiaryActionIcons}></View>
               </View>
-            )}
-          </View>
+            ))
+          ) : (
+            <View style={styles.noBeneficiariesContainer}>
+              <Text style={styles.noBeneficiariesText}>
+                No beneficiaries found. Please add a beneficiary.
+              </Text>
+            </View>
+          )}
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSubmitClaim}
-            >
-              <Text style={styles.submitButtonText}>Submit Claim</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addBeneficiaryButton}
+            onPress={handleNavigateToUploadDocuments}
+          >
+            <Text style={styles.addBeneficiaryText}>Add More Documents</Text>
+          </TouchableOpacity>
+        </View>
 
-            <TouchableOpacity
-              style={styles.submitLaterButton}
-              onPress={handleSubmitLater}
-            >
-              <Text style={styles.submitLaterButtonText}>Submit Later</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        {/* Add Beneficiary Modal */}
-        <Modal
-          visible={isAddBeneficiaryModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setAddBeneficiaryModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Add Beneficiary</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.name}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({ ...prev, name: value }))
-                }
-                placeholder="Enter name"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.relationship}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({
-                    ...prev,
-                    relationship: value,
-                  }))
-                }
-                placeholder="Enter relationship"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.illness}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({ ...prev, illness: value }))
-                }
-                placeholder="Enter illness"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.amount}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({ ...prev, amount: value }))
-                }
-                placeholder="Amount will be set automatically"
-                keyboardType="numeric"
-                editable={false}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  onPress={() => setAddBeneficiaryModalVisible(false)}
-                  style={styles.cancelBtn}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleAddBeneficiary}
-                  style={styles.saveBtn}
-                >
-                  <Text style={styles.saveText}>Add</Text>
-                </TouchableOpacity>
+        {/* Documents Section */}
+        <View style={styles.documentsSection}>
+          {documentsLoading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading documents...</Text>
+            </View>
+          ) : documents.length > 0 ? (
+            documents.map((document) => (
+              <View key={document.id} style={styles.documentCard}>
+                {renderDocumentImage(document)}
+                <View style={styles.documentContent}>
+                  <View style={styles.documentRow}>
+                    <Text style={styles.documentLabel}>Document Type</Text>
+                    <Text style={styles.documentColon}>:</Text>
+                    <Text style={styles.documentValue}>{document.type}</Text>
+                  </View>
+                  <View style={styles.documentRow}>
+                    <Text style={styles.documentLabel}>Date of Document</Text>
+                    <Text style={styles.documentColon}>:</Text>
+                    <Text style={styles.documentValue}>{document.date}</Text>
+                  </View>
+                  <View style={styles.documentRow}>
+                    <Text style={styles.documentLabel}>Amount</Text>
+                    <Text style={styles.documentColon}>:</Text>
+                    <Text style={styles.documentValue}>{document.amount}</Text>
+                  </View>
+                </View>
+                <View style={styles.documentActionIcons}>
+                  <TouchableOpacity
+                    style={styles.documentIconButton}
+                    onPress={() => handleEditDocument(document)}
+                  >
+                    <Ionicons name="create-outline" size={16} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.documentIconButton}
+                    onPress={() => handleDeleteDocument(document.id)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
+            ))
+          ) : (
+            <View style={styles.noDocumentsContainer}>
+              <Text style={styles.noDocumentsText}>No documents found.</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmitClaim}
+          >
+            <Text style={styles.submitButtonText}>Submit Claim</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.submitLaterButton}
+            onPress={handleSubmitLater}
+          >
+            <Text style={styles.submitLaterButtonText}>Submit Later</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Add Beneficiary Modal */}
+      <Modal
+        visible={isAddBeneficiaryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAddBeneficiaryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Beneficiary</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.name}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, name: value }))
+              }
+              placeholder="Enter name"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.relationship}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({
+                  ...prev,
+                  relationship: value,
+                }))
+              }
+              placeholder="Enter relationship"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.illness}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, illness: value }))
+              }
+              placeholder="Enter illness"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.amount}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, amount: value }))
+              }
+              placeholder="Amount will be set automatically"
+              keyboardType="numeric"
+              editable={false}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={() => setAddBeneficiaryModalVisible(false)}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleAddBeneficiary}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveText}>Add</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Edit Beneficiary Modal */}
-        <Modal
-          visible={isEditBeneficiaryModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setEditBeneficiaryModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Beneficiary</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.name}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({ ...prev, name: value }))
-                }
-                placeholder="Enter name"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.relationship}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({
-                    ...prev,
-                    relationship: value,
-                  }))
-                }
-                placeholder="Enter relationship"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.illness}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({ ...prev, illness: value }))
-                }
-                placeholder="Enter illness"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newBeneficiary.amount}
-                onChangeText={(value) =>
-                  setNewBeneficiary((prev) => ({ ...prev, amount: value }))
-                }
-                placeholder="Amount will be updated automatically"
-                keyboardType="numeric"
-                editable={false}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  onPress={() => setEditBeneficiaryModalVisible(false)}
-                  style={styles.cancelBtn}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSaveBeneficiaryEdit}
-                  style={styles.saveBtn}
-                >
-                  <Text style={styles.saveText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Edit Beneficiary Modal */}
+      <Modal
+        visible={isEditBeneficiaryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditBeneficiaryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Beneficiary</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.name}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, name: value }))
+              }
+              placeholder="Enter name"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.relationship}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({
+                  ...prev,
+                  relationship: value,
+                }))
+              }
+              placeholder="Enter relationship"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.illness}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, illness: value }))
+              }
+              placeholder="Enter illness"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newBeneficiary.amount}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, amount: value }))
+              }
+              placeholder="Amount will be updated automatically"
+              keyboardType="numeric"
+              editable={false}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={() => setEditBeneficiaryModalVisible(false)}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveBeneficiaryEdit}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Add Document Modal */}
-        <Modal
-          visible={isAddDocumentModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setAddDocumentModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Add Document</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newDocument.type}
-                onChangeText={(value) =>
-                  setNewDocument((prev) => ({ ...prev, type: value }))
-                }
-                placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newDocument.date}
-                onChangeText={(value) =>
-                  setNewDocument((prev) => ({ ...prev, date: value }))
-                }
-                placeholder="Enter date (DD/MM/YYYY)"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newDocument.amount}
-                onChangeText={(value) =>
-                  setNewDocument((prev) => ({ ...prev, amount: value }))
-                }
-                placeholder="Enter amount"
-                keyboardType="numeric"
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  onPress={() => setAddDocumentModalVisible(false)}
-                  style={styles.cancelBtn}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleAddDocument}
-                  style={styles.saveBtn}
-                >
-                  <Text style={styles.saveText}>Add</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Add Document Modal */}
+      <Modal
+        visible={isAddDocumentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAddDocumentModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Document</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newDocument.type}
+              onChangeText={(value) =>
+                setNewDocument((prev) => ({ ...prev, type: value }))
+              }
+              placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newDocument.date}
+              onChangeText={(value) =>
+                setNewDocument((prev) => ({ ...prev, date: value }))
+              }
+              placeholder="Enter date (DD/MM/YYYY)"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newDocument.amount}
+              onChangeText={(value) =>
+                setNewDocument((prev) => ({ ...prev, amount: value }))
+              }
+              placeholder="Enter amount"
+              keyboardType="numeric"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={() => setAddDocumentModalVisible(false)}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleAddDocument}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveText}>Add</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Edit Document Modal */}
-        <Modal
-          visible={isEditDocumentModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setEditDocumentModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Document</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newDocument.type}
-                onChangeText={(value) =>
-                  setNewDocument((prev) => ({ ...prev, type: value }))
-                }
-                placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newDocument.date}
-                onChangeText={(value) =>
-                  setNewDocument((prev) => ({ ...prev, date: value }))
-                }
-                placeholder="Enter date (DD/MM/YYYY)"
-              />
-              <TextInput
-                style={styles.modalInput}
-                value={newDocument.amount}
-                onChangeText={(value) =>
-                  setNewDocument((prev) => ({ ...prev, amount: value }))
-                }
-                placeholder="Enter amount"
-                keyboardType="numeric"
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  onPress={() => setEditDocumentModalVisible(false)}
-                  style={styles.cancelBtn}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSaveDocumentEdit}
-                  style={styles.saveBtn}
-                >
-                  <Text style={styles.saveText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Edit Document Modal */}
+      <Modal
+        visible={isEditDocumentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditDocumentModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Document</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newDocument.type}
+              onChangeText={(value) =>
+                setNewDocument((prev) => ({ ...prev, type: value }))
+              }
+              placeholder="Enter document type (e.g., JPG, Diagnosis Card)"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newDocument.date}
+              onChangeText={(value) =>
+                setNewDocument((prev) => ({ ...prev, date: value }))
+              }
+              placeholder="Enter date (DD/MM/YYYY)"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newDocument.amount}
+              onChangeText={(value) =>
+                setNewDocument((prev) => ({ ...prev, amount: value }))
+              }
+              placeholder="Enter amount"
+              keyboardType="numeric"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                onPress={() => setEditDocumentModalVisible(false)}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveDocumentEdit}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-        {/* Image Preview Modal */}
-        <Modal
-          visible={isImageModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setImageModalVisible(false)}
-        >
-          <View style={styles.imageModalOverlay}>
-            <TouchableOpacity
-              style={styles.imageModalClose}
-              onPress={() => setImageModalVisible(false)}
-            >
-              <Ionicons name="close" size={30} color="#fff" />
-            </TouchableOpacity>
-            {selectedImageUri && (
-              <Image
-                source={{ uri: selectedImageUri }}
-                style={styles.enlargedImage}
-                resizeMode="contain"
-              />
-            )}
-          </View>
-        </Modal>
-      </LinearGradient>
+        </View>
+      </Modal>
+      {/* Image Preview Modal */}
+      <Modal
+        visible={isImageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity
+            style={styles.imageModalClose}
+            onPress={() => setImageModalVisible(false)}
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          {selectedImageUri && (
+            <Image
+              source={{ uri: selectedImageUri }}
+              style={styles.enlargedImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
