@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState, useEffect } from "react";
-import {Alert,Modal, ScrollView,
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import {
+  Alert,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -397,7 +400,6 @@ const EditClaimIntimation = ({ route }) => {
       await SecureStore.setItemAsync("edit_referenceNo", referenceNo);
       await SecureStore.setItemAsync("edit_claimType", claimType);
       await SecureStore.setItemAsync("edit_createdOn", createdOn);
-
     } catch (error) {
       console.error("Error storing claim details:", error);
     }
@@ -410,8 +412,6 @@ const EditClaimIntimation = ({ route }) => {
       const referenceNo = await retrieveClaimDetails();
       // Retrieve beneficiary data from SecureStore and fetch claim amount
       await retrieveBeneficiaryData(referenceNo);
-      // Fetch documents from API
-      await fetchDocuments(referenceNo);
       // Then fetch employee info
       await fetchEmployeeInfo();
       // Store the claim details (in case they came from route params)
@@ -420,6 +420,19 @@ const EditClaimIntimation = ({ route }) => {
 
     initializeComponent();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchDocumentsOnFocus = async () => {
+        const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+        if (referenceNo) {
+          await fetchDocuments(referenceNo);
+        }
+      };
+
+      fetchDocumentsOnFocus();
+    }, [claimDetails.referenceNo, claim?.referenceNo])
+  );
 
   // Navigate to UploadDocuments page
   const handleNavigateToUploadDocuments = () => {
