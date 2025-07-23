@@ -837,7 +837,7 @@ const UploadDocumentsSaved = ({ route }) => {
 
   if (loading) {
     return (
-      <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={[styles.gradient]}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={[styles.gradient]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading document types...</Text>
         </View>
@@ -846,7 +846,7 @@ const UploadDocumentsSaved = ({ route }) => {
   }
 
   return (
-    <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={[styles.gradient]}>
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={[styles.gradient]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>

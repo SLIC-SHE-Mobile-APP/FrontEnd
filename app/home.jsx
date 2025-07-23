@@ -983,7 +983,7 @@ export default function PolicyHome() {
 
   return (
     // <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
             <View style={styles.logoRow}>
