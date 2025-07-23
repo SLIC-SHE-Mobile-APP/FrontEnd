@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from 'expo-file-system';
-import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -45,9 +46,9 @@ const UploadDocuments = ({ route }) => {
   const [editDocumentType, setEditDocumentType] = useState("");
   const [documentTypes, setDocumentTypes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDocumentDetails, setSelectedDocumentDetails] = useState(null);
-  const [claimSequenceNo, setClaimSequenceNo] = useState(1);
-  const [createdBy, setCreatedBy] = useState("CurrentUser");
+  const [storedReferenceNo, setStoredReferenceNo] = useState("");
+  const [storedNic, setStoredNic] = useState("");
+  const [selectedDocId, setSelectedDocId] = useState("");
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -74,25 +75,30 @@ const UploadDocuments = ({ route }) => {
       try {
         setLoading(true);
         // You can make this dynamic based on request type if needed
-        const response = await fetch('http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor');
+        const response = await fetch(
+          "http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor"
+        );
 
         if (!response.ok) {
-          throw new Error('Failed to fetch document types');
+          throw new Error("Failed to fetch document types");
         }
 
         const data = await response.json();
 
         // Transform API response to match the expected format
-        const transformedDocumentTypes = data.map(doc => ({
+        const transformedDocumentTypes = data.map((doc) => ({
           id: doc.docId,
           label: doc.docDesc,
-          icon: getIconForDocType(doc.docDesc)
+          icon: getIconForDocType(doc.docDesc),
         }));
 
         setDocumentTypes(transformedDocumentTypes);
       } catch (error) {
-        console.error('Error fetching document types:', error);
-        Alert.alert('Error', 'Failed to load document types. Please try again.');
+        console.error("Error fetching document types:", error);
+        Alert.alert(
+          "Error",
+          "Failed to load document types. Please try again."
+        );
 
         // Fallback to hardcoded types if API fails
         setDocumentTypes([
@@ -109,52 +115,95 @@ const UploadDocuments = ({ route }) => {
     fetchDocumentTypes();
   }, []);
 
+  useEffect(() => {
+    const loadStoredValues = async () => {
+      try {
+        const referenceNo = await SecureStore.getItemAsync("edit_referenceNo");
+        const nic = await SecureStore.getItemAsync("user_nic");
+
+        setStoredReferenceNo(referenceNo || "");
+        setStoredNic(nic || "");
+
+        console.log("Loaded stored values:", { referenceNo, nic });
+      } catch (error) {
+        console.error("Error loading stored values:", error);
+      }
+    };
+
+    loadStoredValues();
+  }, []);
+
+  const formatDateForAPI = (date) => {
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits
+    return `${day}-${month}-${year}`;
+  };
+
+  const createFormDataForDocument = async (document) => {
+    const formData = new FormData();
+
+    // Add the image file
+    const fileUri = document.uri;
+    const fileName = document.name;
+    const fileType = document.type || "image/jpeg";
+
+    formData.append("ImgContent", {
+      uri: fileUri,
+      type: fileType,
+      name: fileName,
+    });
+
+    // Add other required fields
+    formData.append("ClmSeqNo", storedReferenceNo);
+    formData.append("DocType", document.documentType);
+    formData.append("ImgName", fileName);
+    formData.append(
+      "DocDate",
+      formatDateForAPI(new Date(document.date.split("/").reverse().join("-")))
+    );
+    formData.append("DocAmount", document.amount);
+    formData.append("CreatedBy", storedNic);
+
+    return formData;
+  };
+
   // Helper function to get appropriate icon for document type
   const getIconForDocType = (docDesc) => {
     switch (docDesc.toUpperCase()) {
-      case 'BILL':
-        return 'receipt-outline';
-      case 'PRESCRIPTION':
-        return 'medical-outline';
-      case 'DIAGNOSIS CARD':
-        return 'document-text-outline';
-      case 'OTHER':
-        return 'folder-outline';
+      case "BILL":
+        return "receipt-outline";
+      case "PRESCRIPTION":
+        return "medical-outline";
+      case "DIAGNOSIS CARD":
+        return "document-text-outline";
+      case "OTHER":
+        return "folder-outline";
       default:
-        return 'document-outline';
+        return "document-outline";
     }
   };
 
   const handleDocumentTypeSelect = (type) => {
     setSelectedDocumentType(type);
 
-    // Find and store the selected document details (docId and docDesc)
-    const selectedDoc = documentTypes.find(docType => docType.id === type);
-    if (selectedDoc) {
-      setSelectedDocumentDetails({
-        docId: selectedDoc.id,
-        docDesc: selectedDoc.label
-      });
-
-      console.log('Selected Document Details:', {
-        docId: selectedDoc.id,
-        docDesc: selectedDoc.label
-      });
-    }
+    // Store the selected docId temporarily
+    setSelectedDocId(type);
+    console.log("Selected document type ID:", type);
 
     // Set amount based on document type
-    if (type === "O02" || type === "O03") { // PRESCRIPTION or DIAGNOSIS CARD
+    if (type === "O02" || type === "O03") {
+      // PRESCRIPTION or DIAGNOSIS CARD
       setAmount("0.00");
-    } else if (type === "O01") { // BILL
+    } else if (type === "O01") {
+      // BILL
       setAmount(""); // Clear amount for bill type so user can enter
     } else {
-      setAmount("");
+      setAmount(""); // Clear for other types
     }
 
-  };
-
-  const getSelectedDocumentDetails = () => {
-    return selectedDocumentDetails;
+    // Don't clear uploaded documents when switching document types
+    // setUploadedDocuments([]);
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -213,15 +262,15 @@ const UploadDocuments = ({ route }) => {
 
       // If image is already less than 1MB, return as is
       if (fileSizeInMB < 1) {
-        console.log('Image is already under 1MB, no compression needed');
+        console.log("Image is already under 1MB, no compression needed");
         return imageUri;
       }
 
       // If image is larger than 5MB, show error
       if (fileSizeInMB > 5) {
         Alert.alert(
-          'File Too Large',
-          'Image size cannot exceed 5MB. Please select a smaller image.'
+          "File Too Large",
+          "Image size cannot exceed 5MB. Please select a smaller image."
         );
         return null;
       }
@@ -242,7 +291,7 @@ const UploadDocuments = ({ route }) => {
         imageUri,
         [
           // Resize if image is too large
-          { resize: { width: 1200 } } // Resize to max width of 1200px
+          { resize: { width: 1200 } }, // Resize to max width of 1200px
         ],
         {
           compress: compress,
@@ -252,15 +301,17 @@ const UploadDocuments = ({ route }) => {
       );
 
       // Check compressed file size
-      const compressedFileInfo = await FileSystem.getInfoAsync(compressedImage.uri);
+      const compressedFileInfo = await FileSystem.getInfoAsync(
+        compressedImage.uri
+      );
       const compressedSizeInMB = compressedFileInfo.size / (1024 * 1024);
 
       console.log(`Compressed image size: ${compressedSizeInMB.toFixed(2)} MB`);
 
       return compressedImage.uri;
     } catch (error) {
-      console.error('Error compressing image:', error);
-      Alert.alert('Error', 'Failed to compress image. Please try again.');
+      console.error("Error compressing image:", error);
+      Alert.alert("Error", "Failed to compress image. Please try again.");
       return null;
     }
   };
@@ -337,7 +388,8 @@ const UploadDocuments = ({ route }) => {
 
   // FIXED: Check if maximum documents reached based on document type
   const canAddMoreDocuments = () => {
-    if (selectedDocumentType === "O01") { // BILL
+    if (selectedDocumentType === "O01") {
+      // BILL
       // Count only bill-type documents
       const billDocuments = uploadedDocuments.filter(
         (doc) => doc.documentType === "O01"
@@ -355,8 +407,14 @@ const UploadDocuments = ({ route }) => {
     }
 
     // Add validation for bill amount
-    if (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
-      Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
+    if (
+      selectedDocumentType === "O01" &&
+      (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+    ) {
+      Alert.alert(
+        "Validation Error",
+        "Please enter a valid amount greater than 0 for Bill type"
+      );
       return;
     }
 
@@ -378,36 +436,25 @@ const UploadDocuments = ({ route }) => {
         const file = result.assets[0];
 
         let finalUri = file.uri;
-        let imgContent = null;
 
-        // If it's an image, compress it and convert to base64
-        if (file.mimeType && file.mimeType.startsWith('image/')) {
+        // If it's an image, compress it
+        if (file.mimeType && file.mimeType.startsWith("image/")) {
           const compressedUri = await compressImage(file.uri);
           if (!compressedUri) {
             return; // Compression failed or file too large
           }
           finalUri = compressedUri;
-
-          // Convert image to base64 for ImgContent
-          try {
-            imgContent = await FileSystem.readAsStringAsync(finalUri, {
-              encoding: FileSystem.EncodingType.Base64,
-            });
-          } catch (error) {
-            console.error('Error converting image to base64:', error);
-            Alert.alert("Error", "Failed to process image");
-            return;
-          }
         }
 
         // Get document type label for custom name
-        const docTypeLabel = documentTypes.find(type => type.id === selectedDocumentType)?.label || selectedDocumentType;
+        const docTypeLabel =
+          documentTypes.find((type) => type.id === selectedDocumentType)
+            ?.label || selectedDocumentType;
 
         // Generate custom name based on document type
         const fileExtension = file.name.split(".").pop();
         const customName = `${docTypeLabel}.${fileExtension}`;
 
-        // Create document object with required fields
         const newDocument = {
           id: Date.now(),
           name: customName,
@@ -417,18 +464,8 @@ const UploadDocuments = ({ route }) => {
           documentType: selectedDocumentType,
           amount: formatAmountForDisplay(amount),
           date: formatDate(documentDate),
-          // NEW REQUIRED FIELDS
-          ClmSeqNo: claimSequenceNo,
-          DocType: selectedDocumentType,
-          ImgName: file.name, // Original file name from gallery
-          ImgContent: imgContent, // Base64 content of image
-          DocDate: documentDate.toISOString().split('T')[0], // YYYY-MM-DD format
-          DocAmount: parseFloat(amount) || 0,
-          CreatedBy: createdBy
         };
-
         setUploadedDocuments((prev) => [...prev, newDocument]);
-        setClaimSequenceNo(prev => prev + 1); // Increment sequence number
 
         // Reset form after successful upload
         setSelectedDocumentType("");
@@ -443,7 +480,6 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
-
   const handleTakePhoto = async () => {
     // Add validation for document type
     if (!selectedDocumentType) {
@@ -452,8 +488,14 @@ const UploadDocuments = ({ route }) => {
     }
 
     // Add validation for bill amount
-    if (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
-      Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
+    if (
+      selectedDocumentType === "O01" &&
+      (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+    ) {
+      Alert.alert(
+        "Validation Error",
+        "Please enter a valid amount greater than 0 for Bill type"
+      );
       return;
     }
 
@@ -495,26 +537,14 @@ const UploadDocuments = ({ route }) => {
           return; // Compression failed or file too large
         }
 
-        // Convert image to base64 for ImgContent
-        let imgContent = null;
-        try {
-          imgContent = await FileSystem.readAsStringAsync(compressedUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-        } catch (error) {
-          console.error('Error converting image to base64:', error);
-          Alert.alert("Error", "Failed to process image");
-          return;
-        }
-
         // Get document type label for custom name
-        const docTypeLabel = documentTypes.find(type => type.id === selectedDocumentType)?.label || selectedDocumentType;
+        const docTypeLabel =
+          documentTypes.find((type) => type.id === selectedDocumentType)
+            ?.label || selectedDocumentType;
 
         // Generate custom name based on document type
         const customName = `${docTypeLabel}.jpg`;
-        const originalName = `photo_${Date.now()}.jpg`; // Generated name for camera photos
 
-        // Create document object with required fields
         const newDocument = {
           id: Date.now(),
           name: customName,
@@ -524,18 +554,8 @@ const UploadDocuments = ({ route }) => {
           documentType: selectedDocumentType,
           amount: formatAmountForDisplay(amount),
           date: formatDate(documentDate),
-          // NEW REQUIRED FIELDS
-          ClmSeqNo: claimSequenceNo,
-          DocType: selectedDocumentType,
-          ImgName: originalName, // Generated name for camera photos
-          ImgContent: imgContent, // Base64 content of image
-          DocDate: documentDate.toISOString().split('T')[0], // YYYY-MM-DD format
-          DocAmount: parseFloat(amount) || 0,
-          CreatedBy: createdBy
         };
-
         setUploadedDocuments((prev) => [...prev, newDocument]);
-        setClaimSequenceNo(prev => prev + 1); // Increment sequence number
 
         // Reset form after successful upload
         setSelectedDocumentType("");
@@ -548,28 +568,6 @@ const UploadDocuments = ({ route }) => {
       console.error("Error taking photo:", error);
       Alert.alert("Error", "Failed to take photo");
     }
-  };
-
-
-  const getDocumentDataArray = () => {
-    return uploadedDocuments.map(doc => {
-      console.log('ClmSeqNo:', doc.ClmSeqNo);
-      console.log('DocType:', doc.DocType);
-      console.log('ImgName:', doc.ImgName);
-      console.log('ImgContent:', doc.ImgContent);
-      console.log('DocDate:', doc.DocDate);
-      console.log('DocAmount:', doc.DocAmount);
-      console.log('CreatedBy:', doc.CreatedBy);
-      return {
-        ClmSeqNo: doc.ClmSeqNo,
-        DocType: doc.DocType,
-        ImgName: doc.ImgName,
-        ImgContent: doc.ImgContent,
-        DocDate: doc.DocDate,
-        DocAmount: doc.DocAmount,
-        CreatedBy: doc.CreatedBy
-      };
-    });
   };
 
   const handleRemoveDocument = (documentId) => {
@@ -653,13 +651,51 @@ const UploadDocuments = ({ route }) => {
     return true;
   };
 
+  const uploadDocumentToAPI = async (document) => {
+    try {
+      const formData = await createFormDataForDocument(document);
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/ClaimIntimationDoc/AddClaimDocument",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log("Document uploaded successfully:", result);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
       Alert.alert("Validation Error", "Please upload at least one document");
       return;
     }
 
-    const invalidDocuments = uploadedDocuments.filter(doc => {
+    // Validate stored values
+    if (!storedReferenceNo || !storedNic) {
+      Alert.alert(
+        "Error",
+        "Missing required information. Please ensure you have a valid reference number and user identification."
+      );
+      return;
+    }
+
+    const invalidDocuments = uploadedDocuments.filter((doc) => {
       if (!doc.documentType) {
         return true;
       }
@@ -682,23 +718,45 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    // Get the required data array
-    const documentDataArray = getDocumentDataArray();
-
-    // Create document info from uploaded documents
-    const documentInfo = {
-      patientData,
-      documents: uploadedDocuments,
-      selectedDocumentDetails: selectedDocumentDetails,
-      documentDataArray: documentDataArray, // Add the required array
-    };
-
-    console.log("Document submission data:", documentInfo);
-    console.log("Required Document Array:", documentDataArray);
+    // Show loading alert
+    Alert.alert("Uploading", "Please wait while we upload your documents...");
 
     try {
+      const uploadPromises = uploadedDocuments.map((doc) =>
+        uploadDocumentToAPI(doc)
+      );
+      const results = await Promise.all(uploadPromises);
+
+      // Check if all uploads were successful
+      const failedUploads = results.filter((result) => !result.success);
+
+      if (failedUploads.length > 0) {
+        Alert.alert(
+          "Upload Error",
+          `Failed to upload ${failedUploads.length} document(s). Please try again.`,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                console.error("Failed uploads:", failedUploads);
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      // All uploads successful
+      const documentInfo = {
+        patientData,
+        documents: uploadedDocuments,
+        uploadResults: results,
+      };
+
+      console.log("All documents uploaded successfully:", documentInfo);
+
       // Show success alert and navigate on OK
-      Alert.alert("Success", "Document submitted successfully!", [
+      Alert.alert("Success", "All documents uploaded successfully!", [
         {
           text: "OK",
           onPress: () => {
@@ -709,8 +767,11 @@ const UploadDocuments = ({ route }) => {
         },
       ]);
     } catch (error) {
-      console.error("Error submitting document:", error);
-      Alert.alert("Error", "Failed to submit document. Please try again.");
+      console.error("Error during document upload:", error);
+      Alert.alert(
+        "Error",
+        "An unexpected error occurred while uploading documents. Please try again."
+      );
     }
   };
 
@@ -770,13 +831,13 @@ const UploadDocuments = ({ route }) => {
 
   // Get document type label by ID
   const getDocumentTypeLabel = (docId) => {
-    const docType = documentTypes.find(type => type.id === docId);
+    const docType = documentTypes.find((type) => type.id === docId);
     return docType ? docType.label : docId;
   };
 
   if (loading) {
     return (
-      <LinearGradient colors={["#FAFAFA", "#6DD3D3"]} style={[styles.gradient]}>
+      <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={[styles.gradient]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading document types...</Text>
         </View>
@@ -785,7 +846,7 @@ const UploadDocuments = ({ route }) => {
   }
 
   return (
-    <LinearGradient colors={["#FAFAFA", "#6DD3D3"]} style={[styles.gradient]}>
+    <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={[styles.gradient]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
@@ -821,7 +882,7 @@ const UploadDocuments = ({ route }) => {
                 style={[
                   styles.documentTypeOption,
                   selectedDocumentType === type.id &&
-                  styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                 ]}
                 onPress={() => handleDocumentTypeSelect(type.id)}
               >
@@ -830,7 +891,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.radioButton,
                       selectedDocumentType === type.id &&
-                      styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                     ]}
                   >
                     {selectedDocumentType === type.id && (
@@ -841,7 +902,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.documentTypeText,
                       selectedDocumentType === type.id &&
-                      styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                     ]}
                   >
                     {type.label}
@@ -850,7 +911,6 @@ const UploadDocuments = ({ route }) => {
               </TouchableOpacity>
             ))}
           </View>
-
         </View>
 
         {/* Amount Input */}
@@ -865,7 +925,9 @@ const UploadDocuments = ({ route }) => {
             style={[
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
-              selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.textInputError,
+              selectedDocumentType === "O01" &&
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
             placeholderTextColor="#B0B0B0"
@@ -876,11 +938,18 @@ const UploadDocuments = ({ route }) => {
           />
           {selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
             <Text style={styles.helpText}>
-              Amount is automatically set to 0.00 for {getDocumentTypeLabel(selectedDocumentType)}
+              Amount is automatically set to 0.00 for{" "}
+              {getDocumentTypeLabel(selectedDocumentType)}
             </Text>
           ) : selectedDocumentType === "O01" ? (
-            <Text style={[styles.helpText, (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.errorText]}>
-              {(!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+            <Text
+              style={[
+                styles.helpText,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                  styles.errorText,
+              ]}
+            >
+              {!amount || amount.trim() === "" || parseFloat(amount) <= 0
                 ? "Amount is required and must be greater than 0 for Bill type"
                 : "Amount is required for Bill type"}
             </Text>
@@ -939,11 +1008,7 @@ const UploadDocuments = ({ route }) => {
                       {image.description}
                     </Text>
                     <View style={styles.expandIcon}>
-                      <Ionicons
-                        name="expand-outline"
-                        size={16}
-                        color="#fff"
-                      />
+                      <Ionicons name="expand-outline" size={16} color="#fff" />
                     </View>
                   </View>
                 </View>
@@ -989,19 +1054,30 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.uploadButton,
                         (!canAddMoreDocuments() ||
-                          (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          (selectedDocumentType === "O01" &&
+                            (!amount ||
+                              amount.trim() === "" ||
+                              parseFloat(amount) <= 0))) &&
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
-                      disabled={!canAddMoreDocuments() ||
-                        (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
+                      disabled={
+                        !canAddMoreDocuments() ||
+                        (selectedDocumentType === "O01" &&
+                          (!amount ||
+                            amount.trim() === "" ||
+                            parseFloat(amount) <= 0))
+                      }
                     >
                       <Text
                         style={[
                           styles.uploadButtonText,
                           (!canAddMoreDocuments() ||
-                            (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            (selectedDocumentType === "O01" &&
+                              (!amount ||
+                                amount.trim() === "" ||
+                                parseFloat(amount) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1012,19 +1088,30 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.uploadButton,
                         (!canAddMoreDocuments() ||
-                          (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          (selectedDocumentType === "O01" &&
+                            (!amount ||
+                              amount.trim() === "" ||
+                              parseFloat(amount) <= 0))) &&
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
-                      disabled={!canAddMoreDocuments() ||
-                        (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
+                      disabled={
+                        !canAddMoreDocuments() ||
+                        (selectedDocumentType === "O01" &&
+                          (!amount ||
+                            amount.trim() === "" ||
+                            parseFloat(amount) <= 0))
+                      }
                     >
                       <Text
                         style={[
                           styles.uploadButtonText,
                           (!canAddMoreDocuments() ||
-                            (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            (selectedDocumentType === "O01" &&
+                              (!amount ||
+                                amount.trim() === "" ||
+                                parseFloat(amount) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1046,8 +1133,13 @@ const UploadDocuments = ({ route }) => {
                 <View key={doc.id} style={styles.documentItem}>
                   {/* Show image thumbnail if it's an image */}
                   {doc.type?.startsWith("image/") && (
-                    <TouchableOpacity onPress={() => handleDocumentImagePress(doc)}>
-                      <Image source={{ uri: doc.uri }} style={styles.documentThumbnail} />
+                    <TouchableOpacity
+                      onPress={() => handleDocumentImagePress(doc)}
+                    >
+                      <Image
+                        source={{ uri: doc.uri }}
+                        style={styles.documentThumbnail}
+                      />
                     </TouchableOpacity>
                   )}
 
@@ -1055,7 +1147,9 @@ const UploadDocuments = ({ route }) => {
                     <Text style={styles.documentType}>
                       Type: {getDocumentTypeLabel(doc.documentType)}
                     </Text>
-                    <Text style={styles.documentAmount}>Rs {doc.amount || "0.00"}</Text>
+                    <Text style={styles.documentAmount}>
+                      Rs {doc.amount || "0.00"}
+                    </Text>
                     <Text style={styles.documentDate}>Date: {doc.date}</Text>
                   </View>
 
@@ -1070,7 +1164,6 @@ const UploadDocuments = ({ route }) => {
             </View>
           </View>
         )}
-
 
         {/* Add Document Button */}
         <TouchableOpacity
@@ -1142,7 +1235,7 @@ const UploadDocuments = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                    editDocumentType.slice(1)
+                      editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1159,9 +1252,7 @@ const UploadDocuments = ({ route }) => {
                     styles.editInput,
                     !isEditAmountEditable() && styles.editInputDisabled,
                   ]}
-                  placeholder={
-                    isEditAmountEditable() ? "Enter amount" : "0.00"
-                  }
+                  placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
                   placeholderTextColor="#B0B0B0"
                   value={editAmount}
                   onChangeText={handleEditAmountChange}
@@ -1169,7 +1260,7 @@ const UploadDocuments = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
+                editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
@@ -1226,7 +1317,7 @@ const styles = StyleSheet.create({
     minWidth: 34,
     minHeight: 34,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 18,

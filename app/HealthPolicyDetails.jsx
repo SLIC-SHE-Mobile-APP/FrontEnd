@@ -534,7 +534,7 @@ const HealthPolicyDetails = () => {
   }
 
   return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={styles.container}>
         {/* Fixed Header Section */}
         <View style={styles.headerContainer}>
           {/* Back Icon + Title */}
