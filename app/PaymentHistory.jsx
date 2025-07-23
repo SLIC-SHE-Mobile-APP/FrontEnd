@@ -94,9 +94,17 @@ const PaymentHistory = ({ onClose }) => {
           }))
         );
       } catch (err) {
-        console.error('Error fetching payment history:', err);
-        setApiError('Something went wrong. Please try again later.');
-        setPaymentData([]);
+        // Handle 404 specifically - treat as "no data found"
+        if (err.response && err.response.status === 404) {
+          // Don't log 404 errors as they are expected when no data exists
+          setApiError(null); // Don't show error, just show no data
+          setPaymentData([]);
+        } else {
+          // Only log non-404 errors
+          console.error('Error fetching payment history:', err);
+          setApiError('Something went wrong. Please try again later.');
+          setPaymentData([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -133,7 +141,7 @@ const PaymentHistory = ({ onClose }) => {
         ) : apiError ? (
           <Text style={styles.error}>{apiError}</Text>
         ) : paymentData.length === 0 ? (
-          <Text style={styles.empty}>No payment records found for the selected period.</Text>
+          <Text style={styles.empty}>No data found.</Text>
         ) : (
           paymentData.map((p, i) => (
             <View key={i} style={styles.paymentCard}>
