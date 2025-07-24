@@ -22,6 +22,7 @@ import {
 } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { Ionicons } from "@expo/vector-icons";
+import { API_BASE_URL } from '../constants/index.js';
 
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
@@ -253,7 +254,7 @@ function OTPVerificationContent() {
       });
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/LoginNicMnumber/ValidateOtp",
+        `${API_BASE_URL}/LoginNicMnumber/ValidateOtp`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -330,7 +331,7 @@ function OTPVerificationContent() {
       });
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/LoginNicMnumber/CheckAvailability",
+        `${API_BASE_URL}/LoginNicMnumber/CheckAvailability`,
         {
           method: "POST",
           headers: {

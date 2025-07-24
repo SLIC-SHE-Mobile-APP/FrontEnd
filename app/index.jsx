@@ -6,7 +6,7 @@ import LoginRequestOTP from './loginRequestOTP.jsx';
 
 export default function HomeScreen() {
   return (
-    <Home/>
+    <LoginRequestOTP/>
   );
 }
 

@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import * as ImageManipulator from "expo-image-manipulator";
-import * as FileSystem from "expo-file-system";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 
+import { API_BASE_URL } from '../constants/index.js';
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 const UploadDocumentsSaved = ({ route }) => {
@@ -77,7 +78,7 @@ const UploadDocumentsSaved = ({ route }) => {
         setLoading(true);
         // You can make this dynamic based on request type if needed
         const response = await fetch(
-          "http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor"
+          `${API_BASE_URL}/RequiredDocumentsCon/Outdoor`
         );
 
         if (!response.ok) {
@@ -672,7 +673,7 @@ const UploadDocumentsSaved = ({ route }) => {
       const formData = await createFormDataForDocument(document);
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/ClaimIntimationDoc/AddClaimDocument",
+        `${API_BASE_URL}/ClaimIntimationDoc/AddClaimDocument`,
         {
           method: "POST",
           body: formData,

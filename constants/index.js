@@ -1,1 +1,1 @@
-export const API_BASE_URL = 'http://203.115.11.229:1002/api';
+export const API_BASE_URL = 'https://shemobileapi.slicgeneral.com/api';
