@@ -12,6 +12,7 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { API_BASE_URL } from '../constants/index.js';
 
 const PaymentHistory = ({ onClose }) => {
   const {
@@ -26,7 +27,7 @@ const PaymentHistory = ({ onClose }) => {
   const [memberNo, setMemberNo] = useState('');
   const [apiError, setApiError] = useState(null);
 
-  // ✅ Format as DD-MMM-YY (e.g., 16-JUL-25)
+  // Format as DD-MMM-YY (e.g., 16-JUL-25)
   const formatForApi = (dateObj) => {
     const day = String(dateObj.getDate()).padStart(2, '0');
     const month = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][dateObj.getMonth()];
@@ -68,7 +69,7 @@ const PaymentHistory = ({ onClose }) => {
         setLoading(true);
         setApiError(null);
 
-        const url = 'http://203.115.11.229:1002/api/ClaimHistory/GetHistory';
+        const url = `${API_BASE_URL}/ClaimHistory/GetHistory`;
         const params = { policyNo, memberNo, fromDate, toDate };
 
         console.log('GET', url, params); // for debugging

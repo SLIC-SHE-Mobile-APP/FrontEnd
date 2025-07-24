@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -46,6 +46,9 @@ const UploadDocuments = ({ route }) => {
   const [editDocumentType, setEditDocumentType] = useState("");
   const [documentTypes, setDocumentTypes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [storedReferenceNo, setStoredReferenceNo] = useState("");
+  const [storedNic, setStoredNic] = useState("");
+  const [selectedDocId, setSelectedDocId] = useState("");
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -72,25 +75,30 @@ const UploadDocuments = ({ route }) => {
       try {
         setLoading(true);
         // You can make this dynamic based on request type if needed
-        const response = await fetch('http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor');
+        const response = await fetch(
+          "http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor"
+        );
 
         if (!response.ok) {
-          throw new Error('Failed to fetch document types');
+          throw new Error("Failed to fetch document types");
         }
 
         const data = await response.json();
 
         // Transform API response to match the expected format
-        const transformedDocumentTypes = data.map(doc => ({
+        const transformedDocumentTypes = data.map((doc) => ({
           id: doc.docId,
           label: doc.docDesc,
-          icon: getIconForDocType(doc.docDesc)
+          icon: getIconForDocType(doc.docDesc),
         }));
 
         setDocumentTypes(transformedDocumentTypes);
       } catch (error) {
-        console.error('Error fetching document types:', error);
-        Alert.alert('Error', 'Failed to load document types. Please try again.');
+        console.error("Error fetching document types:", error);
+        Alert.alert(
+          "Error",
+          "Failed to load document types. Please try again."
+        );
 
         // Fallback to hardcoded types if API fails
         setDocumentTypes([
@@ -107,29 +115,88 @@ const UploadDocuments = ({ route }) => {
     fetchDocumentTypes();
   }, []);
 
+  useEffect(() => {
+    const loadStoredValues = async () => {
+      try {
+        const referenceNo = await SecureStore.getItemAsync("edit_referenceNo");
+        const nic = await SecureStore.getItemAsync("user_nic");
+
+        setStoredReferenceNo(referenceNo || "");
+        setStoredNic(nic || "");
+
+        console.log("Loaded stored values:", { referenceNo, nic });
+      } catch (error) {
+        console.error("Error loading stored values:", error);
+      }
+    };
+
+    loadStoredValues();
+  }, []);
+
+  const formatDateForAPI = (date) => {
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits
+    return `${day}-${month}-${year}`;
+  };
+
+  const createFormDataForDocument = async (document) => {
+    const formData = new FormData();
+
+    // Add the image file
+    const fileUri = document.uri;
+    const fileName = document.name;
+    const fileType = document.type || "image/jpeg";
+
+    formData.append("ImgContent", {
+      uri: fileUri,
+      type: fileType,
+      name: fileName,
+    });
+
+    // Add other required fields
+    formData.append("ClmSeqNo", storedReferenceNo);
+    formData.append("DocType", document.documentType);
+    formData.append("ImgName", fileName);
+    formData.append(
+      "DocDate",
+      formatDateForAPI(new Date(document.date.split("/").reverse().join("-")))
+    );
+    formData.append("DocAmount", document.amount);
+    formData.append("CreatedBy", storedNic);
+
+    return formData;
+  };
+
   // Helper function to get appropriate icon for document type
   const getIconForDocType = (docDesc) => {
     switch (docDesc.toUpperCase()) {
-      case 'BILL':
-        return 'receipt-outline';
-      case 'PRESCRIPTION':
-        return 'medical-outline';
-      case 'DIAGNOSIS CARD':
-        return 'document-text-outline';
-      case 'OTHER':
-        return 'folder-outline';
+      case "BILL":
+        return "receipt-outline";
+      case "PRESCRIPTION":
+        return "medical-outline";
+      case "DIAGNOSIS CARD":
+        return "document-text-outline";
+      case "OTHER":
+        return "folder-outline";
       default:
-        return 'document-outline';
+        return "document-outline";
     }
   };
 
   const handleDocumentTypeSelect = (type) => {
     setSelectedDocumentType(type);
 
+    // Store the selected docId temporarily
+    setSelectedDocId(type);
+    console.log("Selected document type ID:", type);
+
     // Set amount based on document type
-    if (type === "O02" || type === "O03") { // PRESCRIPTION or DIAGNOSIS CARD
+    if (type === "O02" || type === "O03") {
+      // PRESCRIPTION or DIAGNOSIS CARD
       setAmount("0.00");
-    } else if (type === "O01") { // BILL
+    } else if (type === "O01") {
+      // BILL
       setAmount(""); // Clear amount for bill type so user can enter
     } else {
       setAmount(""); // Clear for other types
@@ -195,15 +262,15 @@ const UploadDocuments = ({ route }) => {
 
       // If image is already less than 1MB, return as is
       if (fileSizeInMB < 1) {
-        console.log('Image is already under 1MB, no compression needed');
+        console.log("Image is already under 1MB, no compression needed");
         return imageUri;
       }
 
       // If image is larger than 5MB, show error
       if (fileSizeInMB > 5) {
         Alert.alert(
-          'File Too Large',
-          'Image size cannot exceed 5MB. Please select a smaller image.'
+          "File Too Large",
+          "Image size cannot exceed 5MB. Please select a smaller image."
         );
         return null;
       }
@@ -224,7 +291,7 @@ const UploadDocuments = ({ route }) => {
         imageUri,
         [
           // Resize if image is too large
-          { resize: { width: 1200 } } // Resize to max width of 1200px
+          { resize: { width: 1200 } }, // Resize to max width of 1200px
         ],
         {
           compress: compress,
@@ -234,15 +301,17 @@ const UploadDocuments = ({ route }) => {
       );
 
       // Check compressed file size
-      const compressedFileInfo = await FileSystem.getInfoAsync(compressedImage.uri);
+      const compressedFileInfo = await FileSystem.getInfoAsync(
+        compressedImage.uri
+      );
       const compressedSizeInMB = compressedFileInfo.size / (1024 * 1024);
 
       console.log(`Compressed image size: ${compressedSizeInMB.toFixed(2)} MB`);
 
       return compressedImage.uri;
     } catch (error) {
-      console.error('Error compressing image:', error);
-      Alert.alert('Error', 'Failed to compress image. Please try again.');
+      console.error("Error compressing image:", error);
+      Alert.alert("Error", "Failed to compress image. Please try again.");
       return null;
     }
   };
@@ -319,7 +388,8 @@ const UploadDocuments = ({ route }) => {
 
   // FIXED: Check if maximum documents reached based on document type
   const canAddMoreDocuments = () => {
-    if (selectedDocumentType === "O01") { // BILL
+    if (selectedDocumentType === "O01") {
+      // BILL
       // Count only bill-type documents
       const billDocuments = uploadedDocuments.filter(
         (doc) => doc.documentType === "O01"
@@ -335,13 +405,19 @@ const UploadDocuments = ({ route }) => {
       Alert.alert("Validation Error", "Please select a document type first");
       return;
     }
-  
+
     // Add validation for bill amount
-    if (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
-      Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
+    if (
+      selectedDocumentType === "O01" &&
+      (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+    ) {
+      Alert.alert(
+        "Validation Error",
+        "Please enter a valid amount greater than 0 for Bill type"
+      );
       return;
     }
-  
+
     if (!canAddMoreDocuments()) {
       Alert.alert(
         "Document Limit",
@@ -349,36 +425,36 @@ const UploadDocuments = ({ route }) => {
       );
       return;
     }
-  
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/*", "application/pdf", "image/jpeg", "image/png"],
         copyToCacheDirectory: true,
       });
-  
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        
+
         let finalUri = file.uri;
-        
+
         // If it's an image, compress it
-        if (file.mimeType && file.mimeType.startsWith('image/')) {
-         
-          
+        if (file.mimeType && file.mimeType.startsWith("image/")) {
           const compressedUri = await compressImage(file.uri);
           if (!compressedUri) {
             return; // Compression failed or file too large
           }
           finalUri = compressedUri;
         }
-  
+
         // Get document type label for custom name
-        const docTypeLabel = documentTypes.find(type => type.id === selectedDocumentType)?.label || selectedDocumentType;
-  
+        const docTypeLabel =
+          documentTypes.find((type) => type.id === selectedDocumentType)
+            ?.label || selectedDocumentType;
+
         // Generate custom name based on document type
         const fileExtension = file.name.split(".").pop();
         const customName = `${docTypeLabel}.${fileExtension}`;
-  
+
         const newDocument = {
           id: Date.now(),
           name: customName,
@@ -390,12 +466,12 @@ const UploadDocuments = ({ route }) => {
           date: formatDate(documentDate),
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
-  
+
         // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
-  
+
         Alert.alert("Success", "Document uploaded successfully!");
       }
     } catch (error) {
@@ -410,13 +486,19 @@ const UploadDocuments = ({ route }) => {
       Alert.alert("Validation Error", "Please select a document type first");
       return;
     }
-  
+
     // Add validation for bill amount
-    if (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0)) {
-      Alert.alert("Validation Error", "Please enter a valid amount greater than 0 for Bill type");
+    if (
+      selectedDocumentType === "O01" &&
+      (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+    ) {
+      Alert.alert(
+        "Validation Error",
+        "Please enter a valid amount greater than 0 for Bill type"
+      );
       return;
     }
-  
+
     if (!canAddMoreDocuments()) {
       Alert.alert(
         "Document Limit",
@@ -424,7 +506,7 @@ const UploadDocuments = ({ route }) => {
       );
       return;
     }
-  
+
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
@@ -434,33 +516,35 @@ const UploadDocuments = ({ route }) => {
         );
         return;
       }
-  
+
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         quality: 0.8,
       });
-  
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const photo = result.assets[0];
-        
+
         Alert.alert(
           "Processing Image",
           "Please wait while we optimize your image..."
         );
-        
+
         // Compress the captured photo
         const compressedUri = await compressImage(photo.uri);
         if (!compressedUri) {
           return; // Compression failed or file too large
         }
-  
+
         // Get document type label for custom name
-        const docTypeLabel = documentTypes.find(type => type.id === selectedDocumentType)?.label || selectedDocumentType;
-  
+        const docTypeLabel =
+          documentTypes.find((type) => type.id === selectedDocumentType)
+            ?.label || selectedDocumentType;
+
         // Generate custom name based on document type
         const customName = `${docTypeLabel}.jpg`;
-  
+
         const newDocument = {
           id: Date.now(),
           name: customName,
@@ -472,12 +556,12 @@ const UploadDocuments = ({ route }) => {
           date: formatDate(documentDate),
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
-  
+
         // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
-        
+
         Alert.alert("Success", "Photo captured and uploaded successfully!");
       }
     } catch (error) {
@@ -567,13 +651,51 @@ const UploadDocuments = ({ route }) => {
     return true;
   };
 
+  const uploadDocumentToAPI = async (document) => {
+    try {
+      const formData = await createFormDataForDocument(document);
+
+      const response = await fetch(
+        "http://203.115.11.229:1002/api/ClaimIntimationDoc/AddClaimDocument",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log("Document uploaded successfully:", result);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
       Alert.alert("Validation Error", "Please upload at least one document");
       return;
     }
 
-    const invalidDocuments = uploadedDocuments.filter(doc => {
+    // Validate stored values
+    if (!storedReferenceNo || !storedNic) {
+      Alert.alert(
+        "Error",
+        "Missing required information. Please ensure you have a valid reference number and user identification."
+      );
+      return;
+    }
+
+    const invalidDocuments = uploadedDocuments.filter((doc) => {
       if (!doc.documentType) {
         return true;
       }
@@ -596,17 +718,45 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    // Create document info from uploaded documents
-    const documentInfo = {
-      patientData,
-      documents: uploadedDocuments,
-    };
-
-    console.log("Document submission data:", documentInfo);
+    // Show loading alert
+    Alert.alert("Uploading", "Please wait while we upload your documents...");
 
     try {
+      const uploadPromises = uploadedDocuments.map((doc) =>
+        uploadDocumentToAPI(doc)
+      );
+      const results = await Promise.all(uploadPromises);
+
+      // Check if all uploads were successful
+      const failedUploads = results.filter((result) => !result.success);
+
+      if (failedUploads.length > 0) {
+        Alert.alert(
+          "Upload Error",
+          `Failed to upload ${failedUploads.length} document(s). Please try again.`,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                console.error("Failed uploads:", failedUploads);
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      // All uploads successful
+      const documentInfo = {
+        patientData,
+        documents: uploadedDocuments,
+        uploadResults: results,
+      };
+
+      console.log("All documents uploaded successfully:", documentInfo);
+
       // Show success alert and navigate on OK
-      Alert.alert("Success", "Document submitted successfully!", [
+      Alert.alert("Success", "All documents uploaded successfully!", [
         {
           text: "OK",
           onPress: () => {
@@ -617,8 +767,11 @@ const UploadDocuments = ({ route }) => {
         },
       ]);
     } catch (error) {
-      console.error("Error submitting document:", error);
-      Alert.alert("Error", "Failed to submit document. Please try again.");
+      console.error("Error during document upload:", error);
+      Alert.alert(
+        "Error",
+        "An unexpected error occurred while uploading documents. Please try again."
+      );
     }
   };
 
@@ -678,434 +831,465 @@ const UploadDocuments = ({ route }) => {
 
   // Get document type label by ID
   const getDocumentTypeLabel = (docId) => {
-    const docType = documentTypes.find(type => type.id === docId);
+    const docType = documentTypes.find((type) => type.id === docId);
     return docType ? docType.label : docId;
   };
 
   if (loading) {
     return (
-        <LinearGradient colors={["#FAFAFA", "#6DD3D3"]} style={[styles.gradient]}>
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading document types...</Text>
-          </View>
-        </LinearGradient>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={[styles.gradient]}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading document types...</Text>
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-      <LinearGradient colors={["#FAFAFA", "#6DD3D3"]} style={[styles.gradient]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#13646D" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Upload Documents</Text>
-          <View style={styles.placeholder} />
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={[styles.gradient]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#13646D" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Upload Documents</Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Patient Info Display */}
+        {patientData.patientName && (
+          <View style={styles.patientInfoCard}>
+            <Text style={styles.patientInfoTitle}>Patient Information</Text>
+            <Text style={styles.patientName}>
+              Name: {patientData.patientName}
+            </Text>
+            {patientData.illness && (
+              <Text style={styles.patientIllness}>
+                Illness: {patientData.illness}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Document Type Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Document Type</Text>
+          <View style={styles.documentTypeContainer}>
+            {documentTypes.map((type) => (
+              <TouchableOpacity
+                key={type.id}
+                style={[
+                  styles.documentTypeOption,
+                  selectedDocumentType === type.id &&
+                    styles.documentTypeSelected,
+                ]}
+                onPress={() => handleDocumentTypeSelect(type.id)}
+              >
+                <View style={styles.radioContainer}>
+                  <View
+                    style={[
+                      styles.radioButton,
+                      selectedDocumentType === type.id &&
+                        styles.radioButtonSelected,
+                    ]}
+                  >
+                    {selectedDocumentType === type.id && (
+                      <View style={styles.radioButtonInner} />
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.documentTypeText,
+                      selectedDocumentType === type.id &&
+                        styles.documentTypeTextSelected,
+                    ]}
+                  >
+                    {type.label}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Patient Info Display */}
-          {patientData.patientName && (
-            <View style={styles.patientInfoCard}>
-              <Text style={styles.patientInfoTitle}>Patient Information</Text>
-              <Text style={styles.patientName}>
-                Name: {patientData.patientName}
-              </Text>
-              {patientData.illness && (
-                <Text style={styles.patientIllness}>
-                  Illness: {patientData.illness}
-                </Text>
-              )}
-            </View>
-          )}
-
-          {/* Document Type Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Document Type</Text>
-            <View style={styles.documentTypeContainer}>
-              {documentTypes.map((type) => (
-                <TouchableOpacity
-                  key={type.id}
-                  style={[
-                    styles.documentTypeOption,
-                    selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
-                  ]}
-                  onPress={() => handleDocumentTypeSelect(type.id)}
-                >
-                  <View style={styles.radioContainer}>
-                    <View
-                      style={[
-                        styles.radioButton,
-                        selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
-                      ]}
-                    >
-                      {selectedDocumentType === type.id && (
-                        <View style={styles.radioButtonInner} />
-                      )}
-                    </View>
-                    <Text
-                      style={[
-                        styles.documentTypeText,
-                        selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
-                      ]}
-                    >
-                      {type.label}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Amount Input */}
-          <View style={styles.section}>
-            <Text style={styles.inputLabel}>
-              Amount{" "}
-              {selectedDocumentType === "O01" && (
-                <Text style={styles.requiredAsterisk}>*</Text>
-              )}
-            </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                !isAmountEditable() && styles.textInputDisabled,
-                selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.textInputError,
-              ]}
-              placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
-              placeholderTextColor="#B0B0B0"
-              value={amount}
-              onChangeText={handleAmountChange}
-              keyboardType="decimal-pad"
-              editable={isAmountEditable()}
-            />
-            {selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
-              <Text style={styles.helpText}>
-                Amount is automatically set to 0.00 for {getDocumentTypeLabel(selectedDocumentType)}
-              </Text>
-            ) : selectedDocumentType === "O01" ? (
-              <Text style={[styles.helpText, (!amount || amount.trim() === "" || parseFloat(amount) <= 0) && styles.errorText]}>
-                {(!amount || amount.trim() === "" || parseFloat(amount) <= 0)
-                  ? "Amount is required and must be greater than 0 for Bill type"
-                  : "Amount is required for Bill type"}
-              </Text>
-            ) : null}
-          </View>
-
-          {/* Document Date Input */}
-          <View style={styles.section}>
-            <Text style={styles.inputLabel}>Document Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={showDatePickerModal}
-            >
-              <Text style={styles.datePickerText}>
-                {formatDate(documentDate)}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#00C4CC" />
-            </TouchableOpacity>
-
-            {showDatePicker && (
-              <DateTimePicker
-                testID="dateTimePicker"
-                value={documentDate}
-                mode="date"
-                is24Hour={true}
-                display="default"
-                onChange={handleDateChange}
-                maximumDate={new Date()} // Prevent future dates
-              />
+        {/* Amount Input */}
+        <View style={styles.section}>
+          <Text style={styles.inputLabel}>
+            Amount{" "}
+            {selectedDocumentType === "O01" && (
+              <Text style={styles.requiredAsterisk}>*</Text>
             )}
-          </View>
-
-          {/* Sample Images Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Sample Images</Text>
-            <Text style={styles.sectionSubtitle}>
-              Any document without "Submitted to SLICGL on [Date],[Policy
-              No],[MemberID]" will be rejected by SLICGL
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              !isAmountEditable() && styles.textInputDisabled,
+              selectedDocumentType === "O01" &&
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
+            ]}
+            placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
+            placeholderTextColor="#B0B0B0"
+            value={amount}
+            onChangeText={handleAmountChange}
+            keyboardType="decimal-pad"
+            editable={isAmountEditable()}
+          />
+          {selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
+            <Text style={styles.helpText}>
+              Amount is automatically set to 0.00 for{" "}
+              {getDocumentTypeLabel(selectedDocumentType)}
             </Text>
-            <View style={styles.sampleImagesContainer}>
-              {sampleImages.map((image) => (
-                <TouchableOpacity
-                  key={image.id}
-                  style={styles.sampleImageCard}
-                  onPress={() => handleImagePress(image)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.sampleImageWrapper}>
-                    <Image
-                      source={image.source}
-                      style={styles.sampleImage}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.sampleImageOverlay}>
-                      <Text style={styles.sampleImageDescription}>
-                        {image.description}
-                      </Text>
-                      <View style={styles.expandIcon}>
-                        <Ionicons
-                          name="expand-outline"
-                          size={16}
-                          color="#fff"
-                        />
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          ) : selectedDocumentType === "O01" ? (
+            <Text
+              style={[
+                styles.helpText,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                  styles.errorText,
+              ]}
+            >
+              {!amount || amount.trim() === "" || parseFloat(amount) <= 0
+                ? "Amount is required and must be greater than 0 for Bill type"
+                : "Amount is required for Bill type"}
+            </Text>
+          ) : null}
+        </View>
 
-          {/* Document Upload Section */}
-          <View style={styles.section}>
-            {selectedDocumentType && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Document</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Allowed formats: JPG, JPEG, TIFF, PNG
-                </Text>
+        {/* Document Date Input */}
+        <View style={styles.section}>
+          <Text style={styles.inputLabel}>Document Date</Text>
+          <TouchableOpacity
+            style={styles.datePickerButton}
+            onPress={showDatePickerModal}
+          >
+            <Text style={styles.datePickerText}>
+              {formatDate(documentDate)}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#00C4CC" />
+          </TouchableOpacity>
 
-                {/* Upload instruction based on document type */}
-                <Text
-                  style={[
-                    styles.sectionSubtitle,
-                    selectedDocumentType === "O01"
-                      ? styles.limitWarning
-                      : styles.limitInfo,
-                  ]}
-                >
-                  {getUploadInstructionText()}
-                </Text>
+          {showDatePicker && (
+            <DateTimePicker
+              testID="dateTimePicker"
+              value={documentDate}
+              mode="date"
+              is24Hour={true}
+              display="default"
+              onChange={handleDateChange}
+              maximumDate={new Date()} // Prevent future dates
+            />
+          )}
+        </View>
 
-                <View style={styles.uploadContainer}>
-                  <View style={styles.uploadArea}>
-                    <Ionicons
-                      name="cloud-upload-outline"
-                      size={40}
-                      color="#00C4CC"
-                    />
-                    <Text style={styles.uploadText}>
-                      Upload your documents here
+        {/* Sample Images Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sample Images</Text>
+          <Text style={styles.sectionSubtitle}>
+            Any document without "Submitted to SLICGL on [Date],[Policy
+            No],[MemberID]" will be rejected by SLICGL
+          </Text>
+          <View style={styles.sampleImagesContainer}>
+            {sampleImages.map((image) => (
+              <TouchableOpacity
+                key={image.id}
+                style={styles.sampleImageCard}
+                onPress={() => handleImagePress(image)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.sampleImageWrapper}>
+                  <Image
+                    source={image.source}
+                    style={styles.sampleImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.sampleImageOverlay}>
+                    <Text style={styles.sampleImageDescription}>
+                      {image.description}
                     </Text>
-
-                    <View style={styles.uploadButtons}>
-                      <TouchableOpacity
-                        style={[
-                          styles.uploadButton,
-                          (!canAddMoreDocuments() ||
-                            (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
-                        ]}
-                        onPress={handleBrowseFiles}
-                        disabled={!canAddMoreDocuments() ||
-                          (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
-                      >
-                        <Text
-                          style={[
-                            styles.uploadButtonText,
-                            (!canAddMoreDocuments() ||
-                              (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
-                          ]}
-                        >
-                          Browse files
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.uploadButton,
-                          (!canAddMoreDocuments() ||
-                            (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
-                        ]}
-                        onPress={handleTakePhoto}
-                        disabled={!canAddMoreDocuments() ||
-                          (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))}
-                      >
-                        <Text
-                          style={[
-                            styles.uploadButtonText,
-                            (!canAddMoreDocuments() ||
-                              (selectedDocumentType === "O01" && (!amount || amount.trim() === "" || parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
-                          ]}
-                        >
-                          Take Photo
-                        </Text>
-                      </TouchableOpacity>
+                    <View style={styles.expandIcon}>
+                      <Ionicons name="expand-outline" size={16} color="#fff" />
                     </View>
                   </View>
                 </View>
-              </View>
-            )}
+              </TouchableOpacity>
+            ))}
           </View>
+        </View>
 
-          {/* Uploaded Documents List - Show after document type selection */}
-          {uploadedDocuments.length > 0 && (
+        {/* Document Upload Section */}
+        <View style={styles.section}>
+          {selectedDocumentType && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Uploaded Documents</Text>
-              <View style={styles.uploadedDocuments}>
-                {uploadedDocuments.map((doc) => (
-                  <View key={doc.id} style={styles.documentItem}>
-                    {/* Show image thumbnail if it's an image */}
-                    {doc.type?.startsWith("image/") && (
-                      <TouchableOpacity onPress={() => handleDocumentImagePress(doc)}>
-                        <Image source={{ uri: doc.uri }} style={styles.documentThumbnail} />
-                      </TouchableOpacity>
-                    )}
+              <Text style={styles.sectionTitle}>Document</Text>
+              <Text style={styles.sectionSubtitle}>
+                Allowed formats: JPG, JPEG, TIFF, PNG
+              </Text>
 
-                    <View style={styles.documentInfo}>
-                      <Text style={styles.documentType}>
-                        Type: {getDocumentTypeLabel(doc.documentType)}
+              {/* Upload instruction based on document type */}
+              <Text
+                style={[
+                  styles.sectionSubtitle,
+                  selectedDocumentType === "O01"
+                    ? styles.limitWarning
+                    : styles.limitInfo,
+                ]}
+              >
+                {getUploadInstructionText()}
+              </Text>
+
+              <View style={styles.uploadContainer}>
+                <View style={styles.uploadArea}>
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={40}
+                    color="#00C4CC"
+                  />
+                  <Text style={styles.uploadText}>
+                    Upload your documents here
+                  </Text>
+
+                  <View style={styles.uploadButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadButton,
+                        (!canAddMoreDocuments() ||
+                          (selectedDocumentType === "O01" &&
+                            (!amount ||
+                              amount.trim() === "" ||
+                              parseFloat(amount) <= 0))) &&
+                          styles.uploadButtonDisabled,
+                      ]}
+                      onPress={handleBrowseFiles}
+                      disabled={
+                        !canAddMoreDocuments() ||
+                        (selectedDocumentType === "O01" &&
+                          (!amount ||
+                            amount.trim() === "" ||
+                            parseFloat(amount) <= 0))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.uploadButtonText,
+                          (!canAddMoreDocuments() ||
+                            (selectedDocumentType === "O01" &&
+                              (!amount ||
+                                amount.trim() === "" ||
+                                parseFloat(amount) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
+                        ]}
+                      >
+                        Browse files
                       </Text>
-                      <Text style={styles.documentAmount}>Rs {doc.amount || "0.00"}</Text>
-                      <Text style={styles.documentDate}>Date: {doc.date}</Text>
-                    </View>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => handleRemoveDocument(doc.id)}
-                      style={styles.deleteButton}
+                      style={[
+                        styles.uploadButton,
+                        (!canAddMoreDocuments() ||
+                          (selectedDocumentType === "O01" &&
+                            (!amount ||
+                              amount.trim() === "" ||
+                              parseFloat(amount) <= 0))) &&
+                          styles.uploadButtonDisabled,
+                      ]}
+                      onPress={handleTakePhoto}
+                      disabled={
+                        !canAddMoreDocuments() ||
+                        (selectedDocumentType === "O01" &&
+                          (!amount ||
+                            amount.trim() === "" ||
+                            parseFloat(amount) <= 0))
+                      }
                     >
-                      <Ionicons name="trash-outline" size={28} color="#FF6B6B" />
+                      <Text
+                        style={[
+                          styles.uploadButtonText,
+                          (!canAddMoreDocuments() ||
+                            (selectedDocumentType === "O01" &&
+                              (!amount ||
+                                amount.trim() === "" ||
+                                parseFloat(amount) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
+                        ]}
+                      >
+                        Take Photo
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                ))}
+                </View>
               </View>
             </View>
           )}
+        </View>
 
+        {/* Uploaded Documents List - Show after document type selection */}
+        {uploadedDocuments.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Uploaded Documents</Text>
+            <View style={styles.uploadedDocuments}>
+              {uploadedDocuments.map((doc) => (
+                <View key={doc.id} style={styles.documentItem}>
+                  {/* Show image thumbnail if it's an image */}
+                  {doc.type?.startsWith("image/") && (
+                    <TouchableOpacity
+                      onPress={() => handleDocumentImagePress(doc)}
+                    >
+                      <Image
+                        source={{ uri: doc.uri }}
+                        style={styles.documentThumbnail}
+                      />
+                    </TouchableOpacity>
+                  )}
 
-          {/* Add Document Button */}
-          <TouchableOpacity
-            style={styles.addDocumentButton}
-            onPress={handleAddDocument}
-          >
-            <Text style={styles.addDocumentButtonText}>Add Document</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* Image Popup Modal */}
-        <Modal
-          visible={showImagePopup}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={closeImagePopup}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.modalCloseArea}
-              onPress={closeImagePopup}
-              activeOpacity={1}
-            >
-              <View style={styles.modalContent}>
-                {selectedImage && (
-                  <>
-                    <Image
-                      source={selectedImage.source}
-                      style={styles.modalImage}
-                      resizeMode="contain"
-                    />
-                    <View style={styles.modalImageInfo}>
-                      <Text style={styles.modalImageTitle}>
-                        {selectedImage.description}
-                      </Text>
-                      <Text style={styles.modalImageSubtitle}>
-                        Tap outside to close
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-
-        {/* Edit Document Modal */}
-        <Modal
-          visible={showEditModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowEditModal(false)}
-        >
-          <View style={styles.editModalOverlay}>
-            <View style={styles.editModalContent}>
-              <View style={styles.editModalHeader}>
-                <Text style={styles.editModalTitle}>Edit Document Details</Text>
-                <TouchableOpacity
-                  onPress={() => setShowEditModal(false)}
-                  style={styles.editModalCloseButton}
-                >
-                  <Ionicons name="close" size={24} color="#666" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.editModalBody}>
-                <View style={styles.editSection}>
-                  <Text style={styles.editLabel}>Document Type</Text>
-                  <Text style={styles.editValue}>
-                    {editDocumentType
-                      ? editDocumentType.charAt(0).toUpperCase() +
-                      editDocumentType.slice(1)
-                      : "Unknown"}
-                  </Text>
-                </View>
-
-                <View style={styles.editSection}>
-                  <Text style={styles.editLabel}>
-                    Amount{" "}
-                    {editDocumentType === "bill" && (
-                      <Text style={styles.requiredAsterisk}>*</Text>
-                    )}
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.editInput,
-                      !isEditAmountEditable() && styles.editInputDisabled,
-                    ]}
-                    placeholder={
-                      isEditAmountEditable() ? "Enter amount" : "0.00"
-                    }
-                    placeholderTextColor="#B0B0B0"
-                    value={editAmount}
-                    onChangeText={handleEditAmountChange}
-                    keyboardType="decimal-pad"
-                    editable={isEditAmountEditable()}
-                  />
-                  {editDocumentType === "prescription" ||
-                    editDocumentType === "diagnosis" ? (
-                    <Text style={styles.editHelpText}>
-                      Amount is automatically set to 0.00 for {editDocumentType}
+                  <View style={styles.documentInfo}>
+                    <Text style={styles.documentType}>
+                      Type: {getDocumentTypeLabel(doc.documentType)}
                     </Text>
-                  ) : editDocumentType === "bill" ? (
-                    <Text style={styles.editHelpText}>
-                      Amount is required for Bill type
+                    <Text style={styles.documentAmount}>
+                      Rs {doc.amount || "0.00"}
                     </Text>
-                  ) : null}
-                </View>
-              </View>
+                    <Text style={styles.documentDate}>Date: {doc.date}</Text>
+                  </View>
 
-              <View style={styles.editModalFooter}>
-                <TouchableOpacity
-                  style={styles.editCancelButton}
-                  onPress={() => setShowEditModal(false)}
-                >
-                  <Text style={styles.editCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.editSaveButton}
-                  onPress={handleSaveEdit}
-                >
-                  <Text style={styles.editSaveButtonText}>Save Changes</Text>
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveDocument(doc.id)}
+                    style={styles.deleteButton}
+                  >
+                    <Ionicons name="trash-outline" size={28} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           </View>
-        </Modal>
-      </LinearGradient>
+        )}
+
+        {/* Add Document Button */}
+        <TouchableOpacity
+          style={styles.addDocumentButton}
+          onPress={handleAddDocument}
+        >
+          <Text style={styles.addDocumentButtonText}>Add Document</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Image Popup Modal */}
+      <Modal
+        visible={showImagePopup}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeImagePopup}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalCloseArea}
+            onPress={closeImagePopup}
+            activeOpacity={1}
+          >
+            <View style={styles.modalContent}>
+              {selectedImage && (
+                <>
+                  <Image
+                    source={selectedImage.source}
+                    style={styles.modalImage}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.modalImageInfo}>
+                    <Text style={styles.modalImageTitle}>
+                      {selectedImage.description}
+                    </Text>
+                    <Text style={styles.modalImageSubtitle}>
+                      Tap outside to close
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Edit Document Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={styles.editModalContent}>
+            <View style={styles.editModalHeader}>
+              <Text style={styles.editModalTitle}>Edit Document Details</Text>
+              <TouchableOpacity
+                onPress={() => setShowEditModal(false)}
+                style={styles.editModalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.editModalBody}>
+              <View style={styles.editSection}>
+                <Text style={styles.editLabel}>Document Type</Text>
+                <Text style={styles.editValue}>
+                  {editDocumentType
+                    ? editDocumentType.charAt(0).toUpperCase() +
+                      editDocumentType.slice(1)
+                    : "Unknown"}
+                </Text>
+              </View>
+
+              <View style={styles.editSection}>
+                <Text style={styles.editLabel}>
+                  Amount{" "}
+                  {editDocumentType === "bill" && (
+                    <Text style={styles.requiredAsterisk}>*</Text>
+                  )}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.editInput,
+                    !isEditAmountEditable() && styles.editInputDisabled,
+                  ]}
+                  placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                  placeholderTextColor="#B0B0B0"
+                  value={editAmount}
+                  onChangeText={handleEditAmountChange}
+                  keyboardType="decimal-pad"
+                  editable={isEditAmountEditable()}
+                />
+                {editDocumentType === "prescription" ||
+                editDocumentType === "diagnosis" ? (
+                  <Text style={styles.editHelpText}>
+                    Amount is automatically set to 0.00 for {editDocumentType}
+                  </Text>
+                ) : editDocumentType === "bill" ? (
+                  <Text style={styles.editHelpText}>
+                    Amount is required for Bill type
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.editModalFooter}>
+              <TouchableOpacity
+                style={styles.editCancelButton}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.editCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editSaveButton}
+                onPress={handleSaveEdit}
+              >
+                <Text style={styles.editSaveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </LinearGradient>
   );
 };
 
@@ -1123,7 +1307,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    marginTop:20,
+    marginTop: 20,
     paddingTop: 20,
     paddingBottom: 20,
   },

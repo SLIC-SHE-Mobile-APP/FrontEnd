@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { API_BASE_URL } from '../constants/index.js';
 
 const HealthInsuCard = ({ onClose }) => {
   const [memberData, setMemberData] = useState(null);
@@ -61,7 +62,7 @@ const HealthInsuCard = ({ onClose }) => {
 
       // Fetch employee info from API
       const memberResponse = await fetch(
-        `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNum}&memberNo=${memberNum}`
+        `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNum}&memberNo=${memberNum}`,
       );
 
       if (!memberResponse.ok) {
@@ -73,7 +74,7 @@ const HealthInsuCard = ({ onClose }) => {
 
       // Fetch policy info from API
       const policyResponse = await fetch(
-        `http://203.115.11.229:1002/api/PolicyInfo/GetPolicyInfo?policyNo=${policyNum}`
+        `${API_BASE_URL}/PolicyInfo/GetPolicyInfo?policyNo=${policyNum}`,
       );
 
       if (!policyResponse.ok) {
@@ -86,7 +87,7 @@ const HealthInsuCard = ({ onClose }) => {
 
       // Fetch dependents from API
       const dependentsResponse = await fetch(
-        `http://203.115.11.229:1002/api/Dependents/WithoutEmployee?policyNo=${policyNum}&memberNo=${memberNum}`
+        `${API_BASE_URL}/Dependents/WithoutEmployee?policyNo=${policyNum}&memberNo=${memberNum}`,
       );
 
       if (!dependentsResponse.ok) {
@@ -274,7 +275,7 @@ const HealthInsuCard = ({ onClose }) => {
               <View style={styles.hotlineColumn}>
                 <TouchableOpacity
                   style={styles.hotlineButton}
-                  onPress={() => makePhoneCall("0114357357")}
+                  onPress={() => makePhoneCall("0112357357")}
                 >
                   <Ionicons
                     name="call"
@@ -282,7 +283,7 @@ const HealthInsuCard = ({ onClose }) => {
                     color="#2E5A87"
                     style={styles.callIcon}
                   />
-                  <Text style={styles.hotline}>0114357357</Text>
+                  <Text style={styles.hotline}>0112357357</Text>
                 </TouchableOpacity>
               </View>
             </View>

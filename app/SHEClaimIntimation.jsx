@@ -301,7 +301,7 @@ const SHEClaimIntimation = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E8F7F8',
+    backgroundColor: '#E8F7F8', 
   },
   header: {
     marginTop:20,

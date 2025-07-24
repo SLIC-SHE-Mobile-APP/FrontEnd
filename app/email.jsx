@@ -21,6 +21,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { API_BASE_URL } from '../constants/index.js';
 
 function EmailVerificationContent() {
   const [email, setEmail] = useState("");
@@ -88,7 +89,7 @@ function EmailVerificationContent() {
   }, []);
 
   const makePhoneCall = () => {
-    Linking.openURL("tel:0112252596").catch((err) => {
+    Linking.openURL("tel:0112357357").catch((err) => {
       console.error("Phone call error:", err);
     });
   };
@@ -129,7 +130,7 @@ function EmailVerificationContent() {
       });
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/LoginPageEmail/Submit",
+        `${API_BASE_URL}/LoginPageEmail/Submit`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -176,7 +177,7 @@ function EmailVerificationContent() {
       console.log("Calling skip API with:", { nic: nicNumber, mobileNumber });
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/LoginPageEmail/Skip",
+       `${API_BASE_URL}/LoginPageEmail/Skip`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -310,7 +311,7 @@ function EmailVerificationContent() {
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>Contact Us 011 - 2252596</Text>
+                <Text style={styles.contactText}>Contact Us 011 - 2357357</Text>
               </TouchableOpacity>
             </View>
           </View>

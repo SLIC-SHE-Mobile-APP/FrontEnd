@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { API_BASE_URL } from '../constants/index.js';
 
 const AddPatientDetails = ({ onClose }) => {
   const router = useRouter();
@@ -70,7 +71,7 @@ const AddPatientDetails = ({ onClose }) => {
 
     const fetchMembers = async () => {
       try {
-        const url = `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${encodeURIComponent(policyNo)}&memberNo=${encodeURIComponent(memberNo)}`;
+        const url = `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${encodeURIComponent(policyNo)}&memberNo=${encodeURIComponent(memberNo)}`;
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error(`Server responded ${res.status}`);
         const data = await res.json();

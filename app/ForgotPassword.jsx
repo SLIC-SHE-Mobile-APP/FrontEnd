@@ -1,30 +1,29 @@
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Keyboard,
+  Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Alert,
-  KeyboardAvoidingView,
-  ScrollView,
-  Image,
-  Animated,
-  Keyboard,
-  ActivityIndicator,
-  Linking
+  View
 } from 'react-native';
-import { router } from 'expo-router';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 function ForgotPasswordContent() {
-  const [contactMethod, setContactMethod] = useState('email'); // 'email' or 'phone'
+  const [contactMethod, setContactMethod] = useState('email'); 
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -90,7 +89,7 @@ function ForgotPasswordContent() {
   };
 
   const makePhoneCall = () => {
-    Linking.openURL("tel:0112252596").catch((err) => {
+    Linking.openURL("tel:0112357357").catch((err) => {
       console.error("Phone call error:", err);
     });
   };
@@ -307,7 +306,7 @@ function ForgotPasswordContent() {
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>Contact Us 0112 - 252596</Text>
+                <Text style={styles.contactText}>Contact Us 0112 - 357357</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -520,7 +519,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     paddingVertical: 16,
     alignItems: "center",
-    marginVertical: 10,
+    marginVertical: 6,
     shadowColor: "#4ECDC4",
     shadowOffset: {
       width: 0,
@@ -544,7 +543,7 @@ const styles = StyleSheet.create({
   },
   backContainer: {
     alignItems: "center",
-    marginVertical: 15,
+    marginVertical: 5,
   },
   backText: {
     fontSize: 16,
@@ -553,7 +552,7 @@ const styles = StyleSheet.create({
   },
   footerContainer: {
     alignItems: "center",
-    marginTop: 30,
+    marginTop: 12,
   },
   troubleText: {
     fontSize: 14,

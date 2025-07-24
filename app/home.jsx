@@ -23,6 +23,7 @@ import ClaimTypeSelection from "./AddPatientDetails.jsx";
 import ClaimHistory from "./ClaimHistory";
 import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";
+import { API_BASE_URL } from '../constants/index.js';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -113,7 +114,7 @@ export default function PolicyHome() {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
+        `${API_BASE_URL}/PolicyInfo/GetPolicyInfo?policyNo=${policyNumber}`,
         {
           method: "GET",
           headers: {
@@ -160,7 +161,7 @@ export default function PolicyHome() {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
         {
           method: "GET",
           headers: {
@@ -225,7 +226,7 @@ export default function PolicyHome() {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/Dependents/WithoutEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        `${API_BASE_URL}/Dependents/WithoutEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
         {
           method: "GET",
           headers: {
@@ -273,7 +274,7 @@ export default function PolicyHome() {
       });
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNumber}&memberNo=${memberNumber}`,
         {
           method: "GET",
           headers: {
@@ -381,7 +382,7 @@ export default function PolicyHome() {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/HomePagePoliciesLoad/GetPoliciesByNic?nicNumber=${nicNumber}`,
+        `${API_BASE_URL}/HomePagePoliciesLoad/GetPoliciesByNic?nicNumber=${nicNumber}`,
         {
           method: "POST",
           headers: {
@@ -599,7 +600,7 @@ export default function PolicyHome() {
       }
 
       const response = await fetch(
-        `http://203.115.11.229:1002/api/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
         {
           method: "GET",
           headers: {
@@ -646,7 +647,7 @@ export default function PolicyHome() {
             try {
               // Call the API to delete the policy
               const response = await fetch(
-                "http://203.115.11.229:1002/api/DeletePoliciesHome/RemovePolicy",
+                `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
                 {
                   method: "POST",
                   headers: {
@@ -982,7 +983,7 @@ export default function PolicyHome() {
 
   return (
     // <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
             <View style={styles.logoRow}>
