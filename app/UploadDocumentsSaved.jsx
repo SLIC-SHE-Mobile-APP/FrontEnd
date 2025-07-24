@@ -49,6 +49,7 @@ const UploadDocumentsSaved = ({ route }) => {
   const [storedReferenceNo, setStoredReferenceNo] = useState("");
   const [storedNic, setStoredNic] = useState("");
   const [selectedDocId, setSelectedDocId] = useState("");
+  const [storedDocAmount, setStoredDocAmount] = useState(0);
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -115,16 +116,29 @@ const UploadDocumentsSaved = ({ route }) => {
     fetchDocumentTypes();
   }, []);
 
+  // In the useEffect where you load stored values, update it to:
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
         const referenceNo = await SecureStore.getItemAsync("referenNo");
         const nic = await SecureStore.getItemAsync("user_nic");
+        const docamount = await SecureStore.getItemAsync(
+          "edit_beneficiary_amount"
+        );
 
         setStoredReferenceNo(referenceNo || "");
         setStoredNic(nic || "");
 
-        console.log("Loaded stored values:", { referenceNo, nic });
+        // Parse docamount and store it in a new state variable
+        const parsedDocAmount = parseFloat(docamount) || 0;
+        setStoredDocAmount(parsedDocAmount); // Add this new state variable
+
+        console.log("Loaded stored values:", {
+          referenceNo,
+          nic,
+          docamount,
+          parsedDocAmount,
+        });
       } catch (error) {
         console.error("Error loading stored values:", error);
       }
@@ -185,25 +199,27 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const handleDocumentTypeSelect = (type) => {
-    setSelectedDocumentType(type);
+    // Prevent selection of O01 (BILL) if docamount > 0
+    if (type === "O01" && storedDocAmount > 0) {
+      Alert.alert(
+        "Document Type Unavailable",
+        "Bill type is not available when there is an existing document amount."
+      );
+      return;
+    }
 
-    // Store the selected docId temporarily
+    setSelectedDocumentType(type);
     setSelectedDocId(type);
     console.log("Selected document type ID:", type);
 
     // Set amount based on document type
     if (type === "O02" || type === "O03") {
-      // PRESCRIPTION or DIAGNOSIS CARD
       setAmount("0.00");
     } else if (type === "O01") {
-      // BILL
-      setAmount(""); // Clear amount for bill type so user can enter
+      setAmount("");
     } else {
-      setAmount(""); // Clear for other types
+      setAmount("");
     }
-
-    // Don't clear uploaded documents when switching document types
-    // setUploadedDocuments([]);
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -876,40 +892,48 @@ const UploadDocumentsSaved = ({ route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Document Type</Text>
           <View style={styles.documentTypeContainer}>
-            {documentTypes.map((type) => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.documentTypeOption,
-                  selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
-                ]}
-                onPress={() => handleDocumentTypeSelect(type.id)}
-              >
-                <View style={styles.radioContainer}>
-                  <View
-                    style={[
-                      styles.radioButton,
-                      selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
-                    ]}
-                  >
-                    {selectedDocumentType === type.id && (
-                      <View style={styles.radioButtonInner} />
-                    )}
+            {documentTypes.map((type) => {
+              const isDisabled = type.id === "O01" && storedDocAmount > 0;
+
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.documentTypeOption,
+                    selectedDocumentType === type.id &&
+                      styles.documentTypeSelected,
+                    isDisabled && styles.documentTypeDisabled, // Add this style
+                  ]}
+                  onPress={() => handleDocumentTypeSelect(type.id)}
+                  disabled={isDisabled}
+                >
+                  <View style={styles.radioContainer}>
+                    <View
+                      style={[
+                        styles.radioButton,
+                        selectedDocumentType === type.id &&
+                          styles.radioButtonSelected,
+                        isDisabled && styles.radioButtonDisabled, // Add this style
+                      ]}
+                    >
+                      {selectedDocumentType === type.id && (
+                        <View style={styles.radioButtonInner} />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.documentTypeText,
+                        selectedDocumentType === type.id &&
+                          styles.documentTypeTextSelected,
+                        isDisabled && styles.documentTypeTextDisabled, // Add this style
+                      ]}
+                    >
+                      {type.label}
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.documentTypeText,
-                      selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
-                    ]}
-                  >
-                    {type.label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -1674,6 +1698,13 @@ const styles = StyleSheet.create({
     color: "#ccc",
     textAlign: "center",
   },
+  documentTypeDisabled: {
+    opacity: 0.5,
+  },
+  radioButtonDisabled: {
+    borderColor: "#ccc",
+  },
+
 });
 
 export default UploadDocumentsSaved;

@@ -625,7 +625,7 @@ const EditClaimIntimation = ({ route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
+        <Text style={styles.headerTitle}>SHE Claim Intimation 3</Text>
         <View style={{ width: 24 }} />
       </View>
 
