@@ -171,7 +171,7 @@ const AddPatientDetails = ({ onClose }) => {
 
     try {
       setSubmitting(true);
-      const res = await fetch('http://203.115.11.229:1002/api/Claimintimation', {
+      const res = await fetch(`${API_BASE_URL}/Claimintimation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ const AddPatientDetails = ({ onClose }) => {
       const memberNumber = await SecureStore.getItemAsync('selected_member_number');
       if (memberNumber) {
         try {
-          const claimDetailsRes = await fetch(`http://203.115.11.229:1002/api/UploadedDocumentsCon/${memberNumber}`);
+          const claimDetailsRes = await fetch(`${API_BASE_URL}/UploadedDocumentsCon/${memberNumber}`);
           if (claimDetailsRes.ok) {
             const claimDetails = await claimDetailsRes.json();
             if (claimDetails.clmSeqNo) {

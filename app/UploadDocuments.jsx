@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { API_BASE_URL } from '../constants/index.js';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -76,7 +77,7 @@ const UploadDocuments = ({ route }) => {
         setLoading(true);
         // You can make this dynamic based on request type if needed
         const response = await fetch(
-          "http://203.115.11.229:1002/api/RequiredDocumentsCon/Outdoor"
+          `${API_BASE_URL}/RequiredDocumentsCon/Outdoor`
         );
 
         if (!response.ok) {
@@ -656,7 +657,7 @@ const UploadDocuments = ({ route }) => {
       const formData = await createFormDataForDocument(document);
 
       const response = await fetch(
-        "http://203.115.11.229:1002/api/ClaimIntimationDoc/AddClaimDocument",
+        `${API_BASE_URL}/ClaimIntimationDoc/AddClaimDocument`,
         {
           method: "POST",
           body: formData,
