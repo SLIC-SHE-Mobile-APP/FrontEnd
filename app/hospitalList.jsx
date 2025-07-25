@@ -11,8 +11,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Animated
 } from 'react-native';
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -46,6 +48,85 @@ const HospitalList = ({ onClose }) => {
 
   const sidebarScrollRef = useRef(null);
   const contentScrollRef = useRef(null);
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    React.useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={18} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Hospital Data...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   // Fetch data for the active section from API
   const fetchData = async (sectionId) => {
@@ -236,17 +317,13 @@ const HospitalList = ({ onClose }) => {
             onChangeText={setSearchText}
           />
 
-          {/* Loading Indicator */}
-          {loadingMap[activeSection] && (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
-              <ActivityIndicator size="large" color="#00ADBB" />
-            </View>
-          )}
+          {/* Loading Screen */}
+          {loadingMap[activeSection] && <LoadingScreen />}
 
           {/* Error Message */}
           {errorMap[activeSection] && (
-            <View style={{ padding: 20 }}>
-              <Text style={{ color: 'red', textAlign: 'center' }}>{errorMap[activeSection]}</Text>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{errorMap[activeSection]}</Text>
             </View>
           )}
 
@@ -407,6 +484,64 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderWidth: 1,
     fontSize: 13,
+  },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 25,
+    minWidth: 180,
+    minHeight: 120,
+  },
+  customLoadingIcon: {
+    marginBottom: 12,
+  },
+  loadingIconOuter: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  loadingSubText: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 14,
+    textAlign: 'center',
   },
   listContent: {
     paddingBottom: 20,

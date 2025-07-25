@@ -9,14 +9,95 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
 const PendingRequirement = ({ onClose }) => {
   const [pendingRequirements, setPendingRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Pending Requirements...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     fetchPendingRequirements();
@@ -170,12 +251,7 @@ const PendingRequirement = ({ onClose }) => {
 
   const renderContent = () => {
     if (loading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00ADBB" />
-          <Text style={styles.loadingText}>Loading pending requirements...</Text>
-        </View>
-      );
+      return <LoadingScreen />;
     }
 
     if (pendingRequirements.length === 0) {
@@ -245,6 +321,53 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     flex: 1,
   },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   scrollContainer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -308,18 +431,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#13646D',
-    textAlign: 'center',
   },
   emptyContainer: {
     flex: 1,
