@@ -626,7 +626,7 @@ const EditClaimIntimation = ({ route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>SHE Claim Intimation 3</Text>
+        <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -1055,12 +1055,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-  },
+    },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: 30,  marginTop:20,
     paddingBottom: 20,
     backgroundColor: "transparent",
   },
