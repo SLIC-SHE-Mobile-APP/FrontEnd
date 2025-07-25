@@ -6,10 +6,9 @@ import LoginRequestOTP from './loginRequestOTP.jsx';
 
 export default function HomeScreen() {
   return (
-    <LoginRequestOTP/>
+    <Home/>
   );
 }
-
 const styles = StyleSheet.create({
   
 });

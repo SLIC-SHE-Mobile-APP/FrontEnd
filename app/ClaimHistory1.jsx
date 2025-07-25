@@ -11,9 +11,12 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from "react-native";
 import axios from "axios";
 import { API_BASE_URL } from '../constants/index.js';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 const ClaimHistory1 = ({ onClose, claimData }) => {
   const [documents, setDocuments] = useState([]);
@@ -44,11 +47,22 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
   }, [claimData]);
 
   const openImageModal = (doc) => {
+    let imageSource;
+    let imageDescription = `${doc.docType} - Claim No: ${doc.clmSeqNo}`;
+    
     if (doc.imagePath !== "0") {
-      setSelectedImage({ type: "url", src: doc.imagePath });
+      imageSource = { uri: doc.imagePath };
     } else {
-      setSelectedImage({ type: "base64", src: doc.imgContent });
+      imageSource = { uri: `data:image/png;base64,${doc.imgContent}` };
     }
+    
+    setSelectedImage({
+      source: imageSource,
+      description: imageDescription,
+      docType: doc.docType,
+      claimNo: doc.clmSeqNo,
+      amount: doc.docAmount
+    });
     setIsImageModalVisible(true);
   };
 
@@ -62,6 +76,7 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
       <TouchableOpacity
         onPress={() => openImageModal(document)}
         style={styles.iconContainer}
+        activeOpacity={0.8}
       >
         {document.imagePath !== "0" ? (
           <Image
@@ -76,6 +91,10 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
             resizeMode="contain"
           />
         )}
+        {/* Add expand icon overlay */}
+        <View style={styles.expandOverlay}>
+          <Ionicons name="expand-outline" size={16} color="#fff" />
+        </View>
       </TouchableOpacity>
 
       <View style={styles.documentContent}>
@@ -117,7 +136,10 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#17ABB7" />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#17ABB7" />
+            <Text style={styles.loadingText}>Loading documents...</Text>
+          </View>
         ) : (
           <ScrollView
             style={styles.scrollContainer}
@@ -127,40 +149,58 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
             {documents.length > 0 ? (
               documents.map(renderDocumentCard)
             ) : (
-              <Text style={{ textAlign: "center", color: "#333" }}>
-                No documents found.
-              </Text>
+              <View style={styles.noDocumentsContainer}>
+                <Ionicons name="document-outline" size={48} color="#888" />
+                <Text style={styles.noDocumentsText}>
+                  No documents found.
+                </Text>
+              </View>
             )}
           </ScrollView>
         )}
 
-        {/* Image Modal */}
+        {/* Image Modal - Close icon removed, tap outside to close preserved */}
         <Modal
           visible={isImageModalVisible}
           transparent={true}
           animationType="fade"
+          onRequestClose={closeImageModal}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <TouchableOpacity
-                onPress={closeImageModal}
-                style={styles.closeButton}
+            <TouchableOpacity
+              style={styles.modalCloseArea}
+              onPress={closeImageModal}
+              activeOpacity={1}
+            >
+              <TouchableOpacity 
+                style={styles.modalContent}
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
               >
-                <Ionicons name="close" size={26} color="#000" />
+                {selectedImage && (
+                  <>
+                    <Image
+                      source={selectedImage.source}
+                      style={styles.modalImage}
+                      resizeMode="contain"
+                    />
+                    <View style={styles.modalImageInfo}>
+                      <Text style={styles.modalImageTitle}>
+                        {selectedImage.description}
+                      </Text>
+                      {selectedImage.amount && (
+                        <Text style={styles.modalImageAmount}>
+                          Amount: Rs {selectedImage.amount}
+                        </Text>
+                      )}
+                      <Text style={styles.modalImageSubtitle}>
+                        Tap outside to close
+                      </Text>
+                    </View>
+                  </>
+                )}
               </TouchableOpacity>
-              {selectedImage && (
-                <Image
-                  source={{
-                    uri:
-                      selectedImage.type === "base64"
-                        ? `data:image/png;base64,${selectedImage.src}`
-                        : selectedImage.src,
-                  }}
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-              )}
-            </View>
+            </TouchableOpacity>
           </View>
         </Modal>
       </View>
@@ -194,6 +234,16 @@ const styles = StyleSheet.create({
     textAlign: "left",
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#17ABB7",
+  },
   scrollContainer: {
     flex: 1,
   },
@@ -221,6 +271,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginRight: 15,
     marginTop: 5,
+    position: "relative",
   },
   documentIcon: {
     width: 50,
@@ -228,6 +279,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#17ABB7",
     borderRadius: 5,
+  },
+  expandOverlay: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 10,
+    padding: 2,
   },
   documentContent: {
     flex: 1,
@@ -256,35 +315,63 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     flex: 1,
   },
+  noDocumentsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  noDocumentsText: {
+    textAlign: "center",
+    color: "#666",
+    fontSize: 16,
+    marginTop: 15,
+  },
+  // Modal Styles - Close button removed
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  modalCloseArea: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
   },
   modalContent: {
-    width: "90%",
-    height: "70%",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
+    width: screenWidth * 0.9,
+    maxHeight: screenHeight * 0.8,
     position: "relative",
   },
-  fullImage: {
+  modalImage: {
     width: "100%",
-    height: "100%",
+    height: screenHeight * 0.6,
+    borderRadius: 10,
   },
-  closeButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    zIndex: 10,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 5,
-    elevation: 5,
+  modalImageInfo: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  modalImageTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  modalImageAmount: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#00C4CC",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  modalImageSubtitle: {
+    fontSize: 14,
+    color: "#ccc",
+    textAlign: "center",
   },
 });
 
