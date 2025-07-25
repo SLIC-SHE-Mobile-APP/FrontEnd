@@ -11,8 +11,10 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
 const HealthInsuCard = ({ onClose }) => {
@@ -23,6 +25,85 @@ const HealthInsuCard = ({ onClose }) => {
   const [error, setError] = useState(null);
   const [policyNumber, setPolicyNumber] = useState("");
   const [memberNumber, setMemberNumber] = useState("");
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Health Card...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     fetchMemberData();
@@ -163,133 +244,119 @@ const HealthInsuCard = ({ onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.container}>
-          <View style={styles.cardContainer}>
-            {/* Card Image with Overlays */}
-            <View style={styles.cardImageContainer}>
-              <Image
-                source={require("../assets/images/healthcard.png")}
-                style={styles.cardImage}
-                resizeMode="contain"
-              />
+      {/* Content */}
+      {loading ? (
+        <LoadingScreen />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            <View style={styles.cardContainer}>
+              {/* Card Image with Overlays */}
+              <View style={styles.cardImageContainer}>
+                <Image
+                  source={require("../assets/images/healthcard.png")}
+                  style={styles.cardImage}
+                  resizeMode="contain"
+                />
 
-              {/* Member Name Overlay */}
-              <View style={styles.memberNameOverlay}>
-                {loading ? (
-                  <ActivityIndicator size="small" color="black" />
-                ) : error ? (
-                  <Text style={styles.errorText}>{error}</Text>
-                ) : (
-                  <Text style={styles.memberNameText}>
-                    {memberData?.memberName || "Member Name"}
-                  </Text>
-                )}
-              </View>
+                {/* Member Name Overlay */}
+                <View style={styles.memberNameOverlay}>
+                  {error ? (
+                    <Text style={styles.errorText}>{error}</Text>
+                  ) : (
+                    <Text style={styles.memberNameText}>
+                      {memberData?.memberName || "Member Name"}
+                    </Text>
+                  )}
+                </View>
 
-              {/* Company Name Overlay */}
-              <View style={styles.companyNameOverlay}>
-                {loading ? (
-                  <ActivityIndicator size="small" color="black" />
-                ) : (
+                {/* Company Name Overlay */}
+                <View style={styles.companyNameOverlay}>
                   <Text style={styles.companyNameText}>
                     {policyInfo?.name || "Company Name"}
                   </Text>
-                )}
-              </View>
+                </View>
 
-              {/* End Date Overlay */}
-              <View style={styles.endDateOverlay}>
-                {loading ? (
-                  <ActivityIndicator size="small" color="black" />
-                ) : (
+                {/* End Date Overlay */}
+                <View style={styles.endDateOverlay}>
                   <Text style={styles.endDateText}>
                     {formatDate(policyInfo?.endDate) || "End Date"}
                   </Text>
-                )}
-              </View>
+                </View>
 
-              {/* Policy Number Overlay */}
-              <View style={styles.policyNumberOverlay}>
-                {loading ? (
-                  <ActivityIndicator size="small" color="black" />
-                ) : (
+                {/* Policy Number Overlay */}
+                <View style={styles.policyNumberOverlay}>
                   <Text style={styles.policyNumberText}>
                     {policyNumber || "Policy Number"}
                   </Text>
-                )}
-              </View>
+                </View>
 
-              {/* Member Number Overlay */}
-              <View style={styles.memberNumberOverlay}>
-                {loading ? (
-                  <ActivityIndicator size="small" color="black" />
-                ) : (
+                {/* Member Number Overlay */}
+                <View style={styles.memberNumberOverlay}>
                   <Text style={styles.memberNumberText}>
                     {memberNumber || "Member Number"}
                   </Text>
-                )}
-              </View>
+                </View>
 
-              {/* Dependents Names Overlay */}
-              <View style={styles.dependentsOverlay}>
-                {renderDependentNames()}
+                {/* Dependents Names Overlay */}
+                <View style={styles.dependentsOverlay}>
+                  {renderDependentNames()}
+                </View>
+              </View>
+            </View>
+
+            {/* Directions Section */}
+            <View style={styles.directions}>
+              <Text style={styles.directionsHeader}>Directions</Text>
+
+              <Text style={styles.directionsText}>
+                This digital card must be presented to the service provider with
+                NIC and/or Employee ID to be eligible for the benefits.
+              </Text>
+
+              <Text style={styles.directionsText}>
+                Please call our 24 hour TOLL FREE HOTLINE in the event of
+                Hospitalization and Discharge.
+              </Text>
+
+              <Text style={styles.hotlinesTitle}>Hotlines:</Text>
+              <View style={styles.hotlineGrid}>
+                <View style={styles.hotlineColumn}>
+                  <TouchableOpacity
+                    style={styles.hotlineButton}
+                    onPress={() => makePhoneCall("0112357357")}
+                  >
+                    <Ionicons
+                      name="call"
+                      size={18}
+                      color="#2E5A87"
+                      style={styles.callIcon}
+                    />
+                    <Text style={styles.hotline}>0112357357</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.hotlineColumn}>
+                  <TouchableOpacity
+                    style={styles.hotlineButton}
+                    onPress={() => makePhoneCall("0112357357")}
+                  >
+                    <Ionicons
+                      name="call"
+                      size={18}
+                      color="#2E5A87"
+                      style={styles.callIcon}
+                    />
+                    <Text style={styles.hotline}>0112357357</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
-
-          {/* Directions Section */}
-          <View style={styles.directions}>
-            <Text style={styles.directionsHeader}>Directions</Text>
-
-            <Text style={styles.directionsText}>
-              This digital card must be presented to the service provider with
-              NIC and/or Employee ID to be eligible for the benefits.
-            </Text>
-
-            <Text style={styles.directionsText}>
-              Please call our 24 hour TOLL FREE HOTLINE in the event of
-              Hospitalization and Discharge.
-            </Text>
-
-            <Text style={styles.hotlinesTitle}>Hotlines:</Text>
-            <View style={styles.hotlineGrid}>
-              <View style={styles.hotlineColumn}>
-                <TouchableOpacity
-                  style={styles.hotlineButton}
-                  onPress={() => makePhoneCall("0112357357")}
-                >
-                  <Ionicons
-                    name="call"
-                    size={18}
-                    color="#2E5A87"
-                    style={styles.callIcon}
-                  />
-                  <Text style={styles.hotline}>0112357357</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.hotlineColumn}>
-                <TouchableOpacity
-                  style={styles.hotlineButton}
-                  onPress={() => makePhoneCall("0112357357")}
-                >
-                  <Ionicons
-                    name="call"
-                    size={18}
-                    color="#2E5A87"
-                    style={styles.callIcon}
-                  />
-                  <Text style={styles.hotline}>0112357357</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </LinearGradient>
   );
 };
@@ -309,6 +376,53 @@ const styles = StyleSheet.create({
     color: "#13646D",
     textAlign: "left",
     flex: 1,
+  },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#6DD3D3",
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   scrollContainer: {
     paddingBottom: 20,

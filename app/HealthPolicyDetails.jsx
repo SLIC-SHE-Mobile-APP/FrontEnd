@@ -53,6 +53,85 @@ const HealthPolicyDetails = () => {
     return screenHeight - insets.top - insets.bottom - 85;
   }, [screenHeight, insets.top, insets.bottom]);
 
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={24} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Policy Details...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
+
   // Function to load data from SecureStore
   const loadStoredData = async () => {
     try {
@@ -500,10 +579,7 @@ const HealthPolicyDetails = () => {
           colors={["#FFFFFF", "#6DD3D3"]}
           style={styles.container}
         >
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#13646D" />
-            <Text style={styles.loadingText}>Loading policy details...</Text>
-          </View>
+          <LoadingScreen />
         </LinearGradient>
     );
   }
@@ -825,17 +901,53 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: "#FFFFFF",
   },
-  // Loading styles
-  loadingContainer: {
+  // Custom Loading Styles
+  loadingOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+    elevation: 10,
+    minWidth: 250,
+    minHeight: 200,
+  },
+  customLoadingIcon: {
+    marginBottom: 20,
+  },
+  loadingIconOuter: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#6DD3D3",
+  },
+  loadingIconInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   loadingText: {
-    fontSize: 16,
-    color: "#13646D",
-    marginTop: 20,
-    fontWeight: "500",
+    fontSize: 18,
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   // Error styles
   errorContainer: {
