@@ -53,85 +53,6 @@ const HealthPolicyDetails = () => {
     return screenHeight - insets.top - insets.bottom - 85;
   }, [screenHeight, insets.top, insets.bottom]);
 
-  // Custom Loading Animation Component
-  const LoadingIcon = () => {
-    const [rotateAnim] = useState(new Animated.Value(0));
-    const [scaleAnim] = useState(new Animated.Value(1));
-
-    useEffect(() => {
-      const createRotateAnimation = () => {
-        return Animated.loop(
-          Animated.timing(rotateAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          })
-        );
-      };
-
-      const createPulseAnimation = () => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.timing(scaleAnim, {
-              toValue: 1.2,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-      };
-
-      const rotateAnimation = createRotateAnimation();
-      const pulseAnimation = createPulseAnimation();
-
-      rotateAnimation.start();
-      pulseAnimation.start();
-
-      return () => {
-        rotateAnimation.stop();
-        pulseAnimation.stop();
-      };
-    }, []);
-
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
-
-    return (
-      <Animated.View
-        style={[
-          styles.customLoadingIcon,
-          {
-            transform: [{ rotate: spin }, { scale: scaleAnim }],
-          },
-        ]}
-      >
-        <View style={styles.loadingIconOuter}>
-          <View style={styles.loadingIconInner}>
-            <Icon name="heartbeat" size={24} color="#FFFFFF" />
-          </View>
-        </View>
-      </Animated.View>
-    );
-  };
-
-  // Loading Screen Component with Custom Icon
-  const LoadingScreen = () => (
-    <View style={styles.loadingOverlay}>
-      <View style={styles.loadingContainer}>
-        <LoadingIcon />
-        <Text style={styles.loadingText}>Loading Policy Details...</Text>
-        <Text style={styles.loadingSubText}>Please wait a moment</Text>
-      </View>
-    </View>
-  );
-
   // Function to load data from SecureStore
   const loadStoredData = async () => {
     try {
@@ -331,7 +252,7 @@ const HealthPolicyDetails = () => {
         },
         "Hospitals List": {
           minHeight: 650,
-          maxHeight: 457 ,
+          maxHeight: 457,
           preferredRatio: 0.9,
           contentBased: true,
         },
@@ -575,126 +496,127 @@ const HealthPolicyDetails = () => {
   // Show loading screen
   if (loading) {
     return (
-        <LinearGradient
-          colors={["#FFFFFF", "#6DD3D3"]}
-          style={styles.container}
-        >
-          <LoadingScreen />
-        </LinearGradient>
+      <LinearGradient
+        colors={["#FFFFFF", "#6DD3D3"]}
+        style={styles.container}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#13646D" />
+          <Text style={styles.loadingText}>Loading policy details...</Text>
+        </View>
+      </LinearGradient>
     );
   }
 
   // Show error screen
   if (error) {
     return (
-        <LinearGradient
-          colors={["#FFFFFF", "#6DD3D3"]}
-          style={styles.container}
-        >
-          <View style={styles.errorContainer}>
-            <Icon name="exclamation-triangle" size={60} color="#FF6B6B" />
-            <Text style={styles.errorTitle}>Error Loading Policy</Text>
-            <Text style={styles.errorMessage}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.backButtonText}>Go Back</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+      <LinearGradient
+        colors={["#FFFFFF", "#6DD3D3"]}
+        style={styles.container}
+      >
+        <View style={styles.errorContainer}>
+          <Icon name="exclamation-triangle" size={60} color="#FF6B6B" />
+          <Text style={styles.errorTitle}>Error Loading Policy</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-      <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={styles.container}>
-        {/* Fixed Header Section */}
-        <View style={styles.headerContainer}>
-          {/* Back Icon + Title */}
-          <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>Health Policy Details</Text>
-            <View style={styles.headerSpacer} />
-          </View>
+    <LinearGradient colors={["#D1D1D1", "#6DD3D3"]} style={styles.container}>
+      {/* Fixed Header Section */}
+      <View style={styles.headerContainer}>
+        {/* Back Icon + Title */}
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Health Policy Details</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-          {/* Policy Info Card */}
-          <View style={styles.policyCard}>
-            {policyDisplayInfo.map((item, idx) => (
-              <Text key={idx} style={styles.policyText}>
-                {item}
-              </Text>
+        {/* Policy Info Card */}
+        <View style={styles.policyCard}>
+          {policyDisplayInfo.map((item, idx) => (
+            <Text key={idx} style={styles.policyText}>
+              {item}
+            </Text>
+          ))}
+          {policyDisplayInfo.length === 0 && (
+            <Text style={styles.policyText}>
+              No policy information available
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Scrollable Buttons Section */}
+      <View style={styles.buttonsContainer}>
+        <View style={styles.buttonsWrapper}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {buttons.map((label, index) => (
+              <TouchableOpacity
+                key={`button-${index}`}
+                style={styles.button}
+                onPress={() => handleButtonPress(label)}
+                accessible={true}
+                accessibilityLabel={label}
+              >
+                <Text style={styles.buttonText}>{label}</Text>
+              </TouchableOpacity>
             ))}
-            {policyDisplayInfo.length === 0 && (
-              <Text style={styles.policyText}>
-                No policy information available
-              </Text>
-            )}
-          </View>
+          </ScrollView>
         </View>
+      </View>
 
-        {/* Scrollable Buttons Section */}
-        <View style={styles.buttonsContainer}>
-          <View style={styles.buttonsWrapper}>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {buttons.map((label, index) => (
-                <TouchableOpacity
-                  key={`button-${index}`}
-                  style={styles.button}
-                  onPress={() => handleButtonPress(label)}
-                  accessible={true}
-                  accessibilityLabel={label}
-                >
-                  <Text style={styles.buttonText}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
+      {/* Bottom Navigation Bar */}
+      <View style={styles.navbar}>
+        {renderNavItem("home", "Home", handleNavigation)}
+        {renderNavItem("bell", "Notification", handleNavigation)}
+        {renderNavItem("file-text", "Policy Details", handleNavigation)}
+        {renderNavItem("user", "Profile", handleNavigation)}
+      </View>
 
-        {/* Bottom Navigation Bar */}
-        <View style={styles.navbar}>
-          {renderNavItem("home", "Home", handleNavigation)}
-          {renderNavItem("bell", "Notification", handleNavigation)}
-          {renderNavItem("file-text", "Policy Details", handleNavigation)}
-          {renderNavItem("user", "Profile", handleNavigation)}
-        </View>
-
-        {/* Modal for displaying pages */}
-        <Modal
-          visible={modalVisible}
-          transparent={true}
-          animationType="none"
-          onRequestClose={handleCloseModal}
-          statusBarTranslucent={true}
-        >
+      {/* Modal for displaying pages */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleCloseModal}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.overlay}>
           <TouchableOpacity
-            style={styles.overlay}
+            style={styles.overlayBackground}
             activeOpacity={1}
             onPress={handleCloseModal}
+          />
+
+          <Animated.View
+            style={[
+              styles.animatedModal,
+              {
+                height: getPageHeight(currentPage),
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
           >
-            <View style={styles.overlayBackground} />
-            
-            <Animated.View
-              style={[
-                styles.animatedModal,
-                {
-                  height: getPageHeight(currentPage),
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
-            >
-              <TouchableOpacity activeOpacity={1} style={{ flex: 1 }}>
-                {renderModalContent()}
-              </TouchableOpacity>
-            </Animated.View>
-          </TouchableOpacity>
-        </Modal>
-      </LinearGradient>
+            {renderModalContent()}
+          </Animated.View>
+        </View>
+      </Modal>
+    </LinearGradient>
   );
 };
 
@@ -725,7 +647,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    marginTop:20,
+    marginTop: 20,
     paddingHorizontal: 15,
   },
   headerRow: {
@@ -800,24 +722,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  overlayBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  animatedModal: {
-    backgroundColor: "transparent",
     justifyContent: "flex-end",
   },
   overlayTouchable: {
@@ -901,53 +806,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: "#FFFFFF",
   },
-  // Custom Loading Styles
-  loadingOverlay: {
+  // Loading styles
+  loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 40,
-    elevation: 10,
-    minWidth: 250,
-    minHeight: 200,
-  },
-  customLoadingIcon: {
-    marginBottom: 20,
-  },
-  loadingIconOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#16858D",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#6DD3D3",
-  },
-  loadingIconInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#17ABB7",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   loadingText: {
-    fontSize: 18,
-    color: "#333",
-    textAlign: "center",
-    fontWeight: "600",
-    marginBottom: 5,
-  },
-  loadingSubText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    fontStyle: "italic",
+    fontSize: 16,
+    color: "#13646D",
+    marginTop: 20,
+    fontWeight: "500",
   },
   // Error styles
   errorContainer: {
