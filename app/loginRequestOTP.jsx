@@ -1,14 +1,14 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   Keyboard,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,12 +16,141 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from "react-native";
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
+
+const { width } = Dimensions.get('window');
+
+// Custom Popup Component with Blur Background
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 function LoginRequestOTPContent() {
   const [nic, setNIC] = useState("");
@@ -29,6 +158,15 @@ function LoginRequestOTPContent() {
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
+
   const slideAnim = new Animated.Value(0);
   const insets = useSafeAreaInsets();
 
@@ -65,7 +203,30 @@ function LoginRequestOTPContent() {
     };
   }, []);
 
-  // Store user data in SecureStore 
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
+
+  // Store user data in SecureStore
   const storeUserData = async (mobileNumber, nicNumber) => {
     try {
       const userData = {
@@ -73,18 +234,21 @@ function LoginRequestOTPContent() {
         nicNumber,
         timestamp: new Date().toISOString(),
       };
-      
+
       // Store each piece of data separately for better security
-      await SecureStore.setItemAsync('user_mobile', mobileNumber);
-      await SecureStore.setItemAsync('user_nic', nicNumber);
-      await SecureStore.setItemAsync('user_timestamp', new Date().toISOString());
-      
+      await SecureStore.setItemAsync("user_mobile", mobileNumber);
+      await SecureStore.setItemAsync("user_nic", nicNumber);
+      await SecureStore.setItemAsync(
+        "user_timestamp",
+        new Date().toISOString()
+      );
+
       // Also store as combined JSON if needed elsewhere
-      await SecureStore.setItemAsync('userData', JSON.stringify(userData));
-      
-      console.log('User data stored securely');
+      await SecureStore.setItemAsync("userData", JSON.stringify(userData));
+
+      console.log("User data stored securely");
     } catch (error) {
-      console.error('Error storing user data:', error);
+      console.error("Error storing user data:", error);
     }
   };
 
@@ -100,6 +264,12 @@ function LoginRequestOTPContent() {
 
   const handleMobileChange = (text) => {
     const cleaned = text.replace(/\D/g, "");
+
+    // Only allow numbers that start with 7
+    if (cleaned.length > 0 && !cleaned.startsWith("7")) {
+      return;
+    }
+
     if (cleaned.length <= 9) {
       setMobile(cleaned);
     }
@@ -161,15 +331,20 @@ function LoginRequestOTPContent() {
 
   const handleRequestOTP = async () => {
     if (!validateNIC(nic)) {
-      Alert.alert(
-        "",
-        "Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)\n• 9 digits + v (e.g., 60XXXXXX3v)\n• 9 digits + X (e.g., 60XXXXXX3X)\n• 9 digits + x (e.g., 60XXXXXX3x)"
+      showPopup(
+        "Invalid NIC Number",
+        "Please enter a valid NIC number\n\nValid formats:\n• 12 digits (e.g., 200XXXXXXX42)\n• 9 digits + V (e.g., 60XXXXXX3V)\n• 9 digits + v (e.g., 60XXXXXX3v)\n• 9 digits + X (e.g., 60XXXXXX3X)\n• 9 digits + x (e.g., 60XXXXXX3x)",
+        "warning"
       );
       return;
     }
 
     if (!mobile || mobile.length < 9) {
-      Alert.alert("", "Please enter a valid 9-digit mobile number");
+      showPopup(
+        "Invalid Mobile Number",
+        "Please enter a valid 9-digit mobile number",
+        "warning"
+      );
       return;
     }
 
@@ -181,29 +356,40 @@ function LoginRequestOTPContent() {
       if (result.success && result.isValid && result.otpSent) {
         // Store the mobile number and NIC number from API response securely
         await storeUserData(result.mobileNumber, result.nicNumber);
-        
-        const maskedNumber = maskPhoneNumber(mobile);
-        Alert.alert("Success", `OTP sent to +94 ${maskedNumber}`);
 
-        router.push({
-          pathname: "/OTPVerification",
-          params: {
-            contactInfo: `+94${maskedNumber}`,
-            contactType: "phone",
-            nicNumber: result.nicNumber, // Use API response data
-            mobileNumber: result.mobileNumber, // Use API response data
-          },
-        });
+        const maskedNumber = maskPhoneNumber(mobile);
+
+        showPopup(
+          "OTP Sent Successfully",
+          `OTP has been sent to +94 ${maskedNumber}`,
+          "success",
+          false,
+          () => {
+            hidePopup();
+            router.push({
+              pathname: "/OTPVerification",
+              params: {
+                contactInfo: `+94${maskedNumber}`,
+                contactType: "phone",
+                nicNumber: result.nicNumber,
+                mobileNumber: result.mobileNumber,
+              },
+            });
+          }
+        );
       } else {
         let errorMessage =
           result.message || "An error occurred. Please try again.";
+        let errorTitle = "Validation Error";
 
         switch (result.errorType) {
           case "NIC_NOT_FOUND":
+            errorTitle = "NIC Not Found";
             errorMessage =
               "NIC number is not registered in our system. Please contact your company HR.";
             break;
           case "MOBILE_NUMBER_MISMATCH":
+            errorTitle = "Mobile Number Mismatch";
             errorMessage =
               "The mobile number is mismatch with this NIC. Please verify your mobile number.";
             break;
@@ -213,12 +399,13 @@ function LoginRequestOTPContent() {
               "Validation failed. Please check your details and try again.";
         }
 
-        Alert.alert("Important", errorMessage);
+        showPopup(errorTitle, errorMessage, "error");
       }
     } catch (error) {
-      Alert.alert(
-        "Error",
-        error.message || "Something went wrong. Please try again."
+      showPopup(
+        "Connection Error",
+        error.message || "Something went wrong. Please try again.",
+        "error"
       );
     } finally {
       setLoading(false);
@@ -303,7 +490,7 @@ function LoginRequestOTPContent() {
                   <Text style={styles.countryCodeText}>+94</Text>
                 </View>
                 <TextInput
-                  placeholder="000 000 000"
+                  placeholder="700 000 000"
                   keyboardType="numeric"
                   style={styles.phoneInput}
                   value={mobile}
@@ -347,6 +534,17 @@ function LoginRequestOTPContent() {
           </View>
         </ScrollView>
       </Animated.View>
+
+      {/* Custom Popup with Blur Background */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={popup.onConfirm || hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </View>
   );
 }
@@ -545,5 +743,101 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#4ECDC4",
     fontWeight: "500",
+  },
+  // Popup Styles with Blur Background
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
