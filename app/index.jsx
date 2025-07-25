@@ -9,7 +9,6 @@ export default function HomeScreen() {
     <Home/>
   );
 }
-
 const styles = StyleSheet.create({
   
 });

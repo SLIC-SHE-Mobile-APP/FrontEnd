@@ -350,7 +350,7 @@ const AddPatientDetails = ({ onClose }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Illness</Text>
             <TextInput
-              style={[styles.textInput, { height: 80 }]}
+              style={[styles.textInput, { height: 60 }]}
               placeholder="Enter illness description"
               value={illness}
               onChangeText={setIllness}
@@ -383,7 +383,7 @@ const AddPatientDetails = ({ onClose }) => {
 const styles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   overlayBackground: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
-  popupContainer: { height: '80%', width: '100%', maxWidth: 400, alignItems: 'center', justifyContent: 'center' },
+  popupContainer: {width: '100%', maxWidth: 400, alignItems: 'center', justifyContent: 'center' },
   card: {
     backgroundColor: '#fff',
     borderTopRightRadius: 25,
