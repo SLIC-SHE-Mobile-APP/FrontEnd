@@ -11,7 +11,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Animated,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
 const PendingIntimations = ({ onClose, onEditClaim }) => {
@@ -22,6 +24,85 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   const [error, setError] = useState(null);
   const [userId, setUserId] = useState(null);
   const [policyNo, setPolicyNo] = useState(null);
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = ({ message = "Loading Pending Claims..." }) => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>{message}</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   // Fetch stored values from SecureStore
   useEffect(() => {
@@ -319,14 +400,12 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2E7D7D" />
-          <Text style={styles.loadingText}>
-            {!userId || !policyNo
-              ? "Loading policy information..."
-              : "Loading claims..."}
-          </Text>
-        </View>
+        <LoadingScreen 
+          message={!userId || !policyNo
+            ? "Loading Policy Information..."
+            : "Loading Pending Claims..."
+          }
+        />
       </LinearGradient>
     );
   }
@@ -460,15 +539,52 @@ const styles = StyleSheet.create({
     padding: 5,
     marginRight: 10,
   },
-  loadingContainer: {
+  // Custom Loading Styles
+  loadingOverlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
     fontSize: 16,
-    color: "#2E7D7D",
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   errorContainer: {
     flex: 1,

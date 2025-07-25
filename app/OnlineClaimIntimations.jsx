@@ -82,7 +82,7 @@ const OnlineClaimIntimations = ({ onClose }) => {
       case "pending":
         return 600; // Current height for PendingIntimations
       case "new":
-        return 550; // Recommended height for AddPatientDetails form
+        return 500; // Recommended height for AddPatientDetails form
       default:
         return 600;
     }
