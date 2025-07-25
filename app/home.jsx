@@ -15,6 +15,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,7 +24,7 @@ import ClaimTypeSelection from "./AddPatientDetails.jsx";
 import ClaimHistory from "./ClaimHistory";
 import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -58,6 +59,11 @@ export default function PolicyHome() {
   const [membersCount, setMembersCount] = useState(0);
   const [policyInfo, setPolicyInfo] = useState(null);
   const [isLoadingPolicyInfo, setIsLoadingPolicyInfo] = useState(false);
+  const [isDropdownDisabled, setIsDropdownDisabled] = useState(false);
+
+  // Add new loading state for policy selection
+  const [isLoadingPolicySelection, setIsLoadingPolicySelection] =
+    useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -72,13 +78,15 @@ export default function PolicyHome() {
             // Clear the refresh flag
             await SecureStore.deleteItemAsync("should_refresh_home");
 
-            // Refresh all data
-            await fetchEmployeeInfo();
-            await fetchPolicyInfo();
-            const count = await fetchMembersCount();
-            setMembersCount(count);
-            const dependentsData = await fetchDependentsWithoutEmployee();
-            setDependents(dependentsData);
+            // Show loading and refresh all data
+            setIsLoadingPolicySelection(true);
+
+            await Promise.all([
+              fetchEmployeeInfo(),
+              fetchPolicyInfo(),
+              refreshMembersData(),
+              refreshDependentsData(),
+            ]);
 
             const storedMemberName = await SecureStore.getItemAsync(
               "selected_member_name"
@@ -88,11 +96,13 @@ export default function PolicyHome() {
             }
 
             await fetchPolicies();
+            setIsLoadingPolicySelection(false);
 
             console.log("Page refreshed after navigation");
           }
         } catch (error) {
           console.error("Error refreshing page data:", error);
+          setIsLoadingPolicySelection(false);
         }
       };
 
@@ -171,6 +181,15 @@ export default function PolicyHome() {
         }
       );
 
+      // Handle 404 error specifically
+      if (response.status === 404) {
+        console.log("Members not found (404), disabling dropdown");
+        setMembers([]);
+        setMembersCount(0);
+        setIsDropdownDisabled(true); // Add this state variable
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -188,6 +207,7 @@ export default function PolicyHome() {
       }));
 
       setMembers(transformedMembers);
+      setIsDropdownDisabled(false); // Enable dropdown when data is available
 
       // Check if there's a stored member name and restore selection
       const storedMemberName = await SecureStore.getItemAsync(
@@ -204,8 +224,9 @@ export default function PolicyHome() {
     } catch (error) {
       console.error("Error fetching members:", error);
       Alert.alert("Error", "Failed to load members. Please try again.");
-      // Set empty members array on error
+      // Set empty members array on error and disable dropdown
       setMembers([]);
+      setIsDropdownDisabled(true);
     } finally {
       setIsLoadingMembers(false);
     }
@@ -236,6 +257,11 @@ export default function PolicyHome() {
         }
       );
 
+      // Handle 404 error silently
+      if (response.status === 404) {
+        return [];
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -243,12 +269,12 @@ export default function PolicyHome() {
       const dependentsData = await response.json();
       return dependentsData;
     } catch (error) {
-      console.error("Error fetching dependents:", error);
+      // Only log, don't show error message to user
+      console.log("Dependents data not available or API error occurred");
       return [];
     }
   };
 
-  // Function to fetch employee information
   const fetchEmployeeInfo = async () => {
     try {
       setIsLoadingEmployeeInfo(true);
@@ -284,7 +310,8 @@ export default function PolicyHome() {
         }
       );
 
-      if (response.status === 500) {
+      // Handle 404 and 500 errors silently
+      if (response.status === 404 || response.status === 500) {
         setEmployeeInfo(null);
         return;
       }
@@ -296,7 +323,8 @@ export default function PolicyHome() {
       const employeeData = await response.json();
       setEmployeeInfo(employeeData);
     } catch (error) {
-      console.error("Error fetching employee info:", error);
+      // Only log error, don't show alert for 404s
+      console.log("Employee info not available or API error occurred");
       setEmployeeInfo(null);
     } finally {
       setIsLoadingEmployeeInfo(false);
@@ -471,6 +499,7 @@ export default function PolicyHome() {
   useEffect(() => {
     const initializePolicyData = async () => {
       try {
+        setIsLoadingPolicySelection(true);
         const storedPolicyData = await getStoredPolicyData();
 
         if (storedPolicyData) {
@@ -486,11 +515,13 @@ export default function PolicyHome() {
 
           setIsFirstTime(false);
 
-          // Fetch employee info
-          await fetchEmployeeInfo();
-          await fetchPolicyInfo();
-          const count = await fetchMembersCount();
-          setMembersCount(count);
+          // Fetch all data simultaneously
+          await Promise.all([
+            fetchEmployeeInfo(),
+            fetchPolicyInfo(),
+            refreshMembersData(),
+            refreshDependentsData(),
+          ]);
 
           // Only check for stored member name, don't auto-fetch all members
           const storedMemberName = await SecureStore.getItemAsync(
@@ -500,16 +531,14 @@ export default function PolicyHome() {
             // If there's a stored member name, fetch members to restore selection
             await fetchMembers();
           }
-
-          // Fetch dependents for health card display
-          const dependentsData = await fetchDependentsWithoutEmployee();
-          setDependents(dependentsData);
         }
 
         await fetchPolicies();
       } catch (error) {
         console.error("Error initializing policy data:", error);
         await fetchPolicies();
+      } finally {
+        setIsLoadingPolicySelection(false);
       }
     };
 
@@ -518,7 +547,13 @@ export default function PolicyHome() {
 
   const handlePolicySelection = async (policy) => {
     try {
-      // Store policy number and member number in SecureStore
+      // Show loading state
+      setIsLoadingPolicySelection(true);
+
+      // 1. Clear all existing data first
+      await clearAllData();
+
+      // 2. Store new policy data in SecureStore
       await SecureStore.setItemAsync(
         "selected_policy_number",
         policy.policyNumber
@@ -533,7 +568,7 @@ export default function PolicyHome() {
         await SecureStore.setItemAsync("user_nic", policy.nicNumber);
       }
 
-      // Optional: Store additional policy data if needed
+      // Store additional policy data
       await SecureStore.setItemAsync(
         "selected_policy_id",
         policy.policyID.toString()
@@ -544,13 +579,13 @@ export default function PolicyHome() {
       );
       await SecureStore.setItemAsync("selected_policy_type", policy.type);
 
-      // Store the full policy data as JSON string for complex data
+      // Store the full policy data as JSON string
       await SecureStore.setItemAsync(
         "selected_policy_data",
         JSON.stringify(policy)
       );
 
-      // Update state as before
+      // 3. Update policy-related state
       setSelectedPolicyNumber(policy.policyNumber);
       setPolicyDetails({
         policyID: policy.policyID,
@@ -561,10 +596,7 @@ export default function PolicyHome() {
       });
       setIsFirstTime(false);
 
-      // Clear member selection when policy changes
-      await clearMemberSelection();
-      setMembers([]);
-
+      // 4. Close the policy selection modal first
       Animated.timing(policySelectSlideAnim, {
         toValue: screenHeight,
         duration: 300,
@@ -573,16 +605,73 @@ export default function PolicyHome() {
         setShowPolicySelection(false);
       });
 
-      await fetchEmployeeInfo();
-      await fetchPolicyInfo();
+      // 5. Fetch all fresh data for the new policy simultaneously
+      await Promise.all([
+        fetchEmployeeInfo(),
+        fetchPolicyInfo(),
+        refreshMembersData(),
+        refreshDependentsData(),
+      ]);
+
+      console.log("Policy selection completed and all data refreshed");
+    } catch (error) {
+      console.error("Error during policy selection:", error);
+      Alert.alert("Error", "Failed to save policy data. Please try again.");
+    } finally {
+      setIsLoadingPolicySelection(false);
+    }
+  };
+
+  // Helper function to clear all existing data
+  const clearAllData = async () => {
+    try {
+      // Clear member selection
+      await clearMemberSelection();
+
+      // Clear all state variables
+      setMembers([]);
+      setSelectedMember(null);
+      setMembersCount(0);
+      setDependents([]);
+      setEmployeeInfo(null);
+      setPolicyInfo(null);
+      setShowMemberDropdown(false);
+
+      // Clear any stored member data
+      await SecureStore.deleteItemAsync("selected_member_name");
+      await SecureStore.deleteItemAsync("selected_member_complete");
+
+      console.log("All data cleared successfully");
+    } catch (error) {
+      console.error("Error clearing data:", error);
+    }
+  };
+
+  const refreshMembersData = async () => {
+    try {
       const count = await fetchMembersCount();
       setMembersCount(count);
 
+      // Don't automatically fetch all members - only fetch when dropdown is opened
+      // This maintains the existing behavior
+      console.log("Members count refreshed:", count);
+    } catch (error) {
+      console.error("Error refreshing members data:", error);
+    }
+  };
+
+  // Helper function to refresh dependents data
+  const refreshDependentsData = async () => {
+    try {
       const dependentsData = await fetchDependentsWithoutEmployee();
       setDependents(dependentsData);
+      console.log(
+        "Dependents data refreshed:",
+        dependentsData.length,
+        "dependents"
+      );
     } catch (error) {
-      console.error("Error storing policy data:", error);
-      Alert.alert("Error", "Failed to save policy data. Please try again.");
+      console.error("Error refreshing dependents data:", error);
     }
   };
 
@@ -625,7 +714,10 @@ export default function PolicyHome() {
   const clearMemberSelection = async () => {
     try {
       await SecureStore.deleteItemAsync("selected_member_complete");
+      await SecureStore.deleteItemAsync("selected_member_name");
       setSelectedMember(null);
+      setShowMemberDropdown(false);
+      console.log("Member selection cleared");
     } catch (error) {
       console.error("Error clearing member selection:", error);
     }
@@ -741,48 +833,13 @@ export default function PolicyHome() {
     if (normalizedType === "New Claim") {
       console.log("Opening New Claim modal");
 
-      // Check if a member is selected for New Claim
-      if (!selectedMember) {
-        Alert.alert(
-          "Member Selection Required",
-          "Please select a member from the dropdown before creating a New Claim.",
-          [{ text: "OK" }]
-        );
-        return;
-      }
-
-      // Verify member data is stored in SecureStore
-      try {
-        const storedMemberData = await SecureStore.getItemAsync(
-          "selected_member_complete"
-        );
-        if (!storedMemberData) {
-          Alert.alert(
-            "Member Selection Required",
-            "Please select a member from the dropdown before creating a New Claim.",
-            [{ text: "OK" }]
-          );
-          return;
-        }
-
-        const memberData = JSON.parse(storedMemberData);
-        console.log("Member data for New Claim:", memberData);
-
-        // Proceed to open New Claim modal
-        setModalVisible(true);
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      } catch (error) {
-        console.error("Error checking member data:", error);
-        Alert.alert(
-          "Error",
-          "Unable to verify member selection. Please select a member again.",
-          [{ text: "OK" }]
-        );
-      }
+      // Removed member selection requirement - directly open New Claim modal
+      setModalVisible(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else if (normalizedType === "Saved Claims") {
       console.log("Saved Claims pressed");
 
@@ -925,10 +982,9 @@ export default function PolicyHome() {
 
   const toggleMemberDropdown = async () => {
     if (!showMemberDropdown) {
-      // Only fetch members when opening the dropdown for the first time
-      if (members.length === 0) {
-        await fetchMembers();
-      }
+      // Always fetch fresh members when opening the dropdown
+      // This ensures we get updated data after policy selection
+      await fetchMembers();
     }
     setShowMemberDropdown(!showMemberDropdown);
   };
@@ -981,368 +1037,458 @@ export default function PolicyHome() {
     return "No User";
   };
 
-  return (
-    // <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
-        <View style={styles.headerContent}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoRow}>
-              <Image
-                source={require("../assets/images/logo.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.userSection}>
-              <Image
-                source={require("../assets/images/userhome.png")}
-                style={styles.userAvatar}
-                resizeMode="contain"
-              />
-              <Text style={styles.userName}>{displayMemberName()}</Text>
-              <TouchableOpacity onPress={showPolicySelectionModal}>
-                <Icon name="chevron-down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ["0deg", "360deg"],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={24} color="#FFFFFF" />
           </View>
         </View>
+      </Animated.View>
+    );
+  };
 
-        <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
-          <View style={styles.cardOutline}>
-            <View style={styles.insuranceCard}>
-              <View style={styles.policyHeader}>
-                <View style={styles.policyInfo}>
-                  <Text style={styles.insuranceText}>
-                    Policy Number :{" "}
-                    <Text style={styles.boldText}>
-                      {policyDetails?.policyNumber || "Loading..."}
-                    </Text>
-                  </Text>
-                  <Text style={styles.insuranceText}>
-                    Policy Period :{" "}
-                    <Text style={styles.boldText}>
-                      {policyDetails?.policyPeriod || "Loading..."}
-                    </Text>
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.moreButton}
-                onPress={handleMoreDetails}
-              >
-                <Text style={styles.moreText}>More Details</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Policy Data...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
-          <Text style={styles.sectionTitle}>MEMBER</Text>
-          <View style={styles.memberCard}>
-            <TouchableOpacity
-              style={styles.memberRow}
-              onPress={toggleMemberDropdown}
-            >
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>
-                  {selectedMember ? selectedMember.name : "Select a Member"}
-                </Text>
-                {selectedMember && (
-                  <Text style={styles.memberRelationship}>
-                    {selectedMember.relationship}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.memberActions}>
-                <View style={styles.totalBadge}>
-                  <Text style={styles.totalText}>Total </Text>
-                  <Text style={styles.totalNumber}>
-                    {membersCount.toString().padStart(2, "0")}
-                  </Text>
-                </View>
-                <Icon
-                  name={showMemberDropdown ? "chevron-up" : "chevron-down"}
-                  size={16}
-                  color="#666"
-                  style={styles.dropdownIcon}
-                />
-              </View>
-            </TouchableOpacity>
+  // Show loading screen during policy selection
+  if (isLoadingPolicySelection) {
+    return (
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
+        <LoadingScreen />
+      </LinearGradient>
+    );
+  }
 
-            {showMemberDropdown && (
-              <View style={styles.dropdownContainer}>
-                {isLoadingMembers ? (
-                  <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading members...</Text>
-                  </View>
-                ) : members.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No members found</Text>
-                  </View>
-                ) : (
-                  members.map((member) => (
-                    <TouchableOpacity
-                      key={member.id}
-                      style={[
-                        styles.dropdownItem,
-                        selectedMember?.id === member.id &&
-                          styles.selectedDropdownItem,
-                      ]}
-                      onPress={() => handleMemberSelect(member)}
-                    >
-                      <View style={styles.dropdownMemberInfo}>
-                        <Text style={styles.dropdownMemberName}>
-                          {member.name}
-                        </Text>
-                        <Text style={styles.dropdownMemberRelationship}>
-                          {member.relationship}
-                        </Text>
-                      </View>
-                      {selectedMember?.id === member.id && (
-                        <Icon name="check" size={16} color="#16858D" />
-                      )}
-                    </TouchableOpacity>
-                  ))
-                )}
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.sectionTitle}>TYPE</Text>
-          <View style={styles.typeContainer}>
-            {renderType(
-              "New\nClaim",
-              require("../assets/images/newclaimicon.png"),
-              handleTypePress
-            )}
-            {renderType(
-              "Saved\nClaims",
-              require("../assets/images/savedclaimicon.png"),
-              handleTypePress
-            )}
-            {renderType(
-              "Claim\nHistory",
-              require("../assets/images/claimhistoryicon.png"),
-              handleTypePress
-            )}
-            {renderType(
-              "Pending\nRequirement",
-              require("../assets/images/pendingicon.png"),
-              handleTypePress
-            )}
-          </View>
-
-          <Text style={styles.sectionTitle}>HEALTH CARD</Text>
-          <View style={styles.healthCardContainer}>
+  return (
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
+      <View style={styles.headerContent}>
+        <View style={styles.logoContainer}>
+          <View style={styles.logoRow}>
             <Image
-              source={require("../assets/images/healthcard.png")}
-              style={styles.healthCard}
+              source={require("../assets/images/logo.png")}
+              style={styles.logo}
               resizeMode="contain"
             />
-            {/* Company Name Overlay - Add this new overlay */}
-            <View style={styles.companyNameOverlay}>
-              <Text style={styles.companyNameOnCard}>
-                {isLoadingPolicyInfo ? "Loading..." : policyInfo?.name || "N/A"}
-              </Text>
-            </View>
-            {/* Employee Name Overlay - First Position */}
-            <View style={styles.employeeNameOverlay}>
-              <Text style={styles.memberNameOnCard}>{displayMemberName()}</Text>
-            </View>
-            {/* Dependent Names Overlay - Second Position */}
-            <View style={styles.dependentNamesOverlay}>
-              {dependents.map((dependent, index) => (
-                <Text key={index} style={styles.dependentNameOnCard}>
-                  {dependent.dependentName}
-                </Text>
-              ))}
-            </View>
-            <View style={styles.memberNumberOverlay}>
-              <Text style={styles.cardDataText}>
-                {employeeInfo?.memberNumber || policyDetails?.policyID || "N/A"}
-              </Text>
-            </View>
-            <View style={styles.policyNumberOverlay}>
-              <Text style={styles.cardDataText}>
-                {policyDetails?.policyNumber || "N/A"}
-              </Text>
-            </View>
-            <View style={styles.endDateOverlay}>
-              <Text style={styles.cardDataText}>
-                {policyDetails?.endDate || "N/A"}
-              </Text>
-            </View>
           </View>
-        </ScrollView>
-
-        <View style={styles.navbar}>
-          {renderNavItem("home", "Home", handleNavigation)}
-          {renderNavItem("bell", "Notification", handleNavigation)}
-          {renderNavItem("file-text", "Policy Details", handleNavigation)}
-          {renderNavItem("user", "Profile", handleNavigation)}
+          <View style={styles.userSection}>
+            <Image
+              source={require("../assets/images/userhome.png")}
+              style={styles.userAvatar}
+              resizeMode="contain"
+            />
+            <Text style={styles.userName}>{displayMemberName()}</Text>
+            <TouchableOpacity onPress={showPolicySelectionModal}>
+              <Icon name="chevron-down" size={16} color="#666" />
+            </TouchableOpacity>
+          </View>
         </View>
-        {/* Policy Selection Modal */}
-        <Modal
-          visible={showPolicySelection}
-          transparent
-          animationType="none"
-          onRequestClose={() => {
-            // Prevent closing modal with back button if no policy selected
-            if (selectedPolicyNumber) {
-              handleClosePolicySelection();
-            }
-          }}
-        >
-          <View style={styles.overlay}>
-            {/* Remove the TouchableOpacity that was allowing outside clicks */}
-            <Animated.View
-              style={[
-                styles.policySelectionModal,
-                { transform: [{ translateY: policySelectSlideAnim }] },
-              ]}
-            >
-              <View style={styles.policyModalHeader}>
-                <Text style={styles.policyModalTitle}>Select Your Policy</Text>
-                <Text style={styles.policyModalSubtitle}>
-                  Please select a policy to continue
+      </View>
+
+      <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
+        <View style={styles.cardOutline}>
+          <View style={styles.insuranceCard}>
+            <View style={styles.policyHeader}>
+              <View style={styles.policyInfo}>
+                <Text style={styles.insuranceText}>
+                  Policy Number :{" "}
+                  <Text style={styles.boldText}>
+                    {policyDetails?.policyNumber || "Loading..."}
+                  </Text>
+                </Text>
+                <Text style={styles.insuranceText}>
+                  Policy Period :{" "}
+                  <Text style={styles.boldText}>
+                    {policyDetails?.policyPeriod || "Loading..."}
+                  </Text>
                 </Text>
               </View>
-              <ScrollView style={styles.policyList}>
-                {isLoadingPolicies ? (
-                  <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading policies...</Text>
-                  </View>
-                ) : availablePolicies.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No policies found</Text>
-                  </View>
-                ) : (
-                  availablePolicies.map((policy) => (
-                    <View key={policy.id} style={styles.policyItemContainer}>
-                      <TouchableOpacity
-                        style={[
-                          styles.policyItem,
-                          selectedPolicyNumber === policy.policyNumber &&
-                            styles.selectedPolicyItem,
-                        ]}
-                        onPress={() => handlePolicySelection(policy)}
-                      >
-                        <View style={styles.policyContent}>
-                          <Text style={styles.policyNumber}>
-                            {policy.policyNumber}
-                          </Text>
-                          <Text style={styles.policyID}>
-                            Member: {policy.policyID}
-                          </Text>
-                          <Text style={styles.policyPeriod}>
-                            {policy.policyPeriod}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() =>
-                          handleDeletePolicy(policy.id, policy.policyNumber)
-                        }
-                      >
-                        <Icon name="trash" size={25} color="#E12427" />
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                )}
-              </ScrollView>
-            </Animated.View>
-          </View>
-        </Modal>
-        {/* Claim Type Selection Modal */}
-        <Modal
-          visible={modalVisible}
-          transparent
-          animationType="none"
-          onRequestClose={handleCloseModal}
-        >
-          <TouchableOpacity
-            style={styles.overlayTouchable}
-            activeOpacity={1}
-            onPress={handleCloseModal}
-          />
-          <Animated.View
-            style={[
-              styles.animatedModal,
-              { transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <ClaimTypeSelection onClose={handleCloseModal} />
-          </Animated.View>
-        </Modal>
-        {/* PendingIntimations Modal */}
-        <View style={{ backgroundColor: "" }}>
-          <Modal
-            visible={showPendingIntimations}
-            style={{ minHeight: 200 }}
-            transparent
-            animationType="none"
-            onRequestClose={handleClosePendingIntimations}
-          >
+            </View>
             <TouchableOpacity
-              style={styles.overlayTouchable}
-              activeOpacity={1}
-              onPress={handleClosePendingIntimations}
-            />
-            <Animated.View
-              style={[
-                styles.animatedModal,
-                { transform: [{ translateY: pendingIntimationsSlideAnim }] },
-              ]}
+              style={styles.moreButton}
+              onPress={handleMoreDetails}
             >
-              <PendingIntimations onClose={handleClosePendingIntimations} />
-            </Animated.View>
-          </Modal>
+              <Text style={styles.moreText}>More Details</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        {/* Claim History Modal */}
-        <Modal
-          visible={showClaimHistory}
-          transparent
-          animationType="none"
-          onRequestClose={handleCloseClaimHistory}
-        >
-          <TouchableOpacity
-            style={styles.overlayTouchable}
-            activeOpacity={1}
-            onPress={handleCloseClaimHistory}
-          />
-          <Animated.View
-            style={[
-              styles.animatedModal,
-              { transform: [{ translateY: claimHistorySlideAnim }] },
-            ]}
-          >
-            <ClaimHistory onClose={handleCloseClaimHistory} />
-          </Animated.View>
-        </Modal>
 
-        {/* Pending Requirement Modal */}
+        <Text style={styles.sectionTitle}>MEMBER</Text>
+        <View style={styles.memberCard}>
+          <TouchableOpacity
+            style={styles.memberRow}
+            onPress={toggleMemberDropdown}
+          >
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>
+                {selectedMember ? selectedMember.name : "View Your Members"}
+              </Text>
+              {selectedMember && (
+                <Text style={styles.memberRelationship}>
+                  {selectedMember.relationship}
+                </Text>
+              )}
+            </View>
+            <View style={styles.memberActions}>
+              <View style={styles.totalBadge}>
+                <Text style={styles.totalText}>Total </Text>
+                <Text style={styles.totalNumber}>
+                  {membersCount.toString().padStart(2, "0")}
+                </Text>
+              </View>
+              <Icon
+                name={showMemberDropdown ? "chevron-up" : "chevron-down"}
+                size={16}
+                color="#666"
+                style={styles.dropdownIcon}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {showMemberDropdown && (
+            <View style={styles.dropdownContainer}>
+              {isLoadingMembers ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading members...</Text>
+                </View>
+              ) : members.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No members found</Text>
+                </View>
+              ) : (
+                members.map((member) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.dropdownItem,
+                      selectedMember?.id === member.id &&
+                        styles.selectedDropdownItem,
+                    ]}
+                    onPress={() => handleMemberSelect(member)}
+                  >
+                    <View style={styles.dropdownMemberInfo}>
+                      <Text style={styles.dropdownMemberName}>
+                        {member.name}
+                      </Text>
+                      <Text style={styles.dropdownMemberRelationship}>
+                        {member.relationship}
+                      </Text>
+                    </View>
+                    {selectedMember?.id === member.id && (
+                      <Icon name="check" size={16} color="#16858D" />
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>TYPE</Text>
+        <View style={styles.typeContainer}>
+          {renderType(
+            "New\nClaim",
+            require("../assets/images/newclaimicon.png"),
+            handleTypePress
+          )}
+          {renderType(
+            "Saved\nClaims",
+            require("../assets/images/savedclaimicon.png"),
+            handleTypePress
+          )}
+          {renderType(
+            "Claim\nHistory",
+            require("../assets/images/claimhistoryicon.png"),
+            handleTypePress
+          )}
+          {renderType(
+            "Pending\nRequirement",
+            require("../assets/images/pendingicon.png"),
+            handleTypePress
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>HEALTH CARD</Text>
+        <View style={styles.healthCardContainer}>
+          <Image
+            source={require("../assets/images/healthcard.png")}
+            style={styles.healthCard}
+            resizeMode="contain"
+          />
+          {/* Company Name Overlay - Add this new overlay */}
+          <View style={styles.companyNameOverlay}>
+            <Text style={styles.companyNameOnCard}>
+              {isLoadingPolicyInfo ? "Loading..." : policyInfo?.name || "N/A"}
+            </Text>
+          </View>
+          {/* Employee Name Overlay - First Position */}
+          <View style={styles.employeeNameOverlay}>
+            <Text style={styles.memberNameOnCard}>{displayMemberName()}</Text>
+          </View>
+          {/* Dependent Names Overlay - Second Position */}
+          <View style={styles.dependentNamesOverlay}>
+            {dependents.map((dependent, index) => (
+              <Text key={index} style={styles.dependentNameOnCard}>
+                {dependent.dependentName}
+              </Text>
+            ))}
+          </View>
+          <View style={styles.memberNumberOverlay}>
+            <Text style={styles.cardDataText}>
+              {employeeInfo?.memberNumber || policyDetails?.policyID || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.policyNumberOverlay}>
+            <Text style={styles.cardDataText}>
+              {policyDetails?.policyNumber || "N/A"}
+            </Text>
+          </View>
+          <View style={styles.endDateOverlay}>
+            <Text style={styles.cardDataText}>
+              {policyDetails?.endDate || "N/A"}
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.navbar}>
+        {renderNavItem("home", "Home", handleNavigation)}
+        {renderNavItem("bell", "Notification", handleNavigation)}
+        {renderNavItem("file-text", "Policy Details", handleNavigation)}
+        {renderNavItem("user", "Profile", handleNavigation)}
+      </View>
+
+      {/* Policy Selection Modal */}
+      <Modal
+        visible={showPolicySelection}
+        transparent
+        animationType="none"
+        onRequestClose={() => {
+          // Prevent closing modal with back button if no policy selected
+          if (selectedPolicyNumber) {
+            handleClosePolicySelection();
+          }
+        }}
+      >
+        <View style={styles.overlay}>
+          {/* Remove the TouchableOpacity that was allowing outside clicks */}
+          <Animated.View
+            style={[
+              styles.policySelectionModal,
+              { transform: [{ translateY: policySelectSlideAnim }] },
+            ]}
+          >
+            <View style={styles.policyModalHeader}>
+              <Text style={styles.policyModalTitle}>Select Your Policy</Text>
+              <Text style={styles.policyModalSubtitle}>
+                Please select a policy to continue
+              </Text>
+            </View>
+            <ScrollView style={styles.policyList}>
+              {isLoadingPolicies ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading policies...</Text>
+                </View>
+              ) : availablePolicies.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No policies found</Text>
+                </View>
+              ) : (
+                availablePolicies.map((policy) => (
+                  <View key={policy.id} style={styles.policyItemContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.policyItem,
+                        selectedPolicyNumber === policy.policyNumber &&
+                          styles.selectedPolicyItem,
+                      ]}
+                      onPress={() => handlePolicySelection(policy)}
+                    >
+                      <View style={styles.policyContent}>
+                        <Text style={styles.policyNumber}>
+                          {policy.policyNumber}
+                        </Text>
+                        <Text style={styles.policyID}>
+                          Member: {policy.policyID}
+                        </Text>
+                        <Text style={styles.policyPeriod}>
+                          {policy.policyPeriod}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() =>
+                        handleDeletePolicy(policy.id, policy.policyNumber)
+                      }
+                    >
+                      <Icon name="trash" size={25} color="#E12427" />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Claim Type Selection Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="none"
+        onRequestClose={handleCloseModal}
+      >
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          activeOpacity={1}
+          onPress={handleCloseModal}
+        />
+        <Animated.View
+          style={[
+            styles.animatedModal,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <ClaimTypeSelection onClose={handleCloseModal} />
+        </Animated.View>
+      </Modal>
+
+      {/* PendingIntimations Modal */}
+      <View style={{ backgroundColor: "" }}>
         <Modal
-          visible={showPendingRequirement}
+          visible={showPendingIntimations}
+          style={{ minHeight: 200 }}
           transparent
           animationType="none"
-          onRequestClose={handleClosePendingRequirement}
+          onRequestClose={handleClosePendingIntimations}
         >
           <TouchableOpacity
             style={styles.overlayTouchable}
             activeOpacity={1}
-            onPress={handleClosePendingRequirement}
+            onPress={handleClosePendingIntimations}
           />
           <Animated.View
             style={[
               styles.animatedModal,
-              { transform: [{ translateY: pendingRequirementSlideAnim }] },
+              { transform: [{ translateY: pendingIntimationsSlideAnim }] },
             ]}
           >
-            <PendingRequirement onClose={handleClosePendingRequirement} />
+            <PendingIntimations onClose={handleClosePendingIntimations} />
           </Animated.View>
         </Modal>
-      </LinearGradient>
-    // {/* </SafeAreaView> */}
+      </View>
+
+      {/* Claim History Modal */}
+      <Modal
+        visible={showClaimHistory}
+        transparent
+        animationType="none"
+        onRequestClose={handleCloseClaimHistory}
+      >
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          activeOpacity={1}
+          onPress={handleCloseClaimHistory}
+        />
+        <Animated.View
+          style={[
+            styles.animatedModal,
+            { transform: [{ translateY: claimHistorySlideAnim }] },
+          ]}
+        >
+          <ClaimHistory onClose={handleCloseClaimHistory} />
+        </Animated.View>
+      </Modal>
+
+      {/* Pending Requirement Modal */}
+      <Modal
+        visible={showPendingRequirement}
+        transparent
+        animationType="none"
+        onRequestClose={handleClosePendingRequirement}
+      >
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          activeOpacity={1}
+          onPress={handleClosePendingRequirement}
+        />
+        <Animated.View
+          style={[
+            styles.animatedModal,
+            { transform: [{ translateY: pendingRequirementSlideAnim }] },
+          ]}
+        >
+          <PendingRequirement onClose={handleClosePendingRequirement} />
+        </Animated.View>
+      </Modal>
+    </LinearGradient>
   );
 }
 
@@ -1353,6 +1499,55 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  // Loading overlay styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+    elevation: 10,
+    minWidth: 250,
+    minHeight: 200,
+  },
+  // Custom loading icon styles
+  customLoadingIcon: {
+    marginBottom: 20,
+  },
+  loadingIconOuter: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#6DD3D3",
+  },
+  loadingIconInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 18,
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   policyModalSubtitle: {
     fontSize: 14,
@@ -1367,7 +1562,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginLeft: 10,
-    marginTop:10
+    marginTop: 10,
   },
   logoRow: {
     alignItems: "center",
@@ -1379,7 +1574,6 @@ const styles = StyleSheet.create({
     width: 150,
     height: 50,
   },
-
   sligBadge: {
     backgroundColor: "#16858D",
     paddingHorizontal: 12,
@@ -1536,7 +1730,6 @@ const styles = StyleSheet.create({
     left: "31%",
     alignItems: "flex-start",
   },
-
   dependentNamesOverlay: {
     position: "absolute",
     top: "38%",
@@ -1553,13 +1746,11 @@ const styles = StyleSheet.create({
     color: "#000",
     textAlign: "center",
   },
-
   memberNameOnCard: {
     color: "#000",
     fontSize: 9,
     marginBottom: 4,
   },
-
   dependentNameOnCard: {
     color: "#000",
     fontSize: 9,
@@ -1583,7 +1774,6 @@ const styles = StyleSheet.create({
     left: "71%",
     alignItems: "flex-start",
   },
-
   cardDataText: {
     color: "#000",
     fontSize: 9,
@@ -1652,10 +1842,6 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
     lineHeight: 16,
-  },
-  healthCardContainer: {
-    alignItems: "center",
-    marginBottom: 15,
   },
   healthCardWrapper: {
     width: screenWidth - 40,
@@ -1816,7 +2002,6 @@ const styles = StyleSheet.create({
   },
   policyID: {
     fontSize: 14,
-    // color: '#16858D',
     fontWeight: "500",
   },
   deleteButton: {
@@ -1838,5 +2023,15 @@ const styles = StyleSheet.create({
   animatedModal: {
     height: "65%",
     backgroundColor: "transparent",
+  },
+  // Empty state styles
+  emptyContainer: {
+    alignItems: "center",
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
   },
 });

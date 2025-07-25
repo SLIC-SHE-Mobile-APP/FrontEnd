@@ -3,7 +3,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   Keyboard,
@@ -15,6 +14,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
+  Dimensions,
 } from "react-native";
 import {
   SafeAreaProvider,
@@ -22,6 +23,118 @@ import {
 } from "react-native-safe-area-context";
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '../constants/index.js';
+// Removed expo-blur dependency
+
+const { width, height } = Dimensions.get('window');
+
+// Custom Popup Component
+const CustomPopup = ({ visible, title, message, onConfirm, type = 'info' }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconColor = () => {
+    switch (type) {
+      case 'success':
+        return '#4CAF50';
+      case 'error':
+        return '#F44336';
+      case 'warning':
+        return '#FF9800';
+      default:
+        return '#4ECDC4';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return '✓';
+      case 'error':
+        return '✕';
+      case 'warning':
+        return '⚠';
+      default:
+        return 'ℹ';
+    }
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      transparent={true}
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onConfirm}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: getIconColor() }]}>
+            <Text style={styles.iconText}>{getIcon()}</Text>
+          </View>
+          
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+          
+          <TouchableOpacity
+            style={[styles.confirmButton, { backgroundColor: getIconColor() }]}
+            onPress={onConfirm}
+          >
+            <Text style={styles.confirmButtonText}>OK</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 function OTPVerificationContent() {
   const params = useLocalSearchParams();
@@ -32,6 +145,14 @@ function OTPVerificationContent() {
   const [contactType, setContactType] = useState(params.contactType || "phone");
   const [nicNumber, setNicNumber] = useState(params.nicNumber || "");
   const [mobileNumber, setMobileNumber] = useState(params.mobileNumber || "");
+
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
 
   // References for OTP input fields
   const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -45,6 +166,26 @@ function OTPVerificationContent() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const slideAnim = new Animated.Value(0);
+
+  // Function to show popup
+  const showPopup = (message, type = 'info', title = '') => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  // Function to hide popup
+  const hidePopup = () => {
+    setPopup({
+      visible: false,
+      title: '',
+      message: '',
+      type: 'info'
+    });
+  };
 
   // Function to clear all stored data
   const clearAllStoredData = async () => {
@@ -229,19 +370,16 @@ function OTPVerificationContent() {
     }
   };
 
-  // Updated verifyOTP function with data clearing
+  // Updated verifyOTP function with popup messages
   const verifyOTP = async () => {
     const otpCode = otp.join("");
     if (otpCode.length !== 4) {
-      Alert.alert("", "Please enter a valid 4-digit OTP");
+      showPopup("Please enter a valid 4-digit OTP", 'warning');
       return;
     }
 
     if (!mobileNumber) {
-      Alert.alert(
-        "Error",
-        "Missing mobile number. Please go back and try again."
-      );
+      showPopup("Missing mobile number. Please go back and try again.", 'error', 'Error');
       return;
     }
 
@@ -270,42 +408,39 @@ function OTPVerificationContent() {
 
       if (result.success) {
         // Clear all stored data before navigation
-        await clearPolicyAndMemberData(); // or use clearAllStoredData() if you want to clear everything including user data
+        await clearPolicyAndMemberData();
         
         if (result.nicAvailaWeb === false) {
           router.push("/email");
         } else if (result.nicAvailaWeb === true) {
           router.push("/home");
         } else {
-          Alert.alert("Error", "Unexpected response. Please try again.");
+          showPopup("Unexpected response. Please try again.", 'error', 'Error');
         }
       } else {
         if (result.errorType === "INVALID_OTP") {
-          Alert.alert("", "Invalid OTP. Please check and try again.");
+          showPopup("Invalid OTP. Please check and try again.", 'error');
         } else if (result.errorType === "OTP_EXPIRED") {
-          Alert.alert("", "OTP has expired. Please request a new one.");
+          showPopup("OTP has expired. Please request a new one.", 'warning');
         } else {
-          Alert.alert("Error", result.message || "OTP verification failed.");
+          showPopup(result.message || "OTP verification failed.", 'error', 'Error');
         }
       }
     } catch (error) {
       console.error("API Error:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Something went wrong. Please try again."
-      );
+      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Resend OTP
+  // Resend OTP with popup messages
   const resendOTP = async () => {
     if (!canResend) return;
 
     // Check if we have required data
     if (!nicNumber || !mobileNumber) {
-      Alert.alert("Error", "Missing user data. Please go back and try again.");
+      showPopup("Missing user data. Please go back and try again.", 'error', 'Error');
       return;
     }
 
@@ -343,19 +478,13 @@ function OTPVerificationContent() {
         setTimer(90);
         setCanResend(false);
 
-        Alert.alert("Success", `OTP resent to ${contactInfo}`);
+        showPopup(`OTP resent to ${contactInfo}`, 'success', 'Success');
       } else {
-        Alert.alert(
-          "Error",
-          result.message || "Failed to resend OTP. Please try again."
-        );
+        showPopup(result.message || "Failed to resend OTP. Please try again.", 'error', 'Error');
       }
     } catch (error) {
       console.error("API Error:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Something went wrong. Please try again."
-      );
+      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
     } finally {
       setResendLoading(false);
     }
@@ -496,6 +625,15 @@ function OTPVerificationContent() {
           </View>
         </ScrollView>
       </Animated.View>
+
+      {/* Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        onConfirm={hidePopup}
+      />
     </View>
   );
 }
@@ -677,5 +815,76 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#4ECDC4",
     fontWeight: "500",
+  },
+  // Popup Styles
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  iconText: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  popupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  popupMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  confirmButton: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    minWidth: 100,
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
