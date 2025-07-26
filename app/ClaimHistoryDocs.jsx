@@ -12,17 +12,98 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Animated,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 import axios from "axios";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const ClaimHistory1 = ({ onClose, claimData }) => {
+const ClaimHistoryDocs = ({ onClose, claimData }) => {
   const [documents, setDocuments] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading documents...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -49,19 +130,19 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
   const openImageModal = (doc) => {
     let imageSource;
     let imageDescription = `${doc.docType} - Claim No: ${doc.clmSeqNo}`;
-    
+
     if (doc.imagePath !== "0") {
       imageSource = { uri: doc.imagePath };
     } else {
       imageSource = { uri: `data:image/png;base64,${doc.imgContent}` };
     }
-    
+
     setSelectedImage({
       source: imageSource,
       description: imageDescription,
       docType: doc.docType,
       claimNo: doc.clmSeqNo,
-      amount: doc.docAmount
+      amount: doc.docAmount,
     });
     setIsImageModalVisible(true);
   };
@@ -121,25 +202,23 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
 
   return (
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-      <View style={styles.modalContainer}>
-        <View style={styles.header}>
-          <View style={{ width: 26 }} />
-          <Text style={styles.headerTitle}>Claim Documents</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons
-              name="close"
-              size={26}
-              color="#13646D"
-              style={{ marginRight: 15 }}
-            />
-          </TouchableOpacity>
-        </View>
+      {/* Fixed Header - moved outside modalContainer like ClaimHistory */}
+      <View style={styles.header}>
+        <View style={{ width: 26 }} />
+        <Text style={styles.headerTitle}>Claim History Documents</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons
+            name="close"
+            size={26}
+            color="#13646D"
+            style={{ marginRight: 15 }}
+          />
+        </TouchableOpacity>
+      </View>
 
+      <View style={styles.modalContainer}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#17ABB7" />
-            <Text style={styles.loadingText}>Loading documents...</Text>
-          </View>
+          <LoadingScreen />
         ) : (
           <ScrollView
             style={styles.scrollContainer}
@@ -151,9 +230,7 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
             ) : (
               <View style={styles.noDocumentsContainer}>
                 <Ionicons name="document-outline" size={48} color="#888" />
-                <Text style={styles.noDocumentsText}>
-                  No documents found.
-                </Text>
+                <Text style={styles.noDocumentsText}>No documents found.</Text>
               </View>
             )}
           </ScrollView>
@@ -172,7 +249,7 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
               onPress={closeImageModal}
               activeOpacity={1}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalContent}
                 activeOpacity={1}
                 onPress={(e) => e.stopPropagation()}
@@ -211,21 +288,18 @@ const ClaimHistory1 = ({ onClose, claimData }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
     overflow: "hidden",
   },
-  modalContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
+  // Updated header styles to match ClaimHistory exactly
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingTop: 15,
     paddingBottom: 10,
-    marginBottom: 20,
+    backgroundColor: "transparent",
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: 22,
@@ -234,15 +308,56 @@ const styles = StyleSheet.create({
     textAlign: "left",
     flex: 1,
   },
-  loadingContainer: {
+  modalContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
     fontSize: 16,
-    color: "#17ABB7",
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   scrollContainer: {
     flex: 1,
@@ -375,4 +490,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ClaimHistory1;
+export default ClaimHistoryDocs;

@@ -20,7 +20,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import ClaimTypeSelection from "./AddPatientDetails.jsx";
+import ClaimTypeSelection from "./NewClaim.jsx";
 import ClaimHistory from "./ClaimHistory";
 import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";

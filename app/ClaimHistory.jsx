@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
-import ClaimHistory1 from './ClaimHistory1';
+import ClaimHistory1 from './ClaimHistoryDocs.jsx';
 
 const ClaimHistory = ({ onClose, availableHeight }) => {
   const {

@@ -11,8 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import PendingIntimations from "./PendingIntimations";
-import AddPatientDetails from "./AddPatientDetails";
+import PendingIntimations from "./PendingIntimations.jsx";
+import AddPatientDetails from "./NewClaim.jsx";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -23,7 +23,7 @@ const OnlineClaimIntimations = ({ onClose }) => {
   const [currentModal, setCurrentModal] = useState("");
 
   const forms = [
-    { title: "Go to Online Claims", action: "pending" },
+    { title: "Go to Saved Claims", action: "pending" },
     { title: "Enter New Claims", action: "new" },
   ];
 
@@ -80,9 +80,9 @@ const OnlineClaimIntimations = ({ onClose }) => {
   const getModalHeight = () => {
     switch (currentModal) {
       case "pending":
-        return 600; // Current height for PendingIntimations
+        return 500; 
       case "new":
-        return 500; // Recommended height for AddPatientDetails form
+        return 515; 
       default:
         return 600;
     }
@@ -143,7 +143,6 @@ const OnlineClaimIntimations = ({ onClose }) => {
           {/* Content Card - Centered */}
           <View style={styles.contentContainer}>
             <View style={styles.card}>
-              <Text style={styles.title}>Online Claim Intimations Exits !</Text>
               {forms.map((form, index) => (
                 <TouchableOpacity
                   key={index}
