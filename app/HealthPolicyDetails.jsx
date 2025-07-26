@@ -342,8 +342,8 @@ const HealthPolicyDetails = () => {
           contentBased: true,
         },
         "Online Claim Intimations": {
-          minHeight: 300,
-          maxHeight: 400,
+          minHeight: 200,
+          maxHeight: 300,
           preferredRatio: 0.75,
           contentBased: true,
         },

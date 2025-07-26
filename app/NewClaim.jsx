@@ -1,20 +1,28 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from 'react';
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+  Animated,
+  FlatList
+} from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
-const AddPatientDetails = ({ onClose }) => {
+const NewClaim = ({ onClose, onEditClaim }) => {
+  const navigation = useNavigation();
   const router = useRouter();
   const {
     policyNo: paramPolicyNo = '',
@@ -28,6 +36,85 @@ const AddPatientDetails = ({ onClose }) => {
   const [nic, setNIC] = useState('');
   const [mobile, setMobile] = useState('');
   const [initialising, setInitialising] = useState(true);
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Patient Details...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     (async () => {
@@ -56,12 +143,13 @@ const AddPatientDetails = ({ onClose }) => {
   const [patientName, setPatientName] = useState('');
   const [relationship, setRelationship] = useState('');
   const [illness, setIllness] = useState('');
-  const [selectedClaimType, setSelectedClaimType] = useState('Outdoor');
+  const [selectedClaimType, setSelectedClaimType] = useState('outdoor');
   const [patientNameError, setPatientNameError] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [memberList, setMemberList] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Main loading state
 
   useEffect(() => {
     if (initialising || !policyNo || !memberNo) return;
@@ -71,6 +159,9 @@ const AddPatientDetails = ({ onClose }) => {
 
     const fetchMembers = async () => {
       try {
+        setIsLoading(true); // Start loading
+        setLoadingMembers(true);
+        
         const url = `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${encodeURIComponent(policyNo)}&memberNo=${encodeURIComponent(memberNo)}`;
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error(`Server responded ${res.status}`);
@@ -88,6 +179,7 @@ const AddPatientDetails = ({ onClose }) => {
             setRelationship(defaultMember.relationship);
           }
           setLoadingMembers(false);
+          setIsLoading(false); // End loading
         }
       } catch (err) {
         if (isMounted) {
@@ -98,6 +190,7 @@ const AddPatientDetails = ({ onClose }) => {
             setRelationship(members[0].relationship);
           }
           setLoadingMembers(false);
+          setIsLoading(false); // End loading even on error
           Alert.alert('Network Error', 'Could not fetch dependents list.');
         }
       }
@@ -246,28 +339,90 @@ const AddPatientDetails = ({ onClose }) => {
     </TouchableOpacity>
   );
 
-  if (initialising) {
+  if (initialising || isLoading) {
     return (
-      <View style={styles.overlay}>
-        <ActivityIndicator size="large" color="#00C4CC" />
-      </View>
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+        <View style={styles.header}>
+          <View style={{ width: 26 }} />
+          <Text style={styles.headerTitle}>Add Patient Details</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons
+              name="close"
+              size={26}
+              color="#2E7D7D"
+              style={{ marginRight: 15 }}
+            />
+          </TouchableOpacity>
+        </View>
+        <LoadingScreen />
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.overlay}>
-      <View style={styles.popupContainer}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.cardTitle}>Add Patient Details</Text>
-            {onClose && (
-              <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={24} color="#13646D" />
-              </TouchableOpacity>
-            )}
-          </View>
+    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <View style={styles.header}>
+        <View style={{ width: 26 }} />
+        <Text style={styles.headerTitle}>Add Patient Details</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons
+            name="close"
+            size={26}
+            color="#2E7D7D"
+            style={{ marginRight: 15 }}
+          />
+        </TouchableOpacity>
+      </View>
 
-          {/* Claim Type Section */}
+      {showDropdown && (
+        <View style={styles.dropdownOverlay}>
+          <View style={[styles.dropdownContainer, { top: 290 }]}>
+            <FlatList
+              data={memberList}
+              keyExtractor={(item, index) => `member-${item.id}-${index}`}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownItem,
+                    index === memberList.length - 1 && { borderBottomWidth: 0 }
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setPatientName(item.name);
+                    setRelationship(item.relationship);
+                    setShowDropdown(false);
+                    if (patientNameError) setPatientNameError('');
+                  }}
+                >
+                  <View style={styles.dropdownMemberInfo}>
+                    <Text style={styles.dropdownMemberName}>{item.name}</Text>
+                    <Text style={styles.dropdownMemberRelationship}>({item.relationship})</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              style={styles.dropdownList}
+              showsVerticalScrollIndicator={true}
+              bounces={false}
+              getItemLayout={(data, index) => ({
+                length: 60,
+                offset: 60 * index,
+                index,
+              })}
+            />
+          </View>
+        </View>
+      )}
+
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={!showDropdown} // Disable main scroll when dropdown is open
+        >
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Claim Type</Text>
             <View style={styles.claimTypeGrid}>
@@ -299,7 +454,6 @@ const AddPatientDetails = ({ onClose }) => {
             </View>
           </View>
 
-          {/* Patient Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Patient Name *</Text>
             <View style={styles.inputWrapper}>
@@ -331,26 +485,15 @@ const AddPatientDetails = ({ onClose }) => {
                   color="#666"
                 />
               </TouchableOpacity>
-              {showDropdown && (
-                <View style={styles.dropdownContainer}>
-                  <FlatList
-                    data={memberList}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={renderMemberItem}
-                    style={styles.membersList}
-                    showsVerticalScrollIndicator={false}
-                  />
-                </View>
-              )}
+              {/* Dropdown moved outside - now handled above KeyboardAvoidingView */}
             </View>
             {patientNameError ? <Text style={styles.errorText}>{patientNameError}</Text> : null}
           </View>
 
-          {/* Illness */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Illness</Text>
             <TextInput
-              style={[styles.textInput, { height: 80 }]}
+              style={[styles.textInput, styles.multilineInput]}
               placeholder="Enter illness description"
               value={illness}
               onChangeText={setIllness}
@@ -359,7 +502,6 @@ const AddPatientDetails = ({ onClose }) => {
             />
           </View>
 
-          {/* Next Button */}
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNextPress}
@@ -371,33 +513,112 @@ const AddPatientDetails = ({ onClose }) => {
               <Text style={styles.nextButtonText}>Next</Text>
             )}
           </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  overlayBackground: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
-  popupContainer: { height: '80%', width: '100%', maxWidth: 400, alignItems: 'center', justifyContent: 'center' },
-  card: {
-    backgroundColor: '#fff',
-    borderTopRightRadius: 25,
+  container: {
+    flex: 1,
     borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    overflow: "hidden",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 15,
+    paddingBottom: 10,
+    backgroundColor: "transparent",
+    zIndex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D7D",
+    textAlign: "left",
+    flex: 1,
+  },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    marginTop: 10,
+  },
+  formCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
     padding: 25,
-    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 25,
     elevation: 10,
   },
-  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 20, zIndex: 1 },
-  cardTitle: { flex: 1, fontSize: 20, fontWeight: '600', color: '#13646D', textAlign: 'center' },
-  inputContainer: { marginBottom: 30 },
-  inputLabel: { fontSize: 15, fontWeight: '500', color: '#13646D', marginBottom: 10 },
-  inputWrapper: { position: 'relative' },
+  inputContainer: { 
+    marginBottom: 25,
+  },
+  inputLabel: { 
+    fontSize: 15, 
+    fontWeight: '500', 
+    color: '#2E7D7D', 
+    marginBottom: 10 
+  },
+  inputWrapper: { 
+    position: 'relative',
+    zIndex: 1000,
+  },
   textInput: {
     borderWidth: 1,
     borderColor: '#E8E8E8',
@@ -408,11 +629,24 @@ const styles = StyleSheet.create({
     color: '#333',
     backgroundColor: '#F9F9F9',
   },
-  textInputWithDropdown: { paddingRight: 50 },
-  textInputError: { borderColor: '#FF6B6B', borderWidth: 2 },
-  dropdownSelectInput: { justifyContent: 'center', paddingRight: 50 },
-  dropdownSelectText: { fontSize: 15, color: '#333' },
-  placeholderText: { color: '#B0B0B0' },
+  multilineInput: {
+    height: 80,
+  },
+  textInputError: { 
+    borderColor: '#FF6B6B', 
+    borderWidth: 2 
+  },
+  dropdownSelectInput: { 
+    justifyContent: 'center', 
+    paddingRight: 50 
+  },
+  dropdownSelectText: { 
+    fontSize: 15, 
+    color: '#333' 
+  },
+  placeholderText: { 
+    color: '#B0B0B0' 
+  },
   dropdownButton: {
     position: 'absolute',
     right: 15,
@@ -421,25 +655,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: 30,
+    zIndex: 1001,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2000,
+    pointerEvents: 'box-none',
   },
   dropdownContainer: {
     position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
+    left: 20,
+    right: 20,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E8E8E8',
     borderRadius: 15,
-    maxHeight: 200,
+    maxHeight: 183,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 15,
   },
-  membersList: { maxHeight: 180 },
+  dropdownList: {
+    maxHeight: 200,
+  },
   dropdownItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -448,13 +692,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    minHeight: 60,
+    backgroundColor: '#fff',
+    borderRadius: 15
   },
-  selectedDropdownItem: { backgroundColor: '#F0F8FF' },
-  dropdownMemberInfo: { flex: 1 },
-  dropdownMemberName: { fontSize: 14, fontWeight: '500', color: '#333' },
-  dropdownMemberRelationship: { fontSize: 12, color: '#666', marginTop: 2 },
-  errorText: { color: '#FF6B6B', fontSize: 12, marginTop: 5, marginLeft: 5 },
-  claimTypeGrid: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 10 },
+  dropdownMemberInfo: { 
+    flex: 1 
+  },
+  dropdownMemberName: { 
+    fontSize: 14, 
+    fontWeight: '500', 
+    color: '#333' 
+  },
+  dropdownMemberRelationship: { 
+    fontSize: 12, 
+    color: '#666', 
+    marginTop: 2 
+  },
+  errorText: { 
+    color: '#FF6B6B', 
+    fontSize: 12, 
+    marginTop: 5, 
+    marginLeft: 5 
+  },
+  claimTypeGrid: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    flexWrap: 'wrap', 
+    marginTop: 10 
+  },
   claimTypeButton: {
     width: '22%',
     height: 70,
@@ -466,25 +732,51 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E8E8E8',
   },
-  selectedClaimType: { backgroundColor: '#00C4CC', borderColor: '#00C4CC' },
-  disabledClaimType: { backgroundColor: '#F0F0F0', borderColor: '#D0D0D0', opacity: 0.6 },
-  claimTypeIcon: { fontSize: 20, marginBottom: 5 },
-  disabledIcon: { opacity: 0.5 },
-  claimTypeLabel: { fontSize: 11, color: '#666', fontWeight: '500', textAlign: 'center' },
-  selectedClaimTypeLabel: { color: '#fff' },
-  disabledClaimTypeLabel: { color: '#999' },
+  selectedClaimType: { 
+    backgroundColor: '#00C4CC', 
+    borderColor: '#00C4CC' 
+  },
+  disabledClaimType: { 
+    backgroundColor: '#F0F0F0', 
+    borderColor: '#D0D0D0', 
+    opacity: 0.6 
+  },
+  claimTypeIcon: { 
+    fontSize: 20, 
+    marginBottom: 5 
+  },
+  disabledIcon: { 
+    opacity: 0.5 
+  },
+  claimTypeLabel: { 
+    fontSize: 11, 
+    color: '#666', 
+    fontWeight: '500', 
+    textAlign: 'center' 
+  },
+  selectedClaimTypeLabel: { 
+    color: '#fff' 
+  },
+  disabledClaimTypeLabel: { 
+    color: '#999' 
+  },
   nextButton: {
     backgroundColor: '#00C4CC',
     borderRadius: 15,
     paddingVertical: 15,
-    marginBottom: 25,
+    marginTop: 10,
     shadowColor: '#00C4CC',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
-  nextButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  nextButtonText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: '600', 
+    textAlign: 'center' 
+  },
 });
 
-export default AddPatientDetails;
+export default NewClaim;

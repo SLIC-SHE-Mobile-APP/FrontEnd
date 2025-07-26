@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
 const BankDetailsSum = ({ onClose }) => {
@@ -41,6 +42,85 @@ const BankDetailsSum = ({ onClose }) => {
 
   // References for OTP input fields
   const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Bank Details...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
 
   // Utility to mask string with only first 2 and last 2 characters visible
   const maskValue = (value) => {
@@ -454,15 +534,6 @@ const BankDetailsSum = ({ onClose }) => {
   };
 
   const renderContent = () => {
-    if (loading) {
-      return (
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#13646D" />
-          <Text style={styles.loadingText}>Loading bank details...</Text>
-        </View>
-      );
-    }
-
     if (error) {
       return (
         <View style={styles.centerContent}>
@@ -550,13 +621,17 @@ const BankDetailsSum = ({ onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.centeredContainer}>{renderContent()}</View>
-      </ScrollView>
+      {/* Content */}
+      {loading ? (
+        <LoadingScreen />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.centeredContainer}>{renderContent()}</View>
+        </ScrollView>
+      )}
 
       {/* OTP Verification Modal */}
       <Modal
@@ -685,6 +760,53 @@ const styles = StyleSheet.create({
     textAlign: "left",
     flex: 1,
   },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   scrollContainer: {
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -729,11 +851,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 50,
   },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#13646D",
-  },
   errorText: {
     marginTop: 10,
     fontSize: 16,
@@ -761,20 +878,16 @@ const styles = StyleSheet.create({
   modalContent: {
     maxHeight: '90%',
     width: '90%',
-    // minHeight: '70%',
     borderRadius: 20,
     overflow: 'hidden',
   },
   modalGradient: {
-    // flex: 1,
     padding: 20,
-    // height: 400
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    // marginBottom: 20,
   },
   modalTitle: {
     fontSize: 24,
@@ -812,7 +925,6 @@ const styles = StyleSheet.create({
   },
   otpInput: {
     width: 55,
-    // height: 55,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.5)',
