@@ -360,16 +360,6 @@ const DependentDetails = ({ onClose }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.centeredContainer}>
-            {/* Policy Information Banner */}
-            {storedData.policyNumber !== "Not Available" && (
-              <View style={styles.policyInfoBanner}>
-                <Ionicons name="document-text-outline" size={20} color="#00ADBB" />
-                <View style={styles.policyInfoContent}>
-                  <Text style={styles.policyInfoText}>Policy: {storedData.policyNumber}</Text>
-                  <Text style={styles.policyInfoText}>Member: {storedData.memberNumber}</Text>
-                </View>
-              </View>
-            )}
 
             <View style={styles.tableContainer}>
               {/* Table Header */}
@@ -389,14 +379,6 @@ const DependentDetails = ({ onClose }) => {
                   {renderFieldWithIcon(dependent.relationship, "relationship")}
                 </View>
               ))}
-            </View>
-
-            {/* Data Status Info */}
-            <View style={styles.dataStatusContainer}>
-              <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
-              <Text style={styles.dataStatusText}>
-                Showing {dependentsData.length} dependent{dependentsData.length !== 1 ? 's' : ''} found
-              </Text>
             </View>
           </View>
         </ScrollView>

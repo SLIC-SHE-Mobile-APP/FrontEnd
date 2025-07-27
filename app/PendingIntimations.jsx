@@ -171,7 +171,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       >
         <View style={styles.loadingIconOuter}>
           <View style={styles.loadingIconInner}>
-            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+            <Icon name="heartbeat" size={24} color="#FFFFFF" />
           </View>
         </View>
       </Animated.View>

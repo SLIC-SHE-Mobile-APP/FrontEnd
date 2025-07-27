@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import {
   Alert,
+  Animated,
   Modal,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import {
   View,
   Image,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from '../constants/index.js';
 
@@ -33,6 +35,15 @@ const EditClaimIntimation = ({ route }) => {
   const [employeeInfo, setEmployeeInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [documentsLoading, setDocumentsLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  
+  // Track all loading states
+  const [loadingStates, setLoadingStates] = useState({
+    claimDetails: true,
+    beneficiaryData: true,
+    employeeInfo: true,
+    documents: true,
+  });
 
   // Beneficiaries state - Initialize as empty array
   const [beneficiaries, setBeneficiaries] = useState([]);
@@ -70,6 +81,98 @@ const EditClaimIntimation = ({ route }) => {
     amount: "",
   });
 
+  // Helper function to update loading states
+  const updateLoadingState = (key, value) => {
+    setLoadingStates(prev => {
+      const newStates = { ...prev, [key]: value };
+      
+      // Check if all loading states are false
+      const allLoaded = Object.values(newStates).every(state => !state);
+      if (allLoaded) {
+        setInitialLoading(false);
+      }
+      
+      return newStates;
+    });
+  };
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={24} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = () => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>Loading Saved Claim Details...</Text>
+        <Text style={styles.loadingSubText}>Please wait a moment</Text>
+      </View>
+    </View>
+  );
+
   // Format date from API response (e.g., "2025-03-04T00:00:00" to "04/03/2025")
   const formatDate = (dateString) => {
     try {
@@ -87,11 +190,10 @@ const EditClaimIntimation = ({ route }) => {
   // Fetch documents from API
   const fetchDocuments = async (referenceNo) => {
     try {
-      setDocumentsLoading(true);
       console.log("Fetching documents for referenceNo:", referenceNo);
 
       const response = await fetch(
-         `${API_BASE_URL}/api/ClaimDocuments/${referenceNo}`,
+         `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
         {
           method: "GET",
           headers: {
@@ -149,6 +251,7 @@ const EditClaimIntimation = ({ route }) => {
       setDocuments([]);
     } finally {
       setDocumentsLoading(false);
+      updateLoadingState('documents', false);
     }
   };
 
@@ -304,6 +407,8 @@ const EditClaimIntimation = ({ route }) => {
         createdOn: claim?.createdOn,
       }));
       return claim?.referenceNo;
+    } finally {
+      updateLoadingState('claimDetails', false);
     }
   };
 
@@ -336,6 +441,8 @@ const EditClaimIntimation = ({ route }) => {
     } catch (error) {
       console.error("Error retrieving beneficiary data:", error);
       setBeneficiaries([]);
+    } finally {
+      updateLoadingState('beneficiaryData', false);
     }
   };
 
@@ -380,6 +487,7 @@ const EditClaimIntimation = ({ route }) => {
       setClaimDetails((prev) => ({ ...prev, enteredBy: "Unknown Member" }));
     } finally {
       setLoading(false);
+      updateLoadingState('employeeInfo', false);
     }
   };
 
@@ -408,14 +516,33 @@ const EditClaimIntimation = ({ route }) => {
   // useEffect to fetch employee info and retrieve claim details on component mount
   useEffect(() => {
     const initializeComponent = async () => {
-      // First retrieve stored claim details
-      const referenceNo = await retrieveClaimDetails();
-      // Retrieve beneficiary data from SecureStore and fetch claim amount
-      await retrieveBeneficiaryData(referenceNo);
-      // Then fetch employee info
-      await fetchEmployeeInfo();
-      // Store the claim details (in case they came from route params)
-      await storeClaimDetails();
+      try {
+        // First retrieve stored claim details
+        const referenceNo = await retrieveClaimDetails();
+        
+        // Start all loading operations in parallel
+        const loadingPromises = [
+          retrieveBeneficiaryData(referenceNo),
+          fetchEmployeeInfo(),
+          storeClaimDetails(),
+        ];
+        
+        // Add document fetching if referenceNo is available
+        if (referenceNo) {
+          loadingPromises.push(fetchDocuments(referenceNo));
+        } else {
+          // If no referenceNo, mark documents as loaded
+          updateLoadingState('documents', false);
+        }
+        
+        // Wait for all operations to complete
+        await Promise.all(loadingPromises);
+        
+      } catch (error) {
+        console.error("Error initializing component:", error);
+        // Ensure loading screen disappears even on error
+        setInitialLoading(false);
+      }
     };
 
     initializeComponent();
@@ -424,14 +551,18 @@ const EditClaimIntimation = ({ route }) => {
   useFocusEffect(
     React.useCallback(() => {
       const fetchDocumentsOnFocus = async () => {
-        const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-        if (referenceNo) {
-          await fetchDocuments(referenceNo);
+        // Only fetch documents on focus if not in initial loading state
+        if (!initialLoading) {
+          const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+          if (referenceNo) {
+            setDocumentsLoading(true);
+            await fetchDocuments(referenceNo);
+          }
         }
       };
 
       fetchDocumentsOnFocus();
-    }, [claimDetails.referenceNo, claim?.referenceNo])
+    }, [claimDetails.referenceNo, claim?.referenceNo, initialLoading])
   );
 
   // Navigate to UploadDocuments page
@@ -619,6 +750,15 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
+  // Show loading screen while initializing
+  if (initialLoading) {
+    return (
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+        <LoadingScreen />
+      </LinearGradient>
+    );
+  }
+
   return (
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
@@ -723,9 +863,13 @@ const EditClaimIntimation = ({ route }) => {
 
         {/* Documents Section */}
         <View style={styles.documentsSection}>
-          {documentsLoading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading documents...</Text>
+          {documentsLoading && !initialLoading ? (
+            <View style={styles.loadingOverlay}>
+              <View style={styles.loadingContainer}>
+                <LoadingIcon />
+                <Text style={styles.loadingText}>Loading Documents...</Text>
+                <Text style={styles.loadingSubText}>Please wait a moment</Text>
+              </View>
             </View>
           ) : documents.length > 0 ? (
             documents.map((document) => (
@@ -1074,6 +1218,54 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: 0,
     paddingBottom: 30,
+  },
+
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 
   // Claim Details Section - Fixed alignment
@@ -1433,6 +1625,24 @@ const styles = StyleSheet.create({
     width: "90%",
     height: "80%",
     borderRadius: 10,
+  },
+  noBeneficiariesContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noBeneficiariesText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  noDocumentsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noDocumentsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

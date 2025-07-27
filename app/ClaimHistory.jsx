@@ -280,7 +280,6 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     if (isDataMissing) {
       return (
         <View style={styles.missingDataContainer}>
-          <Ionicons name="information-circle-outline" size={14} color="#00ADBB" />
           <Text style={styles.missingDataText}>Not Available</Text>
         </View>
       );
@@ -419,13 +418,6 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
           <EmptyStateComponent />
         ) : (
           <View style={styles.contentContainer}>
-            {/* Status Banner */}
-            <View style={styles.statusBanner}>
-              <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
-              <Text style={styles.statusBannerText}>
-                Showing {claimData.length} claim record{claimData.length !== 1 ? 's' : ''} found
-              </Text>
-            </View>
 
             <ScrollView 
               style={styles.scrollContainer} 
