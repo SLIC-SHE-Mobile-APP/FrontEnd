@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 const HealthInsuCard = ({ onClose }) => {
   const [memberData, setMemberData] = useState(null);
@@ -73,7 +73,7 @@ const HealthInsuCard = ({ onClose }) => {
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
+      outputRange: ["0deg", "360deg"],
     });
 
     return (
@@ -110,78 +110,283 @@ const HealthInsuCard = ({ onClose }) => {
   }, []);
 
   const formatDate = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    if (!dateString) return "Not Available";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Invalid Date";
+      return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Date Error";
+    }
+  };
+
+  // Enhanced fetch function for employee info with 404 handling
+  const fetchEmployeeInfo = async (policyNum, memberNum) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNum}&memberNo=${memberNum}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Employee info not found (404), using default values");
+          return {
+            memberName: "Member Information Not Available",
+            memberNumber: memberNum,
+            employeeId: "Not Available",
+            department: "Not Available",
+            designation: "Not Available",
+            joinDate: "Not Available",
+            email: "Not Available",
+            phone: "Not Available",
+            address: "Not Available",
+          };
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        console.warn("Empty response from employee info server");
+        return {
+          memberName: "Member Information Not Available",
+          memberNumber: memberNum,
+          employeeId: "Not Available",
+        };
+      }
+
+      const result = JSON.parse(responseText);
+
+      // Ensure we have valid data and fill in missing fields
+      if (result && typeof result === "object") {
+        return {
+          memberName: result.memberName || "Member Name Not Available",
+          memberNumber: result.memberNumber || memberNum,
+          employeeId: result.employeeId || "Not Available",
+          department: result.department || "Not Available",
+          designation: result.designation || "Not Available",
+          joinDate: result.joinDate || "Not Available",
+          email: result.email || "Not Available",
+          phone: result.phone || "Not Available",
+          address: result.address || "Not Available",
+          ...result,
+        };
+      }
+
+      return {
+        memberName: "Member Information Not Available",
+        memberNumber: memberNum,
+        employeeId: "Not Available",
+      };
+    } catch (err) {
+      console.error("Error fetching employee info:", err);
+      return {
+        memberName: "Member Information Unavailable",
+        memberNumber: memberNum || "Unknown",
+        employeeId: "Unable to retrieve",
+        department: "Unable to retrieve",
+        error: err.message,
+      };
+    }
+  };
+
+  // Enhanced fetch function for policy info with 404 handling
+  const fetchPolicyInfo = async (policyNum) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/PolicyInfo/GetPolicyInfo?policyNo=${policyNum}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Policy info not found (404), using default values");
+          return {
+            name: "Company Information Not Available",
+            policyNumber: policyNum,
+            startDate: "Not Available",
+            endDate: "Not Available",
+            status: "Unknown",
+            coverage: "Not Available",
+          };
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        console.warn("Empty response from policy info server");
+        return {
+          name: "Company Information Not Available",
+          policyNumber: policyNum,
+          endDate: "Not Available",
+        };
+      }
+
+      const result = JSON.parse(responseText);
+
+      // Handle array response (take first item) or direct object
+      let policyData;
+      if (Array.isArray(result) && result.length > 0) {
+        policyData = result[0];
+      } else if (result && typeof result === "object") {
+        policyData = result;
+      } else {
+        return {
+          name: "Company Information Not Available",
+          policyNumber: policyNum,
+          endDate: "Not Available",
+        };
+      }
+
+      // Fill in missing fields with defaults
+      return {
+        name: policyData.name || "Company Information Not Available",
+        policyNumber: policyData.policyNumber || policyNum,
+        startDate: policyData.startDate || "Not Available",
+        endDate: policyData.endDate || "Not Available",
+        status: policyData.status || "Unknown",
+        coverage: policyData.coverage || "Not Available",
+        ...policyData,
+      };
+    } catch (err) {
+      console.error("Error fetching policy info:", err);
+      return {
+        name: "Company Information Unavailable",
+        policyNumber: policyNum || "Unknown",
+        endDate: "Unable to retrieve",
+        status: "Unable to retrieve",
+        error: err.message,
+      };
+    }
+  };
+
+  // Enhanced fetch function for dependents with 404 handling
+  const fetchDependents = async (policyNum, memberNum) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/Dependents/WithoutEmployee?policyNo=${policyNum}&memberNo=${memberNum}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Dependents not found (404), returning empty array");
+          return [];
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        console.warn("Empty response from dependents server");
+        return [];
+      }
+
+      const result = JSON.parse(responseText);
+
+      if (Array.isArray(result)) {
+        // Ensure each dependent has required fields
+        return result.map((dep) => ({
+          dependentName: dep.dependentName || "Dependent Name Not Available",
+          relationship: dep.relationship || "Not Available",
+          dateOfBirth: dep.dateOfBirth || "Not Available",
+          gender: dep.gender || "Not Available",
+          ...dep,
+        }));
+      }
+
+      return [];
+    } catch (err) {
+      console.error("Error fetching dependents:", err);
+      return []; // Return empty array instead of null for dependents
+    }
   };
 
   const fetchMemberData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       // Get policy and member numbers from SecureStore
-      const policyNum = await SecureStore.getItemAsync(
-        "selected_policy_number"
-      );
-      const memberNum = await SecureStore.getItemAsync(
-        "selected_member_number"
-      );
+      const policyNum = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNum = await SecureStore.getItemAsync("selected_member_number");
+      
+      // Get the stored policy end date
+      const storedEndDate = await SecureStore.getItemAsync("selected_policy_end_date");
+      
+      // Or get the entire policy data object
+      const storedPolicyData = await SecureStore.getItemAsync("selected_policy_data");
+      let policyDataFromStorage = null;
+      
+      if (storedPolicyData) {
+        try {
+          policyDataFromStorage = JSON.parse(storedPolicyData);
+        } catch (parseError) {
+          console.error("Error parsing stored policy data:", parseError);
+        }
+      }
 
       // Store the numbers in state for display
-      setPolicyNumber(policyNum || "");
-      setMemberNumber(memberNum || "");
+      setPolicyNumber(policyNum || "Not Available");
+      setMemberNumber(memberNum || "Not Available");
 
       if (!policyNum || !memberNum) {
-        setError("Policy or member number not found");
+        console.warn("Policy or member number not found in storage");
+        // Don't throw error, continue with available data
+        setMemberData({
+          memberName: "Member Information Not Available",
+          memberNumber: memberNum || "Not Available",
+        });
+        setPolicyInfo({
+          name: "Company Information Not Available",
+          policyNumber: policyNum || "Not Available",
+          endDate: storedEndDate || policyDataFromStorage?.endDate || "Not Available",
+        });
+        setDependents([]);
         setLoading(false);
         return;
       }
 
-      // Fetch employee info from API
-      const memberResponse = await fetch(
-        `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNum}&memberNo=${memberNum}`,
-      );
+      // Fetch all data in parallel with enhanced error handling
+      const [memberData, policyData, dependentsData] = await Promise.all([
+        fetchEmployeeInfo(policyNum, memberNum),
+        fetchPolicyInfo(policyNum),
+        fetchDependents(policyNum, memberNum),
+      ]);
 
-      if (!memberResponse.ok) {
-        throw new Error(`HTTP error! status: ${memberResponse.status}`);
-      }
-
-      const memberData = await memberResponse.json();
       setMemberData(memberData);
+      
+      // Merge the fetched policy data with stored end date
+      const enhancedPolicyData = {
+        ...policyData,
+        endDate: storedEndDate || policyDataFromStorage?.endDate || policyData?.endDate || "Not Available"
+      };
+      
+      setPolicyInfo(enhancedPolicyData);
+      setDependents(dependentsData);
 
-      // Fetch policy info from API
-      const policyResponse = await fetch(
-        `${API_BASE_URL}/PolicyInfo/GetPolicyInfo?policyNo=${policyNum}`,
-      );
-
-      if (!policyResponse.ok) {
-        throw new Error(`HTTP error! status: ${policyResponse.status}`);
+      // Only set error if all critical data failed to load
+      if (memberData?.error && policyData?.error) {
+        setError("Some information may be incomplete due to server issues");
       }
-
-      const policyData = await policyResponse.json();
-      // The API returns an array, so we take the first item
-      setPolicyInfo(policyData[0] || null);
-
-      // Fetch dependents from API
-      const dependentsResponse = await fetch(
-        `${API_BASE_URL}/Dependents/WithoutEmployee?policyNo=${policyNum}&memberNo=${memberNum}`,
-      );
-
-      if (!dependentsResponse.ok) {
-        throw new Error(`HTTP error! status: ${dependentsResponse.status}`);
-      }
-
-      const dependentsData = await dependentsResponse.json();
-      setDependents(dependentsData || []);
-
-      setError(null);
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError("Failed to load information");
+      // Set fallback data instead of just error
+      setMemberData({
+        memberName: "Member Information Unavailable",
+        memberNumber: memberNumber || "Unknown",
+      });
+      setPolicyInfo({
+        name: "Company Information Unavailable",
+        policyNumber: policyNumber || "Unknown",
+        endDate: "Unavailable",
+      });
+      setDependents([]);
+      setError("Unable to load complete information. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -209,15 +414,19 @@ const HealthInsuCard = ({ onClose }) => {
       return <ActivityIndicator size="small" color="black" />;
     }
 
-    if (dependents.length === 0) {
+    if (!dependents || dependents.length === 0) {
       return <Text style={styles.dependentNameText}>No Dependents</Text>;
     }
 
     return dependents.map((dependent, index) => (
       <Text key={index} style={styles.dependentNameText}>
-        {dependent.dependentName}
+        {dependent.dependentName || `Dependent ${index + 1}`}
       </Text>
     ));
+  };
+
+  const retryDataLoad = () => {
+    fetchMemberData();
   };
 
   return (
@@ -253,6 +462,20 @@ const HealthInsuCard = ({ onClose }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.container}>
+            {/* Error Banner */}
+            {error && (
+              <View style={styles.errorBanner}>
+                <Icon name="exclamation-triangle" size={16} color="#FF6B6B" />
+                <Text style={styles.errorBannerText}>{error}</Text>
+                <TouchableOpacity
+                  onPress={retryDataLoad}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.cardContainer}>
               {/* Card Image with Overlays */}
               <View style={styles.cardImageContainer}>
@@ -264,40 +487,49 @@ const HealthInsuCard = ({ onClose }) => {
 
                 {/* Member Name Overlay */}
                 <View style={styles.memberNameOverlay}>
-                  {error ? (
-                    <Text style={styles.errorText}>{error}</Text>
-                  ) : (
-                    <Text style={styles.memberNameText}>
-                      {memberData?.memberName || "Member Name"}
-                    </Text>
-                  )}
+                  <Text style={styles.memberNameText}>
+                    {memberData?.memberName &&
+                    memberData.memberName !==
+                      "Member Information Not Available" &&
+                    memberData.memberName !== "Member Information Unavailable"
+                      ? memberData.memberName
+                      : "Member Name Not Available"}
+                  </Text>
                 </View>
 
                 {/* Company Name Overlay */}
                 <View style={styles.companyNameOverlay}>
                   <Text style={styles.companyNameText}>
-                    {policyInfo?.name || "Company Name"}
+                    {policyInfo?.name &&
+                    policyInfo.name !== "Company Information Not Available" &&
+                    policyInfo.name !== "Company Information Unavailable"
+                      ? policyInfo.name
+                      : "Company Name Not Available"}
                   </Text>
                 </View>
 
                 {/* End Date Overlay */}
                 <View style={styles.endDateOverlay}>
                   <Text style={styles.endDateText}>
-                    {formatDate(policyInfo?.endDate) || "End Date"}
+                    {formatDate(policyInfo?.endDate)}
                   </Text>
                 </View>
 
                 {/* Policy Number Overlay */}
                 <View style={styles.policyNumberOverlay}>
                   <Text style={styles.policyNumberText}>
-                    {policyNumber || "Policy Number"}
+                    {policyNumber && policyNumber !== "Not Available"
+                      ? policyNumber
+                      : "Policy Number Not Available"}
                   </Text>
                 </View>
 
                 {/* Member Number Overlay */}
                 <View style={styles.memberNumberOverlay}>
                   <Text style={styles.memberNumberText}>
-                    {memberNumber || "Member Number"}
+                    {memberNumber && memberNumber !== "Not Available"
+                      ? memberNumber
+                      : "Member Number Not Available"}
                   </Text>
                 </View>
 
@@ -324,20 +556,6 @@ const HealthInsuCard = ({ onClose }) => {
 
               <Text style={styles.hotlinesTitle}>Hotlines:</Text>
               <View style={styles.hotlineGrid}>
-                <View style={styles.hotlineColumn}>
-                  <TouchableOpacity
-                    style={styles.hotlineButton}
-                    onPress={() => makePhoneCall("0112357357")}
-                  >
-                    <Ionicons
-                      name="call"
-                      size={18}
-                      color="#2E5A87"
-                      style={styles.callIcon}
-                    />
-                    <Text style={styles.hotline}>0112357357</Text>
-                  </TouchableOpacity>
-                </View>
                 <View style={styles.hotlineColumn}>
                   <TouchableOpacity
                     style={styles.hotlineButton}
@@ -423,6 +641,35 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     fontStyle: "italic",
+  },
+  // Error Banner Styles
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 107, 107, 0.1)",
+    padding: 12,
+    marginBottom: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FF6B6B",
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#FF6B6B",
+    marginLeft: 8,
+  },
+  retryButton: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
   },
   scrollContainer: {
     paddingBottom: 20,

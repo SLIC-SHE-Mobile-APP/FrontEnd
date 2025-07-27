@@ -168,7 +168,7 @@ const HealthPolicyDetails = () => {
     }
   };
 
-  // Function to fetch policy info from the API
+  // Function to fetch policy info from the API with enhanced error handling
   const fetchPolicyInfo = async (policyNumber) => {
     try {
       const response = await fetch(
@@ -183,12 +183,27 @@ const HealthPolicyDetails = () => {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Policy info not found (404), using default values");
+          return {
+            name: "Policy Information Not Available",
+            policyNumber: policyNumber,
+            status: "Unknown",
+            effectiveDate: "Not Available",
+            expiryDate: "Not Available"
+          };
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        throw new Error("Empty response from policy info server");
+        console.warn("Empty response from policy info server, using default values");
+        return {
+          name: "Policy Information Not Available",
+          policyNumber: policyNumber,
+          status: "Unknown"
+        };
       }
 
       const result = JSON.parse(responseText);
@@ -200,14 +215,25 @@ const HealthPolicyDetails = () => {
         return result;
       }
 
-      return null;
+      // If no valid data, return default
+      return {
+        name: "Policy Information Not Available",
+        policyNumber: policyNumber,
+        status: "Unknown"
+      };
     } catch (err) {
       console.error("Error fetching policy info:", err);
-      return null;
+      // Return default policy info instead of null
+      return {
+        name: "Policy Information Unavailable",
+        policyNumber: policyNumber || "Unknown",
+        status: "Unable to retrieve",
+        error: err.message
+      };
     }
   };
 
-  // Function to fetch employee info from the API
+  // Function to fetch employee info from the API with enhanced 404 handling
   const fetchEmployeeInfo = async (policyNumber, memberNumber) => {
     try {
       const response = await fetch(
@@ -222,23 +248,80 @@ const HealthPolicyDetails = () => {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Employee info not found (404), using default values");
+          // Return default employee info structure instead of null
+          return {
+            memberName: "Member Information Not Available",
+            memberNumber: memberNumber,
+            employeeId: "Not Available",
+            department: "Not Available",
+            designation: "Not Available",
+            joinDate: "Not Available",
+            email: "Not Available",
+            phone: "Not Available",
+            address: "Not Available",
+            emergencyContact: "Not Available",
+            relationship: "Not Available",
+            emergencyPhone: "Not Available"
+          };
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        throw new Error("Empty response from employee info server");
+        console.warn("Empty response from employee info server, using default values");
+        return {
+          memberName: "Member Information Not Available",
+          memberNumber: memberNumber,
+          employeeId: "Not Available"
+        };
       }
 
       const result = JSON.parse(responseText);
-      return result;
+      
+      // Ensure we have a valid result object
+      if (result && typeof result === "object") {
+        // Fill in missing fields with appropriate defaults
+        return {
+          memberName: result.memberName || "Member Name Not Available",
+          memberNumber: result.memberNumber || memberNumber,
+          employeeId: result.employeeId || "Not Available",
+          department: result.department || "Not Available", 
+          designation: result.designation || "Not Available",
+          joinDate: result.joinDate || "Not Available",
+          email: result.email || "Not Available",
+          phone: result.phone || "Not Available",
+          address: result.address || "Not Available",
+          emergencyContact: result.emergencyContact || "Not Available",
+          relationship: result.relationship || "Not Available",
+          emergencyPhone: result.emergencyPhone || "Not Available",
+          ...result // Spread original result to preserve any additional fields
+        };
+      }
+
+      // Fallback default
+      return {
+        memberName: "Member Information Not Available",
+        memberNumber: memberNumber,
+        employeeId: "Not Available"
+      };
     } catch (err) {
       console.error("Error fetching employee info:", err);
-      return null;
+      // Return default employee info instead of null
+      return {
+        memberName: "Member Information Unavailable",
+        memberNumber: memberNumber || "Unknown",
+        employeeId: "Unable to retrieve",
+        department: "Unable to retrieve",
+        designation: "Unable to retrieve",
+        error: err.message
+      };
     }
   };
 
-  // Initialize data on component mount
+  // Initialize data on component mount with improved error handling
   useEffect(() => {
     const initializeData = async () => {
       try {
@@ -253,6 +336,7 @@ const HealthPolicyDetails = () => {
         }
 
         // Fetch policy info and employee info in parallel
+        // Both functions now return default objects instead of null on error
         const [policyData, employeeData] = await Promise.all([
           fetchPolicyInfo(stored.policyNumber),
           fetchEmployeeInfo(stored.policyNumber, stored.memberNumber),
@@ -261,8 +345,9 @@ const HealthPolicyDetails = () => {
         setPolicyInfo(policyData);
         setEmployeeInfo(employeeData);
 
-        if (!policyData && !employeeData) {
-          setError("Failed to load policy information");
+        // Only set error if both failed completely (both would have error property)
+        if (policyData?.error && employeeData?.error) {
+          setError("Unable to load policy and member information. Please check your connection and try again.");
         }
       } catch (err) {
         console.error("Error initializing data:", err);
@@ -275,30 +360,34 @@ const HealthPolicyDetails = () => {
     initializeData();
   }, []);
 
-  // Generate policy display info based on loaded data
+  // Generate policy display info based on loaded data with better fallbacks
   const policyDisplayInfo = useMemo(() => {
-    if (!storedData) return [];
+    if (!storedData) return ["Loading policy information..."];
 
     const info = [];
 
     // Add policy number
     if (storedData.policyNumber) {
-      info.push(storedData.policyNumber);
+      info.push(`${storedData.policyNumber}`);
     }
 
     // Add member name (from employee info or stored data)
-    if (employeeInfo?.memberName) {
-      info.push(employeeInfo.memberName);
+    if (employeeInfo?.memberName && employeeInfo.memberName !== "Member Information Not Available" && employeeInfo.memberName !== "Member Information Unavailable") {
+      info.push(`${employeeInfo.memberName}`);
     } else if (storedData.memberName) {
-      info.push(storedData.memberName);
+      info.push(`${storedData.memberName}`);
+    } else {
+      info.push("Member Name is Not Available.");
     }
 
     // Add company name from policy info
-    if (policyInfo?.name) {
-      info.push(policyInfo.name);
+    if (policyInfo?.name && policyInfo.name !== "Policy Information Not Available" && policyInfo.name !== "Policy Information Unavailable") {
+      info.push(`${policyInfo.name}`);
+    } else {
+      info.push("Company Name is Not Available.");
     }
 
-    return info;
+    return info.length > 0 ? info : ["Policy information not available"];
   }, [storedData, policyInfo, employeeInfo]);
 
   // Define heights with multiple strategies for different devices
@@ -541,8 +630,9 @@ const HealthPolicyDetails = () => {
         setPolicyInfo(policyData);
         setEmployeeInfo(employeeData);
 
-        if (!policyData && !employeeData) {
-          setError("Failed to load policy information");
+        // Only set error if both failed completely
+        if (policyData?.error && employeeData?.error) {
+          setError("Unable to load policy and member information. Please check your connection and try again.");
         }
       } catch (err) {
         console.error("Error initializing data:", err);
@@ -584,7 +674,7 @@ const HealthPolicyDetails = () => {
     );
   }
 
-  // Show error screen
+  // Show error screen only for critical errors (not 404s which are now handled)
   if (error) {
     return (
       <LinearGradient
@@ -626,11 +716,6 @@ const HealthPolicyDetails = () => {
               {item}
             </Text>
           ))}
-          {policyDisplayInfo.length === 0 && (
-            <Text style={styles.policyText}>
-              No policy information available
-            </Text>
-          )}
         </View>
       </View>
 

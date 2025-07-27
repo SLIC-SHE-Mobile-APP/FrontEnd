@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Animated,
   FlatList,
   StyleSheet,
   Text,
@@ -12,23 +13,111 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { API_BASE_URL } from '../constants/index.js';
+import Icon from "react-native-vector-icons/FontAwesome";
+import { API_BASE_URL } from "../constants/index.js";
 
 const AddPolicy = () => {
   const [policyNumber, setPolicyNumber] = useState("");
   const [policyList, setPolicyList] = useState([]);
   const [deletedPolicies, setDeletedPolicies] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [removedPoliciesFromAPI, setRemovedPoliciesFromAPI] = useState([]);
   const navigation = useNavigation();
 
   // Required prefix for policy numbers
   const REQUIRED_PREFIX = "G/010/SHE/";
 
+  // Custom Loading Animation Component
+  const LoadingIcon = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [scaleAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      const createRotateAnimation = () => {
+        return Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        );
+      };
+
+      const createPulseAnimation = () => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(scaleAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const rotateAnimation = createRotateAnimation();
+      const pulseAnimation = createPulseAnimation();
+
+      rotateAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        rotateAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }, []);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.customLoadingIcon,
+          {
+            transform: [{ rotate: spin }, { scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={styles.loadingIconOuter}>
+          <View style={styles.loadingIconInner}>
+            <Icon name="heartbeat" size={24} color="#FFFFFF" />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // Loading Screen Component with Custom Icon
+  const LoadingScreen = ({ text = "Loading Policies...", subText = "Please wait a moment" }) => (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <LoadingIcon />
+        <Text style={styles.loadingText}>{text}</Text>
+        <Text style={styles.loadingSubText}>{subText}</Text>
+      </View>
+    </View>
+  );
+
   // Load policies from API when component mounts
   useEffect(() => {
-    loadPoliciesFromAPI();
-    loadRemovedPolicies();
+    const initializeData = async () => {
+      await Promise.all([
+        loadPoliciesFromAPI(),
+        loadRemovedPolicies()
+      ]);
+      setInitialLoading(false);
+    };
+    
+    initializeData();
   }, []);
 
   const loadRemovedPolicies = async () => {
@@ -67,7 +156,6 @@ const AddPolicy = () => {
 
   const loadPoliciesFromAPI = async () => {
     try {
-      setLoading(true);
       const storedNic = await SecureStore.getItemAsync("user_nic");
 
       if (!storedNic) {
@@ -112,8 +200,22 @@ const AddPolicy = () => {
     } catch (error) {
       console.error("Error loading policies:", error);
       Alert.alert("Error", "Failed to connect to server");
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Function to set refresh flag and navigate to home - ONLY for back button
+  const navigateToHomeWithRefresh = async () => {
+    try {
+      // Set the refresh flag in SecureStore
+      await SecureStore.setItemAsync("should_refresh_home", "true");
+      console.log("Refresh flag set, navigating to home");
+
+      // Navigate to home
+      navigation.navigate("home");
+    } catch (error) {
+      console.error("Error setting refresh flag:", error);
+      // Navigate anyway even if setting flag fails
+      navigation.navigate("home");
     }
   };
 
@@ -182,6 +284,7 @@ const AddPolicy = () => {
 
         setPolicyNumber("");
 
+        // Just show success alert - NO NAVIGATION
         Alert.alert("Success", "Policy added successfully");
       } else {
         Alert.alert("Not Found", result.message || "Failed to add policy");
@@ -195,44 +298,67 @@ const AddPolicy = () => {
   };
 
   const handleDeletePolicy = async (id, policyNumber) => {
-    try {
-      setLoading(true);
-
-      // Call the API to remove the policy
-      const response = await fetch(
-        `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
+    Alert.alert(
+      "Delete Policy",
+      `Are you sure you want to delete policy ${policyNumber}?`,
+      [
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // Call the API to remove the policy
+              const response = await fetch(
+                `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    policyNumber: policyNumber,
+                  }),
+                }
+              );
+
+              const result = await response.json();
+
+              if (response.ok && result.success) {
+                // Remove from policy list
+                setPolicyList((prev) => prev.filter((item) => item.id !== id));
+
+                // Only add to deleted policies if it's not already from the API
+                if (!removedPoliciesFromAPI.includes(policyNumber)) {
+                  setDeletedPolicies((prev) => [...prev, policyNumber]);
+                }
+
+                // Just show success alert - NO NAVIGATION
+                Alert.alert(
+                  "Success",
+                  result.message || "Policy removed successfully"
+                );
+              } else {
+                Alert.alert(
+                  "Error",
+                  result.message || "Failed to remove policy"
+                );
+              }
+            } catch (error) {
+              console.error("Error removing policy:", error);
+              Alert.alert("Error", "Failed to connect to server");
+            } finally {
+              setLoading(false);
+            }
           },
-          body: JSON.stringify({
-            policyNumber: policyNumber,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        // Remove from policy list
-        setPolicyList((prev) => prev.filter((item) => item.id !== id));
-
-        // Only add to deleted policies if it's not already from the API
-        if (!removedPoliciesFromAPI.includes(policyNumber)) {
-          setDeletedPolicies((prev) => [...prev, policyNumber]);
-        }
-
-        Alert.alert("Success", result.message || "Policy removed successfully");
-      } else {
-        Alert.alert("Error", result.message || "Failed to remove policy");
-      }
-    } catch (error) {
-      console.error("Error removing policy:", error);
-      Alert.alert("Error", "Failed to connect to server");
-    } finally {
-      setLoading(false);
-    }
+        },
+      ]
+    );
   };
 
   const handleRestoreDeleted = (number) => {
@@ -302,12 +428,33 @@ const AddPolicy = () => {
     </View>
   );
 
+  // Show loading screen during initial load
+  if (initialLoading) {
+    return (
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
+        <LoadingScreen />
+      </LinearGradient>
+    );
+  }
+
+  // Show processing loading screen during operations
+  if (loading && !initialLoading) {
+    return (
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
+        <LoadingScreen 
+          text="Processing..." 
+          subText="Please wait while we process your request" 
+        />
+      </LinearGradient>
+    );
+  }
+
   return (
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
       <View style={styles.container}>
         <TouchableOpacity
           style={styles.header}
-          onPress={() => navigation.navigate("home", { refresh: true })}
+          onPress={navigateToHomeWithRefresh}
         >
           <Ionicons name="arrow-back" size={24} color="#05445E" />
           <Text style={styles.title}>Manage Policy</Text>
@@ -345,14 +492,20 @@ const AddPolicy = () => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.addButton} onPress={handleAddPolicy}>
-          <Text style={styles.addButtonText}>Add Policy</Text>
+        <TouchableOpacity 
+          style={[styles.addButton, loading && styles.buttonDisabled]} 
+          onPress={handleAddPolicy}
+          disabled={loading}
+        >
+          <Text style={styles.addButtonText}>
+            {loading ? "Adding..." : "Add Policy"}
+          </Text>
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
 
-        {loading ? (
-          <Text style={styles.loadingText}>Loading policies...</Text>
+        {loading && !initialLoading ? (
+          <Text style={styles.loadingText}>Processing...</Text>
         ) : (
           <FlatList
             data={policyList}
@@ -389,6 +542,53 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 20,
   },
+  // Custom Loading Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   inputLabel: {
     fontSize: 14,
     color: "#05445E",
@@ -423,6 +623,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   addButtonText: {
     color: "white",
@@ -494,15 +697,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
     opacity: 0.8,
   },
-  loadingText: {
-    textAlign: "center",
-    color: "#05445E",
-    fontSize: 16,
-    marginTop: 20,
-  },
   sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   tapToAddText: {
     fontSize: 13,

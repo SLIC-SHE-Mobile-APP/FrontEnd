@@ -31,6 +31,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
   const [showDetailView, setShowDetailView] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [apiError, setApiError] = useState(null);
+  const [notFoundError, setNotFoundError] = useState(false);
 
   // Custom Loading Animation Component
   const LoadingIcon = () => {
@@ -119,26 +120,35 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
           SecureStore.getItemAsync('selected_policy_number'),
           SecureStore.getItemAsync('selected_member_number'),
         ]);
-        setPolicyNo(storedPolicy || paramPolicyNo);
-        setMemberNo(storedMember || paramMemberNo);
+        setPolicyNo(storedPolicy || paramPolicyNo || "Not Available");
+        setMemberNo(storedMember || paramMemberNo || "Not Available");
       } catch (err) {
         console.warn('SecureStore read failed:', err);
-        setPolicyNo(paramPolicyNo);
-        setMemberNo(paramMemberNo);
+        setPolicyNo(paramPolicyNo || "Not Available");
+        setMemberNo(paramMemberNo || "Not Available");
       } finally {
         setInitialising(false);
       }
     })();
   }, [paramPolicyNo, paramMemberNo]);
 
-  // Fetch claim history when policy and member numbers are available
+  // Enhanced fetch claim history with 404 handling
   useEffect(() => {
-    if (initialising || !policyNo || !memberNo) return;
+    if (initialising) return;
+    
+    // If no policy or member data, show empty state
+    if (!policyNo || policyNo === "Not Available" || !memberNo || memberNo === "Not Available") {
+      setLoading(false);
+      setNotFoundError(true);
+      setClaimData([]);
+      return;
+    }
 
     const fetchClaimHistory = async () => {
       try {
         setLoading(true);
         setApiError(null);
+        setNotFoundError(false);
 
         const url = `${API_BASE_URL}/ClaimHistoryCon`;
         const params = { policy_no: policyNo, member_no: memberNo };
@@ -148,14 +158,38 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         const response = await axios.get(url, { params });
         
         if (Array.isArray(response.data)) {
-          setClaimData(response.data);
+          // Filter out any null/undefined entries and ensure we have valid claims
+          const validClaims = response.data.filter(claim => claim && typeof claim === 'object');
+          setClaimData(validClaims);
+          
+          if (validClaims.length === 0) {
+            setNotFoundError(true);
+          }
+        } else if (response.data && typeof response.data === 'object') {
+          setClaimData([response.data]); // Single object case
         } else {
-          setClaimData([response.data]); // In case single object
+          setNotFoundError(true);
+          setClaimData([]);
         }
       } catch (error) {
-        console.error("Error fetching claim history:", error);
-        setApiError('Failed to fetch claim history. Please try again later.');
-        setClaimData([]);
+        // Handle 404 specifically first
+        if (error.response && error.response.status === 404) {
+          console.info("No claim history found for policy:", policyNo, "member:", memberNo);
+          setNotFoundError(true);
+          setClaimData([]);
+          setApiError(null);
+        } else {
+          // Log actual errors (non-404) for debugging
+          console.error("Error fetching claim history:", {
+            status: error.response?.status || 'Network Error',
+            message: error.message,
+            policy: policyNo,
+            member: memberNo
+          });
+          setApiError('Unable to load claim history. Please check your connection and try again.');
+          setClaimData([]);
+          setNotFoundError(false);
+        }
       } finally {
         setLoading(false);
       }
@@ -165,9 +199,10 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
   }, [initialising, policyNo, memberNo]);
 
   const getStatusColor = (status) => {
-    if (status?.toLowerCase().includes('reject')) return '#FF6B6B';
-    if (status?.toLowerCase().includes('approved')) return '#4CAF50';
-    if (status?.toLowerCase().includes('pending')) return '#FF9800';
+    if (!status || status === "Not Available") return '#666';
+    if (status.toLowerCase().includes('reject')) return '#FF6B6B';
+    if (status.toLowerCase().includes('approved')) return '#4CAF50';
+    if (status.toLowerCase().includes('pending')) return '#FF9800';
     return '#17ABB7';
   };
 
@@ -181,6 +216,94 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     setSelectedClaim(null);
   };
 
+  const handleRetry = () => {
+    if (policyNo && policyNo !== "Not Available" && memberNo && memberNo !== "Not Available") {
+      setLoading(true);
+      setApiError(null);
+      setNotFoundError(false);
+      // Trigger re-fetch by updating a dummy state or call the fetch function directly
+      const fetchClaimHistory = async () => {
+        try {
+          const url = `${API_BASE_URL}/ClaimHistoryCon`;
+          const params = { policy_no: policyNo, member_no: memberNo };
+
+          const response = await axios.get(url, { params });
+          
+          if (Array.isArray(response.data)) {
+            const validClaims = response.data.filter(claim => claim && typeof claim === 'object');
+            setClaimData(validClaims);
+            
+            if (validClaims.length === 0) {
+              setNotFoundError(true);
+            }
+          } else if (response.data && typeof response.data === 'object') {
+            setClaimData([response.data]);
+          } else {
+            setNotFoundError(true);
+            setClaimData([]);
+          }
+        } catch (error) {
+          // Handle 404 specifically first
+          if (error.response && error.response.status === 404) {
+            console.info("No claim history found for policy:", policyNo, "member:", memberNo);
+            setNotFoundError(true);
+            setClaimData([]);
+            setApiError(null);
+          } else {
+            // Log actual errors (non-404) for debugging
+            console.error("Error fetching claim history:", {
+              status: error.response?.status || 'Network Error', 
+              message: error.message,
+              policy: policyNo,
+              member: memberNo
+            });
+            setApiError('Unable to load claim history. Please check your connection and try again.');
+            setClaimData([]);
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchClaimHistory();
+    }
+  };
+
+  // Function to render field value with icon for missing data
+  const renderFieldValue = (value, fieldName) => {
+    const isDataMissing = !value || 
+                          value === "Not Available" || 
+                          value === "" || 
+                          value === null || 
+                          value === undefined;
+
+    if (isDataMissing) {
+      return (
+        <View style={styles.missingDataContainer}>
+          <Ionicons name="information-circle-outline" size={14} color="#00ADBB" />
+          <Text style={styles.missingDataText}>Not Available</Text>
+        </View>
+      );
+    }
+
+    // Handle date formatting
+    if (fieldName === 'Submission Date' && value) {
+      try {
+        const formattedDate = new Date(value).toLocaleDateString();
+        return <Text style={styles.fieldValue}>{formattedDate}</Text>;
+      } catch (error) {
+        return (
+          <View style={styles.missingDataContainer}>
+            <Ionicons name="information-circle-outline" size={14} color="#00ADBB" />
+            <Text style={styles.missingDataText}>Invalid Date</Text>
+          </View>
+        );
+      }
+    }
+
+    return <Text style={[styles.fieldValue, fieldName === 'Status' && { color: getStatusColor(value) }]}>{value}</Text>;
+  };
+
   const renderClaimCard = (claim, index) => (
     <View key={index} style={styles.claimCard}>
       <View style={styles.cardContent}>
@@ -191,12 +314,12 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
           ['Status', claim.status],
           ['Claim Type', claim.indOut],
           ['Claim Amount', claim.claimAmount],
-          ['Submission Date', new Date(claim.intimationDate).toLocaleDateString()]
+          ['Submission Date', claim.intimationDate]
         ].map(([label, value], idx) => (
           <View key={idx} style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>{label}</Text>
             <Text style={styles.separator}>:</Text>
-            <Text style={[styles.fieldValue, label === 'Status' && { color: getStatusColor(value) }]}>{value}</Text>
+            {renderFieldValue(value, label)}
           </View>
         ))}
 
@@ -217,6 +340,35 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     </View>
   );
 
+  // Enhanced empty state component
+  const EmptyStateComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="document-text-outline" size={60} color="#00ADBB" />
+      <Text style={styles.emptyStateMessage}>
+        {notFoundError 
+          ? "No claim records were found for this policy."
+          : "No claim records were found for this policy."
+        }
+      </Text>
+    </View>
+  );
+
+  // Enhanced error component
+  const ErrorComponent = () => (
+    <View style={styles.errorContainer}>
+      <Ionicons name="warning-outline" size={60} color="#00ADBB" />
+      <Text style={styles.errorTitle}>Connection Error</Text>
+      <Text style={styles.errorMessage}>
+        Unable to load claim history. Please check your connection and try again.
+      </Text>
+      <Text style={styles.errorDetailText}>{apiError}</Text>
+      <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+        <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
+        <Text style={styles.retryButtonText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   // Show loading while initializing
   if (initialising) {
     return (
@@ -232,7 +384,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
 
   return (
     <LinearGradient colors={['#FFFFFF', '#6DD3D3']} style={styles.container}>
-      {/* Fixed Header - Updated to match DependentDetails */}
+      {/* Fixed Header */}
       <View style={styles.header}>
         <View style={{ width: 26 }} />
         <Text style={styles.headerTitle}>Claim History</Text>
@@ -250,21 +402,39 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         {/* Policy Info Card */}
         <View style={styles.policyCard}>
           <Text style={styles.policyTitle}>Claim History For :</Text>
-          <Text style={styles.policyNumber}>{policyNo}</Text>
-          <Text style={styles.memberInfo}>Member No: {memberNo}</Text>
+          <Text style={styles.policyNumber}>
+            {policyNo !== "Not Available" ? policyNo : "Policy Not Available"}
+          </Text>
+          <Text style={styles.memberInfo}>
+            Member No: {memberNo !== "Not Available" ? memberNo : "Not Available"}
+          </Text>
         </View>
 
         {/* Content */}
         {loading ? (
           <LoadingScreen />
-        ) : apiError ? (
-          <Text style={styles.error}>{apiError}</Text>
+        ) : apiError && !notFoundError ? (
+          <ErrorComponent />
         ) : claimData.length === 0 ? (
-          <Text style={styles.empty}>No claim records found.</Text>
+          <EmptyStateComponent />
         ) : (
-          <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {claimData.map(renderClaimCard)}
-          </ScrollView>
+          <View style={styles.contentContainer}>
+            {/* Status Banner */}
+            <View style={styles.statusBanner}>
+              <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
+              <Text style={styles.statusBannerText}>
+                Showing {claimData.length} claim record{claimData.length !== 1 ? 's' : ''} found
+              </Text>
+            </View>
+
+            <ScrollView 
+              style={styles.scrollContainer} 
+              contentContainerStyle={styles.scrollContent} 
+              showsVerticalScrollIndicator={false}
+            >
+              {claimData.map(renderClaimCard)}
+            </ScrollView>
+          </View>
         )}
       </View>
     </LinearGradient>
@@ -306,6 +476,9 @@ const styles = StyleSheet.create({
     paddingRight: 20,
     paddingLeft: 20,
   },
+  contentContainer: {
+    flex: 1,
+  },
   policyCard: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 15,
@@ -330,6 +503,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#13646D',
     fontStyle: 'italic',
+  },
+  // Status Banner
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 173, 187, 0.1)",
+    padding: 12,
+    marginBottom: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#00ADBB",
+  },
+  statusBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#00ADBB",
+    marginLeft: 8,
+    fontWeight: "500",
+  },
+  // Policy Info
+  policyInfoContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    marginTop: 15,
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#00ADBB",
+  },
+  policyInfoText: {
+    fontSize: 12,
+    color: "#13646D",
+    fontWeight: "600",
+    marginBottom: 2,
   },
   // Custom Loading Styles
   loadingOverlay: {
@@ -426,6 +632,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap',
   },
+  missingDataContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  missingDataText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+    marginLeft: 4,
+  },
   moreButton: {
     alignSelf: 'flex-end',
     paddingHorizontal: 16,
@@ -438,6 +655,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  // Empty state styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  emptyStateTitle: {
+    marginTop: 15,
+    fontSize: 18,
+    color: "#13646D",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  emptyStateMessage: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  errorTitle: {
+    marginTop: 15,
+    fontSize: 18,
+    color: "#FF6B6B",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  errorMessage: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  errorDetailText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#999",
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    backgroundColor: "#13646D",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryIcon: {
+    marginRight: 8,
+  },
+  retryButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  // Legacy styles (kept for compatibility)
   empty: {
     textAlign: 'center',
     marginTop: 20,
