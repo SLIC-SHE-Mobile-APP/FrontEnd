@@ -36,10 +36,17 @@
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "86b10cb0-95f3-42f4-9b46-4a6215d63cd7"
+      }
     }
   }
 }
