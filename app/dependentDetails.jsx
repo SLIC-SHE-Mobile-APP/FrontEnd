@@ -19,6 +19,7 @@ const DependentDetails = ({ onClose }) => {
   const [dependentsData, setDependentsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notFoundError, setNotFoundError] = useState(false);
   const [storedData, setStoredData] = useState({
     policyNumber: null,
     memberNumber: null,
@@ -118,52 +119,70 @@ const DependentDetails = ({ onClose }) => {
       const userNic = await SecureStore.getItemAsync("user_nic");
 
       const data = {
-        policyNumber,
-        memberNumber,
-        memberName,
-        userNic,
+        policyNumber: policyNumber || "Not Available",
+        memberNumber: memberNumber || "Not Available",
+        memberName: memberName || "Not Available",
+        userNic: userNic || "Not Available",
       };
 
       setStoredData(data);
 
       // Check if required data is available
       if (!policyNumber || !memberNumber) {
-        throw new Error("Required policy or member data not found in storage");
+        console.warn("Required policy or member data not found in storage");
+        return data;
       }
 
       return data;
     } catch (err) {
       console.error("Error loading stored data:", err);
-      setError(err.message);
-      return null;
+      const fallbackData = {
+        policyNumber: "Not Available",
+        memberNumber: "Not Available",
+        memberName: "Not Available",
+        userNic: "Not Available",
+      };
+      setStoredData(fallbackData);
+      return fallbackData;
     }
   };
 
-  // Function to format date from API response
+  // Function to format date from API response with better error handling
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date
-      .toLocaleDateString("en-GB", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-      .replace(/\//g, "/");
+    if (!dateString) return "Not Available";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Invalid Date";
+      return date
+        .toLocaleDateString("en-GB", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        })
+        .replace(/\//g, "/");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Date Error";
+    }
   };
 
-  // Function to fetch dependents data from API
+  // Enhanced function to fetch dependents data with 404 handling
   const fetchDependentsData = async () => {
     try {
       setLoading(true);
       setError(null);
+      setNotFoundError(false);
 
       // Load stored data first
       const data = await loadStoredData();
-      if (!data || !data.policyNumber || !data.memberNumber) {
-        throw new Error(
-          "Missing required data. Please select a policy and member first."
-        );
+      
+      // If no policy or member data, show empty state instead of error
+      if (!data || !data.policyNumber || data.policyNumber === "Not Available" || 
+          !data.memberNumber || data.memberNumber === "Not Available") {
+        console.warn("Missing required data, showing empty state");
+        setDependentsData([]);
+        setLoading(false);
+        return;
       }
 
       console.log("Fetching dependents with:", {
@@ -185,29 +204,50 @@ const DependentDetails = ({ onClose }) => {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Dependents not found (404), showing no dependents state");
+          setDependentsData([]);
+          setNotFoundError(true);
+          setLoading(false);
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const apiData = await response.json();
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        console.warn("Empty response from dependents server");
+        setDependentsData([]);
+        setLoading(false);
+        return;
+      }
 
-      // Transform API data to match component structure
+      const apiData = JSON.parse(responseText);
+
+      // Handle empty array response
+      if (!Array.isArray(apiData) || apiData.length === 0) {
+        console.log("No dependents found in response");
+        setDependentsData([]);
+        setLoading(false);
+        return;
+      }
+
+      // Transform API data to match component structure with fallback values
       const transformedData = apiData.map((dependent, index) => ({
         id: index + 1,
-        name: dependent.dependentName || "N/A",
+        name: dependent.dependentName || "Name Not Available",
         dateOfBirth: formatDate(dependent.depndentBirthDay),
         enrollmentDate: formatDate(dependent.effectiveDate),
-        relationship: dependent.relationship || "N/A",
+        relationship: dependent.relationship || "Relationship Not Available",
+        // Store original data for potential future use
+        originalData: dependent
       }));
 
       setDependentsData(transformedData);
     } catch (err) {
       console.error("Error fetching dependents data:", err);
       setError(err.message);
-      Alert.alert(
-        "Error",
-        "Failed to load dependent details. Please try again.",
-        [{ text: "OK" }]
-      );
+      setDependentsData([]);
     } finally {
       setLoading(false);
     }
@@ -222,6 +262,66 @@ const DependentDetails = ({ onClose }) => {
   const handleRetry = () => {
     fetchDependentsData();
   };
+
+  // Component to render field with icon for missing data
+  const renderFieldWithIcon = (value, fieldName) => {
+    const isDataMissing = !value || 
+                          value === "Not Available" || 
+                          value === "Name Not Available" ||
+                          value === "Relationship Not Available" ||
+                          value === "Date Error" ||
+                          value === "Invalid Date";
+
+    if (isDataMissing) {
+      return (
+        <View style={styles.missingDataContainer}>
+          <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
+          <Text style={styles.missingDataText}>
+            {value === "Invalid Date" || value === "Date Error" ? "Date Unavailable" : "Not Available"}
+          </Text>
+        </View>
+      );
+    }
+
+    return <Text style={styles.tableCellText}>{value}</Text>;
+  };
+
+  // Enhanced empty state component
+  const EmptyStateComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="people-outline" size={60} color="#00ADBB" />
+      
+      <Text style={styles.emptyDetailText}>
+        {notFoundError 
+          ? "No Dependents Found for this policy"
+          : "No dependents are currently registered under this policy."
+        }
+      </Text>
+      
+      {error && (
+        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+          <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  // Enhanced error component
+  const ErrorComponent = () => (
+    <View style={styles.errorContainer}>
+      <Ionicons name="warning-outline" size={60} color="#00ADBB" />
+      <Text style={styles.errorText}>Connection Error</Text>
+      <Text style={styles.errorDetailText}>
+        Unable to load dependent information. Please check your connection and try again.
+      </Text>
+      <Text style={styles.errorDetailText}>{error}</Text>
+      <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+        <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
+        <Text style={styles.retryButtonText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <LinearGradient
@@ -250,29 +350,27 @@ const DependentDetails = ({ onClose }) => {
       {/* Content */}
       {loading ? (
         <LoadingScreen />
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
-          <Text style={styles.errorText}>Failed to load data</Text>
-          <Text style={styles.errorDetailText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+      ) : error && !notFoundError ? (
+        <ErrorComponent />
       ) : dependentsData.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={48} color="#13646D" />
-          <Text style={styles.emptyText}>No dependents found</Text>
-          <Text style={styles.emptyDetailText}>
-            No dependents are registered under this policy.
-          </Text>
-        </View>
+        <EmptyStateComponent />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.centeredContainer}>
+            {/* Policy Information Banner */}
+            {storedData.policyNumber !== "Not Available" && (
+              <View style={styles.policyInfoBanner}>
+                <Ionicons name="document-text-outline" size={20} color="#00ADBB" />
+                <View style={styles.policyInfoContent}>
+                  <Text style={styles.policyInfoText}>Policy: {storedData.policyNumber}</Text>
+                  <Text style={styles.policyInfoText}>Member: {storedData.memberNumber}</Text>
+                </View>
+              </View>
+            )}
+
             <View style={styles.tableContainer}>
               {/* Table Header */}
               <View style={styles.tableRowHeader}>
@@ -285,18 +383,20 @@ const DependentDetails = ({ onClose }) => {
               {/* Table Rows */}
               {dependentsData.map((dependent) => (
                 <View key={dependent.id} style={styles.tableRow}>
-                  <Text style={styles.tableCellText}>{dependent.name}</Text>
-                  <Text style={styles.tableCellText}>
-                    {dependent.dateOfBirth}
-                  </Text>
-                  <Text style={styles.tableCellText}>
-                    {dependent.enrollmentDate}
-                  </Text>
-                  <Text style={styles.tableCellText}>
-                    {dependent.relationship}
-                  </Text>
+                  {renderFieldWithIcon(dependent.name, "name")}
+                  {renderFieldWithIcon(dependent.dateOfBirth, "dateOfBirth")}
+                  {renderFieldWithIcon(dependent.enrollmentDate, "enrollmentDate")}
+                  {renderFieldWithIcon(dependent.relationship, "relationship")}
                 </View>
               ))}
+            </View>
+
+            {/* Data Status Info */}
+            <View style={styles.dataStatusContainer}>
+              <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
+              <Text style={styles.dataStatusText}>
+                Showing {dependentsData.length} dependent{dependentsData.length !== 1 ? 's' : ''} found
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -324,14 +424,29 @@ const styles = StyleSheet.create({
   policyInfoContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.8)",
     marginHorizontal: 20,
-    marginBottom: 10,
+    marginTop: 15,
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: "#2EC6C6",
+    borderLeftColor: "#00ADBB",
+  },
+  policyInfoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    marginBottom: 15,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#00ADBB",
+    width: "100%",
+  },
+  policyInfoContent: {
+    marginLeft: 10,
+    flex: 1,
   },
   policyInfoText: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#13646D",
     fontWeight: "600",
     marginBottom: 2,
@@ -376,12 +491,40 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9F9F9",
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
+    alignItems: "center",
   },
   tableCellText: {
     flex: 1,
     textAlign: "center",
     fontSize: 13,
     color: "#333",
+  },
+  missingDataContainer: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  missingDataText: {
+    fontSize: 11,
+    color: "#666",
+    fontStyle: "italic",
+    marginLeft: 4,
+  },
+  dataStatusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    padding: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderRadius: 6,
+  },
+  dataStatusText: {
+    fontSize: 12,
+    color: "#666",
+    marginLeft: 6,
+    fontStyle: "italic",
   },
   // Custom Loading Styles
   loadingOverlay: {
@@ -439,22 +582,29 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 15,
     marginBottom: 10,
-    fontSize: 16,
+    fontSize: 18,
     color: "#FF6B6B",
     textAlign: "center",
     fontWeight: "bold",
   },
   errorDetailText: {
-    marginBottom: 20,
+    marginBottom: 10,
     fontSize: 14,
     color: "#666",
     textAlign: "center",
+    lineHeight: 20,
   },
   retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#13646D",
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
+    marginTop: 10,
+  },
+  retryIcon: {
+    marginRight: 8,
   },
   retryButtonText: {
     color: "#FFFFFF",
@@ -470,7 +620,7 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 15,
     marginBottom: 8,
-    fontSize: 16,
+    fontSize: 18,
     color: "#13646D",
     textAlign: "center",
     fontWeight: "bold",
@@ -479,6 +629,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 15,
   },
 });
 

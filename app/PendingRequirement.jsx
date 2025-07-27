@@ -259,12 +259,7 @@ const PendingRequirement = ({ onClose }) => {
         <View style={styles.emptyContainer}>
           <Ionicons name="document-outline" size={60} color="#00ADBB" />
           <Text style={styles.emptyText}>No pending requirements found</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={fetchPendingRequirements}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          
         </View>
       );
     }
@@ -440,8 +435,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 20,
-    fontSize: 16,
-    color: '#13646D',
+    fontSize: 14,
+    color: "#666",
     textAlign: 'center',
     marginBottom: 20,
   },

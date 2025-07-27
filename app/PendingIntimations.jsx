@@ -5,13 +5,13 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   Animated,
+  Modal,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
@@ -25,50 +25,135 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   const [userId, setUserId] = useState(null);
   const [policyNo, setPolicyNo] = useState(null);
 
+  // Custom Popup states
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupType, setPopupType] = useState("info"); // "success", "error", "info", "confirm"
+  const [popupActions, setPopupActions] = useState(null);
+
+  // Custom Popup Component
+  const CustomPopup = () => {
+    const getIconName = () => {
+      switch (popupType) {
+        case "success": return "checkmark-circle";
+        case "error": return "alert-circle";
+        case "confirm": return "help-circle";
+        default: return "information-circle";
+      }
+    };
+
+    const getIconColor = () => {
+      switch (popupType) {
+        case "success": return "#4CAF50";
+        case "error": return "#FF6B6B";
+        case "confirm": return "#FF9800";
+        default: return "#2196F3";
+      }
+    };
+
+    const closePopup = () => {
+      setShowPopup(false);
+      setPopupActions(null);
+    };
+
+    if (!showPopup) return null;
+
+    return (
+      <Modal
+        visible={showPopup}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closePopup}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.blurContainer}>
+            <View style={styles.popupContainer}>
+              <LinearGradient
+                colors={["#FFFFFF", "#F8F9FA"]}
+                style={styles.popupContent}
+              >
+                <View style={styles.popupHeader}>
+                  <Ionicons
+                    name={getIconName()}
+                    size={32}
+                    color={getIconColor()}
+                    style={styles.popupIcon}
+                  />
+                  {popupTitle && (
+                    <Text style={styles.popupTitle}>{popupTitle}</Text>
+                  )}
+                </View>
+                
+                <Text style={styles.popupMessage}>{popupMessage}</Text>
+                
+                {popupActions ? (
+                  <View style={styles.popupButtonContainer}>
+                    {popupActions.map((action, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.popupButton,
+                          { 
+                            backgroundColor: action.style === 'destructive' ? '#FF6B6B' : 
+                                            action.style === 'cancel' ? '#9E9E9E' : getIconColor(),
+                            marginHorizontal: 5,
+                          }
+                        ]}
+                        onPress={() => {
+                          closePopup();
+                          if (action.onPress) action.onPress();
+                        }}
+                      >
+                        <Text style={styles.popupButtonText}>{action.text}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.popupButton, { backgroundColor: getIconColor() }]}
+                    onPress={closePopup}
+                  >
+                    <Text style={styles.popupButtonText}>OK</Text>
+                  </TouchableOpacity>
+                )}
+              </LinearGradient>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Show popup function
+  const showCustomPopup = (title, message, type = "info", actions = null) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setPopupActions(actions);
+    setShowPopup(true);
+  };
+
   // Custom Loading Animation Component
   const LoadingIcon = () => {
-    const [rotateAnim] = useState(new Animated.Value(0));
-    const [scaleAnim] = useState(new Animated.Value(1));
+    const rotateAnim = React.useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-      const createRotateAnimation = () => {
-        return Animated.loop(
-          Animated.timing(rotateAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          })
-        );
-      };
-
-      const createPulseAnimation = () => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.timing(scaleAnim, {
-              toValue: 1.2,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-      };
-
-      const rotateAnimation = createRotateAnimation();
-      const pulseAnimation = createPulseAnimation();
+    React.useEffect(() => {
+      const rotateAnimation = Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      );
 
       rotateAnimation.start();
-      pulseAnimation.start();
 
       return () => {
         rotateAnimation.stop();
-        pulseAnimation.stop();
       };
-    }, []);
+    }, [rotateAnim]);
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
@@ -80,7 +165,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         style={[
           styles.customLoadingIcon,
           {
-            transform: [{ rotate: spin }, { scale: scaleAnim }],
+            transform: [{ rotate: spin }],
           },
         ]}
       >
@@ -174,17 +259,19 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
           err.message.includes("NetworkError") ||
           err.message.includes("Failed to fetch")
         ) {
-          Alert.alert(
+          showCustomPopup(
             "Network Error",
-            "Please check your internet connection and try again."
+            "Please check your internet connection and try again.",
+            "error"
           );
         } else if (err.message.includes("HTTP error")) {
-          Alert.alert(
+          showCustomPopup(
             "Server Error",
-            "The server is currently unavailable. Please try again later."
+            "The server is currently unavailable. Please try again later.",
+            "error"
           );
         } else {
-          Alert.alert("Error", "Failed to load claims data. Please try again.");
+          showCustomPopup("Error", "Failed to load claims data. Please try again.", "error");
         }
       } finally {
         setLoading(false);
@@ -221,7 +308,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   // Refresh data function
   const refreshData = async () => {
     if (!userId || !policyNo) {
-      Alert.alert("Error", "Missing policy information");
+      showCustomPopup("Error", "Missing policy information", "error");
       return;
     }
 
@@ -258,7 +345,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       setPendingClaims(transformedData);
 
       // Optional: Show success message
-      // Alert.alert("Success", "Claims data refreshed successfully");
+      // showCustomPopup("Success", "Claims data refreshed successfully", "success");
     } catch (err) {
       console.error("Error refreshing claims:", err);
       setError(err.message);
@@ -268,26 +355,30 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         err.message.includes("NetworkError") ||
         err.message.includes("Failed to fetch")
       ) {
-        Alert.alert(
+        showCustomPopup(
           "Network Error",
-          "Please check your internet connection and try again."
+          "Please check your internet connection and try again.",
+          "error"
         );
       } else if (err.message.includes("HTTP error! status: 404")) {
-        Alert.alert("Not Found", "No claims found for this policy.");
+        showCustomPopup("Not Found", "No claims found for this policy.", "error");
       } else if (err.message.includes("HTTP error! status: 500")) {
-        Alert.alert(
+        showCustomPopup(
           "Server Error",
-          "The server is experiencing issues. Please try again later."
+          "The server is experiencing issues. Please try again later.",
+          "error"
         );
       } else if (err.message.includes("Invalid data format")) {
-        Alert.alert(
+        showCustomPopup(
           "Data Error",
-          "Received unexpected data format from server."
+          "Received unexpected data format from server.",
+          "error"
         );
       } else {
-        Alert.alert(
+        showCustomPopup(
           "Error",
-          "Failed to refresh claims data. Please try again."
+          "Failed to refresh claims data. Please try again.",
+          "error"
         );
       }
     } finally {
@@ -325,18 +416,20 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       });
     } catch (error) {
       console.error("Error storing claim data or navigating:", error);
-      Alert.alert(
+      showCustomPopup(
         "Error",
-        "Could not save claim data or navigate to edit page"
+        "Could not save claim data or navigate to edit page",
+        "error"
       );
     }
   };
 
   // Handle Delete
   const handleDelete = (id) => {
-    Alert.alert(
+    showCustomPopup(
       "Confirm Delete",
       "Are you sure you want to delete this claim?",
+      "confirm",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -375,10 +468,10 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       // Remove the claim from local state after successful deletion
       setPendingClaims((prev) => prev.filter((item) => item.id !== claimId));
 
-      Alert.alert("Success", "Claim deleted successfully");
+      showCustomPopup("Success", "Claim deleted successfully", "success");
     } catch (error) {
       console.error("Error deleting claim:", error);
-      Alert.alert("Error", "Failed to delete claim. Please try again.");
+      showCustomPopup("Error", "Failed to delete claim. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -406,6 +499,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
             : "Loading Pending Claims..."
           }
         />
+        <CustomPopup />
       </LinearGradient>
     );
   }
@@ -432,6 +526,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
+        <CustomPopup />
       </LinearGradient>
     );
   }
@@ -458,8 +553,8 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {pendingClaims.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="document-outline" size={50} color="#B0BEC5" />
-            <Text style={styles.emptyText}>No pending claims found</Text>
+            <Ionicons name="document-outline" size={60} color="#00ADBB" />
+            <Text style={styles.emptyText}>No pending claims found.</Text>
           </View>
         ) : (
           pendingClaims.map((claim) => (
@@ -505,6 +600,9 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
           ))
         )}
       </ScrollView>
+
+      {/* Custom Popup */}
+      <CustomPopup />
     </LinearGradient>
   );
 };
@@ -616,8 +714,8 @@ const styles = StyleSheet.create({
     marginTop: 100,
   },
   emptyText: {
-    fontSize: 16,
-    color: "#B0BEC5",
+    fontSize: 14,
+    color: "#666",
     marginTop: 10,
   },
   scrollContainer: {
@@ -673,6 +771,78 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 40,
     height: 40,
+  },
+  // Custom Popup Styles
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blurContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    width: '85%',
+    maxWidth: 350,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  popupContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  popupHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  popupIcon: {
+    marginBottom: 12,
+  },
+  popupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  popupMessage: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  popupButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  popupButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 25,
+    minWidth: 100,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  popupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

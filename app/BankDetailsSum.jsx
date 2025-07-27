@@ -4,7 +4,6 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Keyboard,
   Modal,
@@ -15,14 +14,127 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
+
+const { width, height } = Dimensions.get('window');
+
+// Custom Popup Component
+const CustomPopup = ({ visible, title, message, onConfirm, type = 'info' }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconColor = () => {
+    switch (type) {
+      case 'success':
+        return '#4CAF50';
+      case 'error':
+        return '#F44336';
+      case 'warning':
+        return '#FF9800';
+      default:
+        return '#4ECDC4';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return '✓';
+      case 'error':
+        return '✕';
+      case 'warning':
+        return '⚠';
+      default:
+        return 'ℹ';
+    }
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      transparent={true}
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onConfirm}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: getIconColor() }]}>
+            <Text style={styles.iconText}>{getIcon()}</Text>
+          </View>
+          
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+          
+          <TouchableOpacity
+            style={[styles.confirmButton, { backgroundColor: getIconColor() }]}
+            onPress={onConfirm}
+          >
+            <Text style={styles.confirmButtonText}>OK</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const BankDetailsSum = ({ onClose }) => {
   const [bankDetails, setBankDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notFoundError, setNotFoundError] = useState(false);
   const [showMasked, setShowMasked] = useState(true);
   const [policyNo, setPolicyNo] = useState(null);
   const [memberNo, setMemberNo] = useState(null);
@@ -40,8 +152,36 @@ const BankDetailsSum = ({ onClose }) => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const slideAnim = new Animated.Value(0);
 
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
   // References for OTP input fields
   const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
+  // Function to show popup
+  const showPopup = (message, type = 'info', title = '') => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  // Function to hide popup
+  const hidePopup = () => {
+    setPopup({
+      visible: false,
+      title: '',
+      message: '',
+      type: 'info'
+    });
+  };
 
   // Custom Loading Animation Component
   const LoadingIcon = () => {
@@ -143,7 +283,7 @@ const BankDetailsSum = ({ onClose }) => {
     return contact;
   };
 
-  // Get policy, member, NIC and mobile numbers from SecureStore
+  // Get policy, member, NIC and mobile numbers from SecureStore with fallbacks
   const getStoredData = async () => {
     try {
       const storedPolicyNumber = await SecureStore.getItemAsync(
@@ -162,6 +302,11 @@ const BankDetailsSum = ({ onClose }) => {
         mobileNumber: storedMobileNumber,
       });
 
+      // Set data with fallbacks
+      setPolicyNo(storedPolicyNumber || "Not Available");
+      setNicNumber(storedNicNumber || "Not Available");
+      setMobileNumber(storedMobileNumber || "Not Available");
+
       if (storedPolicyNumber && storedMemberNumber) {
         const paddedMemberNumber = storedMemberNumber.padStart(9, "0");
 
@@ -170,10 +315,7 @@ const BankDetailsSum = ({ onClose }) => {
           padded: paddedMemberNumber,
         });
 
-        setPolicyNo(storedPolicyNumber);
         setMemberNo(paddedMemberNumber);
-        setNicNumber(storedNicNumber);
-        setMobileNumber(storedMobileNumber);
         
         return { 
           policyNo: storedPolicyNumber, 
@@ -182,22 +324,26 @@ const BankDetailsSum = ({ onClose }) => {
           mobileNumber: storedMobileNumber
         };
       } else {
-        throw new Error(
-          "Policy number or member number not found in SecureStore"
-        );
+        console.warn("Policy number or member number not found in SecureStore");
+        setMemberNo("Not Available");
+        return null;
       }
     } catch (error) {
       console.error("Error retrieving stored data:", error);
-      setError("Failed to retrieve policy information");
+      setPolicyNo("Not Available");
+      setMemberNo("Not Available");
+      setNicNumber("Not Available");
+      setMobileNumber("Not Available");
       return null;
     }
   };
 
-  // Fetch bank details from API
+  // Enhanced fetch bank details with 404 handling
   const fetchBankDetails = async (policyNumber, memberNumber) => {
     try {
       setLoading(true);
       setError(null);
+      setNotFoundError(false);
 
       console.log("Fetching bank details for:", {
         policyNumber,
@@ -209,27 +355,67 @@ const BankDetailsSum = ({ onClose }) => {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Bank details not found (404), using default values");
+          setNotFoundError(true);
+          setBankDetails({
+            bankName: "Bank Information Not Available",
+            branchName: "Branch Information Not Available",
+            accountNumber: "Account Number Not Available",
+            mobileNumber: "Mobile Number Not Available",
+            bankCode: "Not Available",
+            branchCode: "Not Available",
+          });
+          setLoading(false);
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === "") {
+        console.warn("Empty response from bank details server");
+        setNotFoundError(true);
+        setBankDetails({
+          bankName: "Bank Information Not Available",
+          branchName: "Branch Information Not Available",
+          accountNumber: "Account Number Not Available",
+          mobileNumber: "Mobile Number Not Available",
+          bankCode: "Not Available",
+          branchCode: "Not Available",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const data = JSON.parse(responseText);
 
       if (data && data.length > 0) {
         const bankInfo = data[0];
         setBankDetails({
-          bankName: bankInfo.bankname,
-          branchName: bankInfo.bankbranch,
-          accountNumber: bankInfo.accountno,
-          mobileNumber: bankInfo.mobileno,
-          bankCode: bankInfo.bankcode,
-          branchCode: bankInfo.branchcode,
+          bankName: bankInfo.bankname || "Bank Name Not Available",
+          branchName: bankInfo.bankbranch || "Branch Name Not Available",
+          accountNumber: bankInfo.accountno || "Account Number Not Available",
+          mobileNumber: bankInfo.mobileno || "Mobile Number Not Available",
+          bankCode: bankInfo.bankcode || "Not Available",
+          branchCode: bankInfo.branchcode || "Not Available",
         });
       } else {
-        setError("No bank details found");
+        console.warn("No bank details found in response");
+        setNotFoundError(true);
+        setBankDetails({
+          bankName: "Bank Information Not Available",
+          branchName: "Branch Information Not Available",
+          accountNumber: "Account Number Not Available",
+          mobileNumber: "Mobile Number Not Available",
+          bankCode: "Not Available",
+          branchCode: "Not Available",
+        });
       }
     } catch (err) {
       console.error("Error fetching bank details:", err);
-      setError("Failed to load bank details. Please try again.");
+      setError("Unable to load bank details. Please check your connection and try again.");
+      setBankDetails(null);
     } finally {
       setLoading(false);
     }
@@ -237,8 +423,8 @@ const BankDetailsSum = ({ onClose }) => {
 
   // Send OTP via CheckAvailability API
   const sendOTP = async () => {
-    if (!nicNumber || !mobileNumber) {
-      Alert.alert("Error", "Missing user credentials. Please try again.");
+    if (!nicNumber || nicNumber === "Not Available" || !mobileNumber || mobileNumber === "Not Available") {
+      showPopup("User credentials are not available. Cannot verify details.", 'error', 'Error');
       return;
     }
 
@@ -274,17 +460,11 @@ const BankDetailsSum = ({ onClose }) => {
         setCanResend(false);
         setOtp(["", "", "", ""]);
       } else {
-        Alert.alert(
-          "Error",
-          result.message || "Failed to send OTP. Please try again."
-        );
+        showPopup(result.message || "Failed to send OTP. Please try again.", 'error', 'Error');
       }
     } catch (error) {
       console.error("API Error:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Something went wrong. Please try again."
-      );
+      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
     } finally {
       setOtpLoading(false);
     }
@@ -371,15 +551,12 @@ const BankDetailsSum = ({ onClose }) => {
   const verifyOTP = async () => {
     const otpCode = otp.join("");
     if (otpCode.length !== 4) {
-      Alert.alert("", "Please enter a valid 4-digit OTP");
+      showPopup("Please enter a valid 4-digit OTP", 'warning');
       return;
     }
 
-    if (!mobileNumber) {
-      Alert.alert(
-        "Error",
-        "Missing mobile number. Please try again."
-      );
+    if (!mobileNumber || mobileNumber === "Not Available") {
+      showPopup("Missing mobile number. Please try again.", 'error', 'Error');
       return;
     }
 
@@ -410,22 +587,19 @@ const BankDetailsSum = ({ onClose }) => {
         // Close modal and show unmasked details
         setShowOtpModal(false);
         setShowMasked(false);
-        Alert.alert("Success", "OTP verified successfully!");
+        showPopup("OTP verified successfully!", 'success', 'Success');
       } else {
         if (result.errorType === "INVALID_OTP") {
-          Alert.alert("", "Invalid OTP. Please check and try again.");
+          showPopup("Invalid OTP. Please check and try again.", 'error');
         } else if (result.errorType === "OTP_EXPIRED") {
-          Alert.alert("", "OTP has expired. Please request a new one.");
+          showPopup("OTP has expired. Please request a new one.", 'warning');
         } else {
-          Alert.alert("Error", result.message || "OTP verification failed.");
+          showPopup(result.message || "OTP verification failed.", 'error', 'Error');
         }
       }
     } catch (error) {
       console.error("API Error:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Something went wrong. Please try again."
-      );
+      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
     } finally {
       setOtpVerifyLoading(false);
     }
@@ -435,8 +609,8 @@ const BankDetailsSum = ({ onClose }) => {
   const resendOTP = async () => {
     if (!canResend) return;
 
-    if (!nicNumber || !mobileNumber) {
-      Alert.alert("Error", "Missing user data. Please try again.");
+    if (!nicNumber || nicNumber === "Not Available" || !mobileNumber || mobileNumber === "Not Available") {
+      showPopup("Missing user data. Please try again.", 'error', 'Error');
       return;
     }
 
@@ -474,22 +648,13 @@ const BankDetailsSum = ({ onClose }) => {
         setTimer(90);
         setCanResend(false);
 
-        Alert.alert(
-          "Success",
-          `OTP resent to ${maskContactInfo(mobileNumber)}`
-        );
+        showPopup(`OTP resent to ${maskContactInfo(mobileNumber)}`, 'success', 'Success');
       } else {
-        Alert.alert(
-          "Error",
-          result.message || "Failed to resend OTP. Please try again."
-        );
+        showPopup(result.message || "Failed to resend OTP. Please try again.", 'error', 'Error');
       }
     } catch (error) {
       console.error("API Error:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Something went wrong. Please try again."
-      );
+      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
     } finally {
       setResendLoading(false);
     }
@@ -498,10 +663,20 @@ const BankDetailsSum = ({ onClose }) => {
   useEffect(() => {
     const initializeData = async () => {
       const storedData = await getStoredData();
-      if (storedData) {
+      if (storedData && storedData.policyNo && storedData.memberNo) {
         await fetchBankDetails(storedData.policyNo, storedData.memberNo);
       } else {
+        console.warn("Missing required data for bank details fetch");
         setLoading(false);
+        setNotFoundError(true);
+        setBankDetails({
+          bankName: "Bank Information Not Available",
+          branchName: "Branch Information Not Available",
+          accountNumber: "Account Number Not Available",
+          mobileNumber: "Mobile Number Not Available",
+          bankCode: "Not Available",
+          branchCode: "Not Available",
+        });
       }
     };
 
@@ -509,6 +684,11 @@ const BankDetailsSum = ({ onClose }) => {
   }, []);
 
   const handleViewDetails = () => {
+    if (notFoundError) {
+      showPopup("Bank details are not available. Cannot verify.", 'warning', 'Information Not Available');
+      return;
+    }
+
     if (showMasked) {
       // If currently showing masked data, send OTP for verification
       sendOTP();
@@ -519,79 +699,137 @@ const BankDetailsSum = ({ onClose }) => {
   };
 
   const handleRetry = () => {
-    if (policyNo && memberNo) {
+    if (policyNo && policyNo !== "Not Available" && memberNo && memberNo !== "Not Available") {
       fetchBankDetails(policyNo, memberNo);
     } else {
       // Try to get stored data again
       const initializeData = async () => {
         const storedData = await getStoredData();
-        if (storedData) {
+        if (storedData && storedData.policyNo && storedData.memberNo) {
           await fetchBankDetails(storedData.policyNo, storedData.memberNo);
+        } else {
+          showPopup("Required policy information is not available.", 'error', 'Missing Information');
         }
       };
       initializeData();
     }
   };
 
+  // Component to render field with icon for missing/not available data
+  const renderFieldValue = (value, fieldName) => {
+    const isDataNotAvailable = !value || 
+                               value === "Not Available" || 
+                               value === "Bank Name Not Available" ||
+                               value === "Branch Name Not Available" ||
+                               value === "Account Number Not Available" ||
+                               value === "Mobile Number Not Available" ||
+                               value === "Bank Information Not Available" ||
+                               value === "Branch Information Not Available";
+
+    if (isDataNotAvailable) {
+      return (
+        <View style={styles.missingDataContainer}>
+          <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
+          <Text style={styles.missingDataText}>Not Available</Text>
+        </View>
+      );
+    }
+
+    return (
+      <Text style={styles.value}>
+        {showMasked ? maskValue(value) : value}
+      </Text>
+    );
+  };
+
+  // Enhanced empty/error state component
+  const EmptyStateComponent = () => (
+    <View style={styles.centerContent}>
+      <Ionicons name="card-outline" size={60} color="#00ADBB" />
+      <Text style={styles.emptyStateMessage}>
+        {notFoundError 
+          ? "Bank Details Not Found for this Policy."
+          : "BBank Details Not Found for this Policy."
+        }
+      </Text>
+      
+      {error && !notFoundError && (
+        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+          <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   const renderContent = () => {
-    if (error) {
+    if (error && !notFoundError) {
       return (
         <View style={styles.centerContent}>
-          <Ionicons name="alert-circle-outline" size={50} color="#FF6B6B" />
-          <Text style={styles.errorText}>{error}</Text>
+          <Ionicons name="warning-outline" size={60} color="#00ADBB" />
+          <Text style={styles.errorText}>Connection Error</Text>
+          <Text style={styles.errorDetailText}>
+            Unable to load bank details. Please check your connection and try again.
+          </Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    if (!bankDetails) {
-      return (
-        <View style={styles.centerContent}>
-          <Text style={styles.errorText}>No bank details available</Text>
-        </View>
-      );
+    if (!bankDetails || notFoundError) {
+      return <EmptyStateComponent />;
     }
 
     return (
-      <View style={styles.card}>
-        <View style={styles.leftColumn}>
-          <Text style={styles.label}>Bank Name</Text>
-          <Text style={styles.label}>Branch Name</Text>
-          <Text style={styles.label}>Account Number</Text>
-          <Text style={styles.label}>Mobile Number</Text>
-        </View>
-        <View style={styles.rightColumn}>
-          <Text style={styles.value}>
-            {showMasked
-              ? maskValue(bankDetails.bankName)
-              : bankDetails.bankName}
-          </Text>
-          <Text style={styles.value}>
-            {showMasked
-              ? maskValue(bankDetails.branchName)
-              : bankDetails.branchName}
-          </Text>
-          <Text style={styles.value}>
-            {showMasked
-              ? maskValue(bankDetails.accountNumber)
-              : bankDetails.accountNumber}
-          </Text>
-          <Text style={styles.value}>
-            {showMasked
-              ? maskValue(bankDetails.mobileNumber)
-              : bankDetails.mobileNumber}
-          </Text>
-          <TouchableOpacity onPress={handleViewDetails} disabled={otpLoading}>
-            {otpLoading ? (
-              <ActivityIndicator size="small" color="#13646D" />
-            ) : (
-              <Text style={styles.viewDetailsText}>
-                {showMasked ? "View Details" : "Hide Details"}
-              </Text>
-            )}
-          </TouchableOpacity>
+      <View style={styles.contentContainer}>
+        {/* Status Banner */}
+        {notFoundError && (
+          <View style={styles.statusBanner}>
+            <Ionicons name="information-circle-outline" size={20} color="#00ADBB" />
+            <Text style={styles.statusBannerText}>
+              Some bank information may not be available
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.card}>
+          <View style={styles.leftColumn}>
+            <Text style={styles.label}>Bank Name</Text>
+            <Text style={styles.label}>Branch Name</Text>
+            <Text style={styles.label}>Account Number</Text>
+            <Text style={styles.label}>Mobile Number</Text>
+          </View>
+          <View style={styles.rightColumn}>
+            {renderFieldValue(bankDetails.bankName, "bankName")}
+            {renderFieldValue(bankDetails.branchName, "branchName")}
+            {renderFieldValue(bankDetails.accountNumber, "accountNumber")}
+            {renderFieldValue(bankDetails.mobileNumber, "mobileNumber")}
+            
+            <TouchableOpacity 
+              onPress={handleViewDetails} 
+              disabled={otpLoading}
+              style={notFoundError ? styles.disabledButton : null}
+            >
+              {otpLoading ? (
+                <ActivityIndicator size="small" color="#13646D" />
+              ) : (
+                <Text style={[
+                  styles.viewDetailsText,
+                  notFoundError && styles.disabledText
+                ]}>
+                  {notFoundError 
+                    ? "Details Not Available" 
+                    : showMasked 
+                      ? "View Details" 
+                      : "Hide Details"
+                  }
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -735,11 +973,21 @@ const BankDetailsSum = ({ onClose }) => {
                     </Text>
                   )}
                 </TouchableOpacity>
-              </View></View>
+              </View>
+              </View>
             </LinearGradient>
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        onConfirm={hidePopup}
+      />
     </LinearGradient>
   );
 };
@@ -816,6 +1064,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
+  contentContainer: {
+    width: "100%",
+  },
+  // Status Banner
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 173, 187, 0.1)",
+    padding: 12,
+    marginBottom: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#00ADBB",
+  },
+  statusBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#00ADBB",
+    marginLeft: 8,
+    fontWeight: "500",
+  },
+  // Policy Info
+  policyInfoContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    marginTop: 15,
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#00ADBB",
+  },
+  policyInfoText: {
+    fontSize: 12,
+    color: "#13646D",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
   card: {
     flexDirection: "row",
     backgroundColor: "white",
@@ -841,28 +1125,73 @@ const styles = StyleSheet.create({
   value: {
     marginBottom: 15,
   },
+  missingDataContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  missingDataText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+    marginLeft: 4,
+  },
   viewDetailsText: {
     color: "#13646D",
     fontWeight: "bold",
     fontSize: 18,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: "#999",
   },
   centerContent: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 50,
   },
+  emptyStateTitle: {
+    marginTop: 15,
+    fontSize: 18,
+    color: "#13646D",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  emptyStateMessage: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
   errorText: {
     marginTop: 10,
     fontSize: 16,
     color: "#FF6B6B",
     textAlign: "center",
+    fontWeight: "bold",
+  },
+  errorDetailText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 20,
   },
   retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 15,
     backgroundColor: "#13646D",
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
+  },
+  retryIcon: {
+    marginRight: 8,
   },
   retryButtonText: {
     color: "white",
@@ -925,6 +1254,7 @@ const styles = StyleSheet.create({
   },
   otpInput: {
     width: 55,
+    height: 55,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.5)',
@@ -986,6 +1316,77 @@ const styles = StyleSheet.create({
   },
   resendButtonTextDisabled: {
     color: 'rgba(19, 100, 109, 0.5)',
+  },
+  // Popup Styles
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  iconText: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  popupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  popupMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  confirmButton: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    minWidth: 100,
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

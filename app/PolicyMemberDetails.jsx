@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 export default function PolicyMemberDetails() {
   const router = useRouter();
@@ -22,10 +22,12 @@ export default function PolicyMemberDetails() {
   const [error, setError] = useState(null);
   const [storedData, setStoredData] = useState(null);
   const [policyDates, setPolicyDates] = useState(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   // Function to mask contact number
   const maskContactNumber = (contactNo) => {
-    if (!contactNo || contactNo === "N/A") return "N/A";
+    if (!contactNo || contactNo === "N/A" || contactNo === "Not Available")
+      return "Not Available";
     const contact = contactNo.toString();
     if (contact.length <= 4) return contact;
     // Show first 2 digits and last 2 digits, mask the middle
@@ -37,13 +39,46 @@ export default function PolicyMemberDetails() {
 
   // Function to mask date of birth
   const maskDateOfBirth = (dateOfBirth) => {
-    if (!dateOfBirth || dateOfBirth === "N/A") return "N/A";
+    if (
+      !dateOfBirth ||
+      dateOfBirth === "N/A" ||
+      dateOfBirth === "Not Available"
+    )
+      return "Not Available";
     // Format: DD/MM/YYYY -> DD/MM/****
     const parts = dateOfBirth.split("/");
     if (parts.length === 3) {
       return `${parts[0]}/${parts[1]}/****`;
     }
     return dateOfBirth;
+  };
+
+  // Function to create fallback member details from stored data
+  const createFallbackMemberDetails = (storedData) => {
+    return {
+      policyNumber: storedData.policyNumber || "Not Available",
+      memberName: storedData.memberName || "Not Available",
+      contactNo: maskContactNumber(storedData.userMobile) || "Not Available",
+      company: "Not Available",
+      memberNo: storedData.memberNumber || "Not Available",
+      empCategory: "Not Available",
+      dateOfBirth: "Not Available",
+      effectiveDate: "Not Available",
+      policyPeriod: {
+        from: "Not Available",
+        to: "Not Available",
+      },
+      opdLimits: {
+        yearLimit: "0.00",
+        eventLimit: "0.00",
+      },
+      indoorLimits: {
+        yearLimit: "0.00",
+        eventLimit: "0.00",
+      },
+      nic: storedData.userNic || "Not Available",
+      address: "Not Available",
+    };
   };
 
   // Function to load data from SecureStore
@@ -97,12 +132,19 @@ export default function PolicyMemberDetails() {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Policy info not found (404), using fallback data");
+          return null;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        throw new Error("Empty response from policy info server");
+        console.warn(
+          "Empty response from policy info server, using fallback data"
+        );
+        return null;
       }
 
       const result = JSON.parse(responseText);
@@ -139,12 +181,17 @@ export default function PolicyMemberDetails() {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Policy dates not found (404), using fallback data");
+          return null;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        throw new Error("Empty response from server");
+        console.warn("Empty response from server, using fallback data");
+        return null;
       }
 
       const result = JSON.parse(responseText);
@@ -172,47 +219,65 @@ export default function PolicyMemberDetails() {
 
   // Function to format date from API response
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date
-      .toLocaleDateString("en-GB", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-      .replace(/\//g, "/");
+    if (!dateString) return "Not Available";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Not Available";
+      return date
+        .toLocaleDateString("en-GB", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        })
+        .replace(/\//g, "/");
+    } catch (err) {
+      return "Not Available";
+    }
   };
 
   // Function to format policy period from start and end dates
   const formatPolicyPeriod = (startDate, endDate) => {
-    if (!startDate || !endDate) return { from: "N/A", to: "N/A" };
+    if (!startDate || !endDate)
+      return { from: "Not Available", to: "Not Available" };
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    try {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
 
-    const formatDate = (date) => {
-      const day = date.getDate().toString().padStart(2, "0");
-      const month = (date.getMonth() + 1).toString().padStart(2, "0");
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
-    };
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return { from: "Not Available", to: "Not Available" };
+      }
 
-    return {
-      from: formatDate(start),
-      to: formatDate(end),
-    };
+      const formatDate = (date) => {
+        const day = date.getDate().toString().padStart(2, "0");
+        const month = (date.getMonth() + 1).toString().padStart(2, "0");
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+
+      return {
+        from: formatDate(start),
+        to: formatDate(end),
+      };
+    } catch (err) {
+      return { from: "Not Available", to: "Not Available" };
+    }
   };
 
   // Function to format currency values
   const formatCurrency = (value) => {
     if (!value && value !== 0) return "0.00";
-    return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
+    try {
+      return new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value);
+    } catch (err) {
+      return "0.00";
+    }
   };
 
-  // Function to fetch member details from API
+  // Function to fetch member details from API with 404 handling
   const fetchMemberDetails = async (policyNo, memberNo) => {
     try {
       const apiUrl = `${API_BASE_URL}/EmployeeInfo/GetEmployeeInfo?policyNo=${policyNo}&memberNo=${memberNo}`;
@@ -226,18 +291,29 @@ export default function PolicyMemberDetails() {
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("Member details not found (404), using fallback data");
+          setIsOfflineMode(true);
+          return null; // Return null to indicate we should use fallback data
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        throw new Error("Empty response from server");
+        console.warn("Empty response from server, using fallback data");
+        setIsOfflineMode(true);
+        return null;
       }
 
       const data = JSON.parse(responseText);
       return data;
     } catch (err) {
       console.error("Error fetching member details:", err);
+      if (err.message.includes("404")) {
+        setIsOfflineMode(true);
+        return null;
+      }
       throw err;
     }
   };
@@ -289,7 +365,7 @@ export default function PolicyMemberDetails() {
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
+      outputRange: ["0deg", "360deg"],
     });
 
     return (
@@ -321,78 +397,133 @@ export default function PolicyMemberDetails() {
     </View>
   );
 
-  // Initialize data function
+  // Initialize data function with enhanced error handling
   const initializeData = async () => {
     try {
       setLoading(true);
       setError(null);
+      setIsOfflineMode(false);
 
       // Load stored data first
       const stored = await loadStoredData();
       if (!stored) {
+        // Create minimal fallback even without stored data
+        const fallbackData = createFallbackMemberDetails({
+          policyNumber: "Not Available",
+          memberNumber: "Not Available",
+          memberName: "Not Available",
+          userNic: "Not Available",
+          userMobile: "Not Available",
+        });
+        setMemberDetails(fallbackData);
         setLoading(false);
         return;
       }
 
-      // Fetch policy info for company name
-      const policyInfo = await fetchPolicyInfo(stored.policyNumber);
+      let apiData = null;
+      let policyInfo = null;
+      let policyDatesData = null;
 
-      // Fetch policy dates
-      const policyDatesData = await fetchPolicyDates(
-        stored.policyNumber,
-        stored.userNic
-      );
-      setPolicyDates(policyDatesData);
+      // Try to fetch member details from API
+      try {
+        apiData = await fetchMemberDetails(
+          stored.policyNumber,
+          stored.memberNumber
+        );
+      } catch (err) {
+        console.error("Failed to fetch member details, using fallback:", err);
+        setIsOfflineMode(true);
+      }
 
-      // Fetch member details from API
-      const apiData = await fetchMemberDetails(
-        stored.policyNumber,
-        stored.memberNumber
-      );
+      // Try to fetch policy info for company name
+      try {
+        policyInfo = await fetchPolicyInfo(stored.policyNumber);
+      } catch (err) {
+        console.error("Failed to fetch policy info:", err);
+      }
 
-      // Format policy period using fetched dates or fallback to effective date
-      const policyPeriod = policyDatesData
-        ? formatPolicyPeriod(
+      // Try to fetch policy dates
+      try {
+        policyDatesData = await fetchPolicyDates(
+          stored.policyNumber,
+          stored.userNic
+        );
+        setPolicyDates(policyDatesData);
+      } catch (err) {
+        console.error("Failed to fetch policy dates:", err);
+      }
+
+      let transformedData;
+
+      if (apiData) {
+        // We have API data, use it with fallbacks for missing fields
+        const policyPeriod = policyDatesData
+          ? formatPolicyPeriod(
+              policyDatesData.policyStartDate,
+              policyDatesData.policyEndDate
+            )
+          : {
+              from: formatDate(apiData.effectiveDate),
+              to: "Not Available",
+            };
+
+        transformedData = {
+          policyNumber: stored.policyNumber || "Not Available",
+          memberName:
+            apiData.memberName || stored.memberName || "Not Available",
+          contactNo: maskContactNumber(stored.userMobile) || "Not Available",
+          company: policyInfo?.name || "Not Available",
+          memberNo:
+            apiData.employeeNumber || stored.memberNumber || "Not Available",
+          empCategory: apiData.employeeCategory || "Not Available",
+          dateOfBirth:
+            maskDateOfBirth(formatDate(apiData.dateOfBirth)) || "Not Available",
+          effectiveDate: formatDate(apiData.effectiveDate) || "Not Available",
+          policyPeriod: policyPeriod,
+          opdLimits: {
+            yearLimit: formatCurrency(apiData.outdoorYearLimit) || "0.00",
+            eventLimit: formatCurrency(apiData.outdoorEventLimit) || "0.00",
+          },
+          indoorLimits: {
+            yearLimit: formatCurrency(apiData.indoorYearLimit) || "0.00",
+            eventLimit: formatCurrency(apiData.indoorEventLimit) || "0.00",
+          },
+          nic: apiData.nic || stored.userNic || "Not Available",
+          address:
+            [apiData.address1, apiData.address2, apiData.address3]
+              .filter((addr) => addr && addr.trim())
+              .join(", ") || "Not Available",
+        };
+      } else {
+        // No API data available, use fallback with stored data
+        transformedData = createFallbackMemberDetails(stored);
+
+        // Try to add company name if we got policy info
+        if (policyInfo?.name) {
+          transformedData.company = policyInfo.name;
+        }
+
+        // Try to add policy dates if we got them
+        if (policyDatesData) {
+          transformedData.policyPeriod = formatPolicyPeriod(
             policyDatesData.policyStartDate,
             policyDatesData.policyEndDate
-          )
-        : { from: formatDate(apiData.effectiveDate), to: "N/A" };
-
-      // Transform API data to match component structure with masking
-      const transformedData = {
-        policyNumber: stored.policyNumber,
-        memberName: apiData.memberName,
-        contactNo: maskContactNumber(stored.userMobile || "N/A"), // Mask contact number
-        company: policyInfo?.name || "N/A",
-        memberNo: apiData.employeeNumber,
-        empCategory: apiData.employeeCategory,
-        dateOfBirth: maskDateOfBirth(formatDate(apiData.dateOfBirth)), // Mask date of birth
-        effectiveDate: formatDate(apiData.effectiveDate),
-        policyPeriod: policyPeriod,
-        opdLimits: {
-          yearLimit: formatCurrency(apiData.outdoorYearLimit),
-          eventLimit: formatCurrency(apiData.outdoorEventLimit),
-        },
-        indoorLimits: {
-          yearLimit: formatCurrency(apiData.indoorYearLimit),
-          eventLimit: formatCurrency(apiData.indoorEventLimit),
-        },
-        nic: apiData.nic || "N/A",
-        address:
-          [apiData.address1, apiData.address2, apiData.address3]
-            .filter((addr) => addr && addr.trim())
-            .join(", ") || "N/A",
-      };
+          );
+        }
+      }
 
       setMemberDetails(transformedData);
+
     } catch (err) {
       console.error("Error initializing data:", err);
       setError(err.message);
-      Alert.alert(
-        "Error",
-        "Failed to load member details. Please try again.",
-        [{ text: "OK" }]
-      );
+
+      // Even on error, try to show fallback data
+      if (storedData) {
+        const fallbackData = createFallbackMemberDetails(storedData);
+        setMemberDetails(fallbackData);
+        setIsOfflineMode(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -408,6 +539,7 @@ export default function PolicyMemberDetails() {
 
   const handleRetry = () => {
     setError(null);
+    setIsOfflineMode(false);
     initializeData();
   };
 
@@ -419,7 +551,7 @@ export default function PolicyMemberDetails() {
     );
   }
 
-  if (error) {
+  if (error && !memberDetails) {
     return (
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -437,6 +569,9 @@ export default function PolicyMemberDetails() {
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>No member details available</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
     );
@@ -450,7 +585,6 @@ export default function PolicyMemberDetails() {
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
         <Text style={styles.headerTitle1}>Policy Details</Text>
-        <View style={{ width: 24 }} />
       </View>
 
       {/* Body */}
@@ -471,7 +605,14 @@ export default function PolicyMemberDetails() {
             ].map(([label, value], index) => (
               <View style={styles.detailRow} key={index}>
                 <Text style={styles.detailLabel}>{label}</Text>
-                <Text style={styles.detailValue}>{value}</Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    value === "Not Available" && styles.notAvailableText,
+                  ]}
+                >
+                  {value}
+                </Text>
               </View>
             ))}
           </View>
@@ -483,13 +624,25 @@ export default function PolicyMemberDetails() {
           <View style={styles.periodContent}>
             <View style={styles.periodColumn}>
               <Text style={styles.periodLabel}>From</Text>
-              <Text style={styles.periodValue}>
+              <Text
+                style={[
+                  styles.periodValue,
+                  memberDetails.policyPeriod.from === "Not Available" &&
+                    styles.notAvailableText,
+                ]}
+              >
                 {memberDetails.policyPeriod.from}
               </Text>
             </View>
             <View style={styles.periodColumn}>
               <Text style={styles.periodLabel}>To</Text>
-              <Text style={styles.periodValue}>
+              <Text
+                style={[
+                  styles.periodValue,
+                  memberDetails.policyPeriod.to === "Not Available" &&
+                    styles.notAvailableText,
+                ]}
+              >
                 {memberDetails.policyPeriod.to}
               </Text>
             </View>
@@ -557,6 +710,26 @@ const styles = StyleSheet.create({
     color: "#2E7D7D",
     flex: 1,
     textAlign: "center",
+  },
+  offlineIndicator: {
+    width: 24,
+    alignItems: "center",
+  },
+  offlineBanner: {
+    backgroundColor: "#FFF3E0",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    marginHorizontal: 20,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  offlineBannerText: {
+    fontSize: 12,
+    color: "#E65100",
+    marginLeft: 8,
+    flex: 1,
   },
   header: {
     backgroundColor: "rgba(255, 255, 255, 0.9)",
@@ -654,11 +827,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   retryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  retryIcon: {
+    marginRight: 8,
+  },
+  retrySection: {
+    alignItems: "center",
+    marginTop: 20,
   },
   detailCard: {
     backgroundColor: "#FFFFFF",
@@ -696,6 +879,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333333",
     fontWeight: "600",
+  },
+  notAvailableText: {
+    color: "#999999",
+    fontStyle: "italic",
   },
   policyPeriodCard: {
     backgroundColor: "#FFFFFF",
