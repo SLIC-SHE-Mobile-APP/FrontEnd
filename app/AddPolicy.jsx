@@ -2,9 +2,8 @@ import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
-  Alert,
   Animated,
   FlatList,
   StyleSheet,
@@ -12,9 +11,139 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
+  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
+
+const { width } = Dimensions.get('window');
+
+// Custom Popup Component with Blur Background
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const AddPolicy = () => {
   const [policyNumber, setPolicyNumber] = useState("");
@@ -23,10 +152,41 @@ const AddPolicy = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [removedPoliciesFromAPI, setRemovedPoliciesFromAPI] = useState([]);
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
   const navigation = useNavigation();
 
   // Required prefix for policy numbers
   const REQUIRED_PREFIX = "G/010/SHE/";
+
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
 
   // Custom Loading Animation Component
   const LoadingIcon = () => {
@@ -159,7 +319,11 @@ const AddPolicy = () => {
       const storedNic = await SecureStore.getItemAsync("user_nic");
 
       if (!storedNic) {
-        Alert.alert("Error", "NIC not found. Please login again.");
+        showPopup(
+          "Authentication Error", 
+          "Your session has expired. Please login again to continue.", 
+          "error"
+        );
         return;
       }
 
@@ -195,11 +359,19 @@ const AddPolicy = () => {
 
         setPolicyList(formattedPolicies);
       } else {
-        Alert.alert("Error", "Failed to load policies");
+        showPopup(
+          "Data Loading Error", 
+          "Unable to load your policies at this time. Please try refreshing the page or contact support if the issue persists.", 
+          "error"
+        );
       }
     } catch (error) {
       console.error("Error loading policies:", error);
-      Alert.alert("Error", "Failed to connect to server");
+      showPopup(
+        "Connection Error", 
+        "Unable to connect to the server. Please check your internet connection and try again.", 
+        "error"
+      );
     }
   };
 
@@ -221,15 +393,20 @@ const AddPolicy = () => {
 
   const handleAddPolicy = async () => {
     if (!policyNumber.trim()) {
-      Alert.alert("Validation", "Please enter a policy number");
+      showPopup(
+        "Missing Information", 
+        "Please enter a policy number to continue.", 
+        "warning"
+      );
       return;
     }
 
     // Check if policy number starts with required prefix
     if (!policyNumber.startsWith(REQUIRED_PREFIX)) {
-      Alert.alert(
-        "Invalid Format",
-        `Policy number must start with ${REQUIRED_PREFIX}`
+      showPopup(
+        "Invalid Policy Format",
+        `Policy number must start with "${REQUIRED_PREFIX}"\n\nExample: G/010/SHE/18666/25`,
+        "warning"
       );
       return;
     }
@@ -238,7 +415,11 @@ const AddPolicy = () => {
       (item) => item.policyNumber === policyNumber
     );
     if (existing) {
-      Alert.alert("Duplicate", "This policy already exists");
+      showPopup(
+        "Duplicate Policy", 
+        `Policy ${policyNumber} already exists in your account.\n\nPlease enter a different policy number.`, 
+        "warning"
+      );
       return;
     }
 
@@ -284,80 +465,91 @@ const AddPolicy = () => {
 
         setPolicyNumber("");
 
-        // Just show success alert - NO NAVIGATION
-        Alert.alert("Success", "Policy added successfully");
+        // Show enhanced success popup
+        showPopup(
+          "Policy Added Successfully", 
+          `Policy ${policyNumber} has been added to your account and is now active.`, 
+          "success"
+        );
       } else {
-        Alert.alert("Not Found", result.message || "Failed to add policy");
+        showPopup(
+          "Policy Not Found", 
+          result.message || "The policy number you entered could not be found in our system. Please verify the policy number and try again.", 
+          "error"
+        );
       }
     } catch (error) {
       console.error("Error adding policy:", error);
-      Alert.alert("Error", "Failed to connect to server");
+      showPopup(
+        "Connection Error", 
+        "Unable to connect to the server. Please check your internet connection and try again.", 
+        "error"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeletePolicy = async (id, policyNumber) => {
-    Alert.alert(
+    showPopup(
       "Delete Policy",
       `Are you sure you want to delete policy ${policyNumber}?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setLoading(true);
+      "warning",
+      true,
+      async () => {
+        try {
+          setLoading(true);
+          hidePopup(); // Hide the confirmation popup
 
-              // Call the API to remove the policy
-              const response = await fetch(
-                `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    policyNumber: policyNumber,
-                  }),
-                }
-              );
-
-              const result = await response.json();
-
-              if (response.ok && result.success) {
-                // Remove from policy list
-                setPolicyList((prev) => prev.filter((item) => item.id !== id));
-
-                // Only add to deleted policies if it's not already from the API
-                if (!removedPoliciesFromAPI.includes(policyNumber)) {
-                  setDeletedPolicies((prev) => [...prev, policyNumber]);
-                }
-
-                // Just show success alert - NO NAVIGATION
-                Alert.alert(
-                  "Success",
-                  result.message || "Policy removed successfully"
-                );
-              } else {
-                Alert.alert(
-                  "Error",
-                  result.message || "Failed to remove policy"
-                );
-              }
-            } catch (error) {
-              console.error("Error removing policy:", error);
-              Alert.alert("Error", "Failed to connect to server");
-            } finally {
-              setLoading(false);
+          // Call the API to remove the policy
+          const response = await fetch(
+            `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                policyNumber: policyNumber,
+              }),
             }
-          },
-        },
-      ]
+          );
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            // Remove from policy list
+            setPolicyList((prev) => prev.filter((item) => item.id !== id));
+
+            // Only add to deleted policies if it's not already from the API
+            if (!removedPoliciesFromAPI.includes(policyNumber)) {
+              setDeletedPolicies((prev) => [...prev, policyNumber]);
+            }
+
+            // Show success popup with more context
+            showPopup(
+              "Policy Deleted",
+              `Policy ${policyNumber} has been successfully removed from your account.`,
+              "success"
+            );
+          } else {
+            showPopup(
+              "Deletion Failed",
+              result.message || "Unable to remove the policy. Please try again later.",
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Error removing policy:", error);
+          showPopup(
+            "Connection Error", 
+            "Unable to connect to the server. Please check your internet connection and try again.",
+            "error"
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
     );
   };
 
@@ -516,6 +708,17 @@ const AddPolicy = () => {
           />
         )}
       </View>
+
+      {/* Custom Popup Component */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </LinearGradient>
   );
 };
@@ -707,5 +910,101 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 20,
     fontWeight: "normal", // This removes the bold
+  },
+  // Popup Styles with Blur Background
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
