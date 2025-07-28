@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
     Alert,
+    Animated,
     Image,
     Modal,
     ScrollView,
@@ -14,11 +15,12 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
 
 const EditClaimIntimation1 = ({ route }) => {
     const navigation = useNavigation();
-    const { claim } = route?.params || {};
+    const { claim, submittedData } = route?.params || {};
 
     const [memberOptions] = useState([
         { id: 1, name: "John Doe", relationship: "Self" },
@@ -31,17 +33,26 @@ const EditClaimIntimation1 = ({ route }) => {
 
     // State for claim details
     const [claimDetails, setClaimDetails] = useState({
-        referenceNo: claim?.referenceNo || "M000428",
+        referenceNo: "",
         enteredBy: "Loading...",
         status: "Submission for Approval Pending",
-        claimType: claim?.claimType || "Out-door",
-        createdOn: claim?.createdOn || "24-12-2020",
+        claimType: "",
+        createdOn: "",
     });
 
     // Employee info state
     const [employeeInfo, setEmployeeInfo] = useState(null);
     const [loading, setLoading] = useState(true);
     const [documentsLoading, setDocumentsLoading] = useState(true);
+    const [initialLoading, setInitialLoading] = useState(true);
+    
+    // Track all loading states
+    const [loadingStates, setLoadingStates] = useState({
+        claimDetails: true,
+        beneficiaryData: true,
+        employeeInfo: true,
+        documents: true,
+    });
 
     // Beneficiaries state - Initialize as empty array
     const [beneficiaries, setBeneficiaries] = useState([]);
@@ -50,14 +61,10 @@ const EditClaimIntimation1 = ({ route }) => {
     const [documents, setDocuments] = useState([]);
 
     // Modal states
-    const [isAddBeneficiaryModalVisible, setAddBeneficiaryModalVisible] =
-        useState(false);
-    const [isAddDocumentModalVisible, setAddDocumentModalVisible] =
-        useState(false);
-    const [isEditBeneficiaryModalVisible, setEditBeneficiaryModalVisible] =
-        useState(false);
-    const [isEditDocumentModalVisible, setEditDocumentModalVisible] =
-        useState(false);
+    const [isAddBeneficiaryModalVisible, setAddBeneficiaryModalVisible] = useState(false);
+    const [isAddDocumentModalVisible, setAddDocumentModalVisible] = useState(false);
+    const [isEditBeneficiaryModalVisible, setEditBeneficiaryModalVisible] = useState(false);
+    const [isEditDocumentModalVisible, setEditDocumentModalVisible] = useState(false);
     const [selectedBeneficiary, setSelectedBeneficiary] = useState(null);
     const [selectedDocument, setSelectedDocument] = useState(null);
 
@@ -79,7 +86,100 @@ const EditClaimIntimation1 = ({ route }) => {
         amount: "",
     });
 
+    // Helper function to update loading states
+    const updateLoadingState = (key, value) => {
+        setLoadingStates(prev => {
+            const newStates = { ...prev, [key]: value };
+            
+            // Check if all loading states are false
+            const allLoaded = Object.values(newStates).every(state => !state);
+            if (allLoaded) {
+                setInitialLoading(false);
+            }
+            
+            return newStates;
+        });
+    };
 
+    const LoadingIcon = () => {
+        const [rotateAnim] = useState(new Animated.Value(0));
+        const [scaleAnim] = useState(new Animated.Value(1));
+
+        useEffect(() => {
+            const createRotateAnimation = () => {
+                return Animated.loop(
+                    Animated.timing(rotateAnim, {
+                        toValue: 1,
+                        duration: 2000,
+                        useNativeDriver: true,
+                    })
+                );
+            };
+
+            const createPulseAnimation = () => {
+                return Animated.loop(
+                    Animated.sequence([
+                        Animated.timing(scaleAnim, {
+                            toValue: 1.2,
+                            duration: 1000,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(scaleAnim, {
+                            toValue: 1,
+                            duration: 1000,
+                            useNativeDriver: true,
+                        }),
+                    ])
+                );
+            };
+
+            const rotateAnimation = createRotateAnimation();
+            const pulseAnimation = createPulseAnimation();
+
+            rotateAnimation.start();
+            pulseAnimation.start();
+
+            return () => {
+                rotateAnimation.stop();
+                pulseAnimation.stop();
+            };
+        }, []);
+
+        const spin = rotateAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['0deg', '360deg'],
+        });
+
+        return (
+            <Animated.View
+                style={[
+                    styles.customLoadingIcon,
+                    {
+                        transform: [{ rotate: spin }, { scale: scaleAnim }],
+                    },
+                ]}
+            >
+                <View style={styles.loadingIconOuter}>
+                    <View style={styles.loadingIconInner}>
+                        <Icon name="heartbeat" size={24} color="#FFFFFF" />
+                    </View>
+                </View>
+            </Animated.View>
+        );
+    };
+
+    // Loading Screen Component with Custom Icon
+    const LoadingScreen = () => (
+        <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+                <LoadingIcon />
+                <Text style={styles.loadingText}>Loading Saved Claim Details...</Text>
+                <Text style={styles.loadingSubText}>Please wait a moment</Text>
+            </View>
+        </View>
+    );
+
+    // Format date from API response (e.g., "2025-03-04T00:00:00" to "04/03/2025")
     const formatDate = (dateString) => {
         try {
             const date = new Date(dateString);
@@ -93,11 +193,159 @@ const EditClaimIntimation1 = ({ route }) => {
         }
     };
 
+    // Helper function to parse clmMemSeqNo
+    const parseClmMemSeqNo = (clmMemSeqNo) => {
+        try {
+            if (!clmMemSeqNo || typeof clmMemSeqNo !== 'string') {
+                console.warn('Invalid clmMemSeqNo:', clmMemSeqNo);
+                return { memId: 0, seqNo: 0 };
+            }
+
+            const parts = clmMemSeqNo.split('-');
+            if (parts.length !== 2) {
+                console.warn('Invalid clmMemSeqNo format:', clmMemSeqNo);
+                return { memId: 0, seqNo: 0 };
+            }
+
+            const memId = parseInt(parts[0], 10);
+            const seqNo = parseInt(parts[1], 10);
+
+            if (isNaN(memId) || isNaN(seqNo)) {
+                console.warn('Invalid numeric values in clmMemSeqNo:', clmMemSeqNo);
+                return { memId: 0, seqNo: 0 };
+            }
+
+            return { memId, seqNo };
+        } catch (error) {
+            console.error('Error parsing clmMemSeqNo:', error);
+            return { memId: 0, seqNo: 0 };
+        }
+    };
+
+    // Delete document from API
+    const deleteDocumentFromAPI = async (document) => {
+        try {
+            const { memId, seqNo } = parseClmMemSeqNo(document.clmMemSeqNo);
+            
+            console.log('Deleting document with:', {
+                claimNo: claimDetails.referenceNo,
+                memId,
+                seqNo,
+                originalClmMemSeqNo: document.clmMemSeqNo
+            });
+
+            const requestBody = {
+                claimNo: claimDetails.referenceNo,
+                memId: memId,
+                seqNo: seqNo
+            };
+
+            const response = await fetch(
+                `${API_BASE_URL}/Document/deletedocument`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(requestBody),
+                }
+            );
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Delete Document API Error Response:", errorText);
+                throw new Error(
+                    `HTTP error! status: ${response.status}, message: ${errorText}`
+                );
+            }
+
+            const result = await response.json();
+            console.log('Delete document API response:', result);
+
+            return result;
+        } catch (error) {
+            console.error("Error deleting document from API:", error);
+            throw error;
+        }
+    };
+
+    // Add this helper function at the top of your component (before the component definition)
+    const arrayBufferToBase64 = (buffer) => {
+        try {
+            // If buffer is already a string (base64), return it
+            if (typeof buffer === "string") {
+                return buffer;
+            }
+
+            // If buffer is null or undefined
+            if (!buffer) {
+                return null;
+            }
+
+            // If buffer is an array of bytes
+            if (Array.isArray(buffer)) {
+                const bytes = new Uint8Array(buffer);
+                let binary = "";
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64 = btoa(binary);
+                return base64;
+            }
+
+            // If buffer is ArrayBuffer or similar
+            if (buffer instanceof ArrayBuffer) {
+                const bytes = new Uint8Array(buffer);
+                let binary = "";
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64 = btoa(binary);
+                return base64;
+            }
+
+            // If buffer is a typed array
+            if (buffer.buffer instanceof ArrayBuffer) {
+                let binary = "";
+                for (let i = 0; i < buffer.length; i++) {
+                    binary += String.fromCharCode(buffer[i]);
+                }
+                const base64 = btoa(binary);
+                return base64;
+            }
+
+            // Last resort: try to convert object to array
+            if (typeof buffer === "object" && buffer !== null) {
+                const keys = Object.keys(buffer);
+
+                // Check if it's an object with numeric keys (like {0: 255, 1: 216, ...})
+                const isNumericKeys = keys.every((key) => !isNaN(key));
+                if (isNumericKeys) {
+                    const array = keys.map((key) => buffer[key]);
+                    const bytes = new Uint8Array(array);
+                    let binary = "";
+                    for (let i = 0; i < bytes.byteLength; i++) {
+                        binary += String.fromCharCode(bytes[i]);
+                    }
+                    const base64 = btoa(binary);
+                    return base64;
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error("Error converting buffer to base64:", error);
+            return null;
+        }
+    };
+
     // Fetch documents from API
     const fetchDocuments = async (referenceNo) => {
         try {
-            setDocumentsLoading(true);
             console.log("Fetching documents for referenceNo:", referenceNo);
+
+            // Add artificial delay to increase loading time (3 seconds)
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
             const response = await fetch(
                 `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
@@ -118,21 +366,13 @@ const EditClaimIntimation1 = ({ route }) => {
             }
 
             const result = await response.json();
-            console.log("Documents API Response:", result);
 
             if (result.success && result.data && Array.isArray(result.data)) {
                 // Transform API data to match component structure
                 const transformedDocuments = result.data.map((doc, index) => {
-                    console.log(`Processing document ${index}:`, {
-                        id: doc.clmMemSeqNo,
-                        type: doc.docType,
-                        hasImgContent: !!doc.imgContent,
-                        imgContentType: typeof doc.imgContent,
-                        imgContentLength: doc.imgContent?.length,
-                    });
-
                     return {
                         id: doc.clmMemSeqNo || `doc_${index}`,
+                        clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API
                         type: doc.docType || "Unknown",
                         date: formatDate(doc.docDate),
                         amount: doc.docAmount ? doc.docAmount.toString() : "0.00",
@@ -142,21 +382,12 @@ const EditClaimIntimation1 = ({ route }) => {
                             ? arrayBufferToBase64(doc.imgContent)
                             : null,
                         originalImgContent: doc.imgContent, // Keep original for debugging
+                        hasImage: !!doc.imgContent, // Flag to check if document has image
                     };
                 });
 
                 setDocuments(transformedDocuments);
-                console.log(
-                    "Transformed documents:",
-                    transformedDocuments.map((doc) => ({
-                        id: doc.id,
-                        type: doc.type,
-                        hasImgContent: !!doc.imgContent,
-                        imgContentLength: doc.imgContent?.length,
-                    }))
-                );
             } else {
-                console.log("No documents found or invalid response structure");
                 setDocuments([]);
             }
         } catch (error) {
@@ -177,94 +408,7 @@ const EditClaimIntimation1 = ({ route }) => {
             setDocuments([]);
         } finally {
             setDocumentsLoading(false);
-        }
-    };
-
-    // Add this helper function at the top of your component (before the component definition)
-    const arrayBufferToBase64 = (buffer) => {
-        try {
-            console.log("Converting buffer to base64, buffer type:", typeof buffer);
-            console.log("Buffer value:", buffer);
-
-            // If buffer is already a string (base64), return it
-            if (typeof buffer === "string") {
-                console.log("Buffer is already a string, length:", buffer.length);
-                return buffer;
-            }
-
-            // If buffer is null or undefined
-            if (!buffer) {
-                console.log("Buffer is null or undefined");
-                return null;
-            }
-
-            // If buffer is an array of bytes
-            if (Array.isArray(buffer)) {
-                console.log("Buffer is an array, length:", buffer.length);
-                const bytes = new Uint8Array(buffer);
-                let binary = "";
-                for (let i = 0; i < bytes.byteLength; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                const base64 = btoa(binary);
-                console.log("Converted array to base64, length:", base64.length);
-                return base64;
-            }
-
-            // If buffer is ArrayBuffer or similar
-            if (buffer instanceof ArrayBuffer) {
-                console.log("Buffer is ArrayBuffer, byteLength:", buffer.byteLength);
-                const bytes = new Uint8Array(buffer);
-                let binary = "";
-                for (let i = 0; i < bytes.byteLength; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                const base64 = btoa(binary);
-                console.log("Converted ArrayBuffer to base64, length:", base64.length);
-                return base64;
-            }
-
-            // If buffer is a typed array
-            if (buffer.buffer instanceof ArrayBuffer) {
-                console.log("Buffer is typed array, length:", buffer.length);
-                let binary = "";
-                for (let i = 0; i < buffer.length; i++) {
-                    binary += String.fromCharCode(buffer[i]);
-                }
-                const base64 = btoa(binary);
-                console.log("Converted typed array to base64, length:", base64.length);
-                return base64;
-            }
-
-            console.log("Unknown buffer type, trying JSON.stringify:", typeof buffer);
-            console.log("Buffer constructor:", buffer.constructor.name);
-
-            // Last resort: try to convert object to array
-            if (typeof buffer === "object" && buffer !== null) {
-                const keys = Object.keys(buffer);
-                console.log("Buffer object keys:", keys.slice(0, 10)); // Show first 10 keys
-
-                // Check if it's an object with numeric keys (like {0: 255, 1: 216, ...})
-                const isNumericKeys = keys.every((key) => !isNaN(key));
-                if (isNumericKeys) {
-                    console.log("Buffer appears to be an object with numeric keys");
-                    const array = keys.map((key) => buffer[key]);
-                    const bytes = new Uint8Array(array);
-                    let binary = "";
-                    for (let i = 0; i < bytes.byteLength; i++) {
-                        binary += String.fromCharCode(bytes[i]);
-                    }
-                    const base64 = btoa(binary);
-                    console.log("Converted object to base64, length:", base64.length);
-                    return base64;
-                }
-            }
-
-            console.log("Could not convert buffer to base64");
-            return null;
-        } catch (error) {
-            console.error("Error converting buffer to base64:", error);
-            return null;
+            updateLoadingState('documents', false);
         }
     };
 
@@ -321,35 +465,97 @@ const EditClaimIntimation1 = ({ route }) => {
         }
     };
 
+    // Store initial claim details when component first loads
+    const storeInitialClaimDetails = async (claimData) => {
+        try {
+            console.log("Storing initial claim details:", claimData);
+            
+            // Store claim details
+            await SecureStore.setItemAsync("edit_referenceNo", String(claimData.referenceNo || ""));
+            await SecureStore.setItemAsync("edit_claimType", String(claimData.claimType || ""));
+            await SecureStore.setItemAsync("edit_createdOn", String(claimData.createdOn || ""));
+            
+            // Store additional needed data
+            await SecureStore.setItemAsync("referenNo", String(claimData.referenceNo || ""));
+            
+            console.log("Initial claim details stored successfully");
+        } catch (error) {
+            console.error("Error storing initial claim details:", error);
+        }
+    };
+
+    // Store beneficiary data
+    const storeBeneficiaryData = async (beneficiaryData) => {
+        try {
+            console.log("Storing beneficiary data:", beneficiaryData);
+            
+            if (beneficiaryData && beneficiaryData.length > 0) {
+                const firstBeneficiary = beneficiaryData[0];
+                await SecureStore.setItemAsync("edit_enteredBy", String(firstBeneficiary.name || ""));
+                await SecureStore.setItemAsync("edit_relationship", String(firstBeneficiary.relationship || ""));
+                await SecureStore.setItemAsync("edit_illness", String(firstBeneficiary.illness || ""));
+                await SecureStore.setItemAsync("edit_beneficiary_amount", String(firstBeneficiary.amount || "0.00"));
+            }
+            
+            console.log("Beneficiary data stored successfully");
+        } catch (error) {
+            console.error("Error storing beneficiary data:", error);
+        }
+    };
+
     // Retrieve claim details from SecureStore
     const retrieveClaimDetails = async () => {
         try {
-            const storedReferenceNo = await SecureStore.getItemAsync(
-                "edit_referenceNo"
-            );
+            // First check if we have data from route params (initial load)
+            if (claim?.referenceNo) {
+                console.log("Using claim data from route params:", claim);
+                
+                const claimData = {
+                    referenceNo: claim.referenceNo,
+                    claimType: claim.claimType,
+                    createdOn: claim.createdOn,
+                };
+                
+                // Store the initial data for future retrievals
+                await storeInitialClaimDetails(claimData);
+                
+                setClaimDetails(prev => ({
+                    ...prev,
+                    ...claimData
+                }));
+                
+                return claim.referenceNo;
+            }
+            
+            // If no route params, try to retrieve from storage (subsequent loads)
+            const storedReferenceNo = await SecureStore.getItemAsync("edit_referenceNo");
             const storedClaimType = await SecureStore.getItemAsync("edit_claimType");
             const storedCreatedOn = await SecureStore.getItemAsync("edit_createdOn");
 
-            // Update state with retrieved values, fallback to route params or defaults
-            setClaimDetails((prev) => ({
-                ...prev,
-                referenceNo: storedReferenceNo || claim?.referenceNo || "M000428",
-                claimType: storedClaimType || claim?.claimType || "Out-door",
-                createdOn: storedCreatedOn || claim?.createdOn || "24-12-2020",
-            }));
+            console.log("Retrieved stored claim details:", {
+                storedReferenceNo,
+                storedClaimType,
+                storedCreatedOn
+            });
 
-            // Return the reference number for use in other functions
-            return storedReferenceNo || claim?.referenceNo || "M000428";
+            if (storedReferenceNo) {
+                setClaimDetails(prev => ({
+                    ...prev,
+                    referenceNo: storedReferenceNo,
+                    claimType: storedClaimType || "",
+                    createdOn: storedCreatedOn || "",
+                }));
+                
+                return storedReferenceNo;
+            }
+            
+            console.warn("No claim data found in params or storage");
+            return null;
         } catch (error) {
             console.error("Error retrieving claim details:", error);
-            // Fallback to route params or defaults if SecureStore fails
-            setClaimDetails((prev) => ({
-                ...prev,
-                referenceNo: claim?.referenceNo || "M000428",
-                claimType: claim?.claimType || "Out-door",
-                createdOn: claim?.createdOn || "24-12-2020",
-            }));
-            return claim?.referenceNo || "M000428";
+            return null;
+        } finally {
+            updateLoadingState('claimDetails', false);
         }
     };
 
@@ -357,13 +563,17 @@ const EditClaimIntimation1 = ({ route }) => {
     const retrieveBeneficiaryData = async (referenceNo) => {
         try {
             const storedEnteredBy = await SecureStore.getItemAsync("edit_enteredBy");
-            const storedRelationship = await SecureStore.getItemAsync(
-                "edit_relationship"
-            );
+            const storedRelationship = await SecureStore.getItemAsync("edit_relationship");
             const storedIllness = await SecureStore.getItemAsync("edit_illness");
 
+            console.log("Retrieved beneficiary data:", {
+                storedEnteredBy,
+                storedRelationship,
+                storedIllness
+            });
+
             // If we have stored beneficiary data, create a beneficiary object
-            if (storedEnteredBy && storedRelationship) {
+            if (storedEnteredBy && storedRelationship && referenceNo) {
                 // Fetch claim amount for this beneficiary
                 const claimAmount = await fetchClaimAmount(referenceNo);
 
@@ -374,14 +584,21 @@ const EditClaimIntimation1 = ({ route }) => {
                     illness: storedIllness || "",
                     amount: claimAmount, // Set amount from API
                 };
+                
                 setBeneficiaries([beneficiary]);
+                
+                // Store the beneficiary data for future use
+                await storeBeneficiaryData([beneficiary]);
             } else {
                 // If no stored data, initialize with empty array
                 setBeneficiaries([]);
+                console.log("No beneficiary data found, setting empty array");
             }
         } catch (error) {
             console.error("Error retrieving beneficiary data:", error);
             setBeneficiaries([]);
+        } finally {
+            updateLoadingState('beneficiaryData', false);
         }
     };
 
@@ -391,15 +608,15 @@ const EditClaimIntimation1 = ({ route }) => {
             setLoading(true);
 
             // Get stored employee info
-            const policyNumber = await SecureStore.getItemAsync(
-                "selected_policy_number"
-            );
-            const memberNumber = await SecureStore.getItemAsync(
-                "selected_member_number"
-            );
+            const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+            const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+
+            console.log("Employee info from storage:", {
+                policyNumber,
+                memberNumber
+            });
 
             if (!memberNumber || !policyNumber) {
-                console.log("Missing memberNumber or policyNumber in SecureStore");
                 setClaimDetails((prev) => ({ ...prev, enteredBy: "Unknown Member" }));
                 return;
             }
@@ -413,6 +630,7 @@ const EditClaimIntimation1 = ({ route }) => {
             }
 
             const data = await response.json();
+            console.log("Employee info from API:", data);
 
             setEmployeeInfo(data);
 
@@ -427,48 +645,89 @@ const EditClaimIntimation1 = ({ route }) => {
             setClaimDetails((prev) => ({ ...prev, enteredBy: "Unknown Member" }));
         } finally {
             setLoading(false);
-        }
-    };
-
-    // Store claim details in SecureStore
-    const storeClaimDetails = async () => {
-        try {
-            await SecureStore.setItemAsync(
-                "edit_referenceNo",
-                claimDetails.referenceNo
-            );
-            await SecureStore.setItemAsync("edit_claimType", claimDetails.claimType);
-            await SecureStore.setItemAsync("edit_createdOn", claimDetails.createdOn);
-        } catch (error) {
-            console.error("Error storing claim details:", error);
+            updateLoadingState('employeeInfo', false);
         }
     };
 
     // useEffect to fetch employee info and retrieve claim details on component mount
     useEffect(() => {
         const initializeComponent = async () => {
-            // First retrieve stored claim details
-            const referenceNo = await retrieveClaimDetails();
-            // Retrieve beneficiary data from SecureStore and fetch claim amount
-            await retrieveBeneficiaryData(referenceNo);
-            // Fetch documents from API
-            await fetchDocuments(referenceNo);
-            // Then fetch employee info
-            await fetchEmployeeInfo();
-            // Store the claim details (in case they came from route params)
-            await storeClaimDetails();
+            try {
+                console.log("Initializing component with route params:", route?.params);
+                
+                // First retrieve stored claim details
+                const referenceNo = await retrieveClaimDetails();
+                
+                if (!referenceNo) {
+                    console.error("No reference number found, cannot continue");
+                    setInitialLoading(false);
+                    return;
+                }
+                
+                console.log("Using reference number:", referenceNo);
+                
+                // Start all loading operations in parallel
+                const loadingPromises = [
+                    retrieveBeneficiaryData(referenceNo),
+                    fetchEmployeeInfo(),
+                ];
+                
+                // Add document fetching
+                loadingPromises.push(fetchDocuments(referenceNo));
+                
+                // Wait for all operations to complete
+                await Promise.all(loadingPromises);
+                
+            } catch (error) {
+                console.error("Error initializing component:", error);
+                Alert.alert("Initialization Error", "Failed to load claim data. Please try again.");
+            } finally {
+                // Ensure loading screen disappears even on error
+                setInitialLoading(false);
+            }
         };
 
         initializeComponent();
     }, []);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            const fetchDocumentsOnFocus = async () => {
+                // Only fetch documents on focus if not in initial loading state
+                if (!initialLoading) {
+                    console.log("Fetching documents on focus");
+                    const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+                    if (referenceNo) {
+                        setDocumentsLoading(true);
+                        await fetchDocuments(referenceNo);
+                    }
+                }
+            };
+
+            fetchDocumentsOnFocus();
+        }, [claimDetails.referenceNo, claim?.referenceNo, initialLoading])
+    );
+
     // Navigate to UploadDocuments page
     const handleNavigateToUploadDocuments = () => {
-        navigation.navigate("UploadDocuments", {
-            claim: claim,
+        // Store current beneficiary data before navigation
+        if (beneficiaries.length > 0) {
+            storeBeneficiaryData(beneficiaries);
+        }
+        
+        navigation.navigate("UploadDocumentsSaved", {
+            claim: {
+                referenceNo: claimDetails.referenceNo,
+                claimType: claimDetails.claimType,
+                createdOn: claimDetails.createdOn,
+            },
             beneficiaries: beneficiaries,
             documents: documents,
             fromEditClaim: true,
+            patientData: beneficiaries.length > 0 ? {
+                patientName: beneficiaries[0].name,
+                illness: beneficiaries[0].illness,
+            } : {},
         });
     };
 
@@ -478,14 +737,17 @@ const EditClaimIntimation1 = ({ route }) => {
             // Fetch claim amount for the new beneficiary
             const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
 
-            setBeneficiaries((prev) => [
-                ...prev,
-                {
-                    id: Date.now().toString(),
-                    ...newBeneficiary,
-                    amount: claimAmount, // Set amount from API
-                },
-            ]);
+            const newBeneficiaryData = {
+                id: Date.now().toString(),
+                ...newBeneficiary,
+                amount: claimAmount, // Set amount from API
+            };
+
+            setBeneficiaries((prev) => [...prev, newBeneficiaryData]);
+            
+            // Store the updated beneficiary data
+            await storeBeneficiaryData([...beneficiaries, newBeneficiaryData]);
+            
             setNewBeneficiary({
                 name: "",
                 relationship: "",
@@ -524,19 +786,22 @@ const EditClaimIntimation1 = ({ route }) => {
         setDropdownVisible(false);
     };
 
-
     // Save beneficiary edit
     const handleSaveBeneficiaryEdit = async () => {
         // Fetch updated claim amount
         const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
 
-        setBeneficiaries((prev) =>
-            prev.map((item) =>
-                item.id === selectedBeneficiary.id
-                    ? { ...item, ...newBeneficiary, amount: claimAmount }
-                    : item
-            )
+        const updatedBeneficiaries = beneficiaries.map((item) =>
+            item.id === selectedBeneficiary.id
+                ? { ...item, ...newBeneficiary, amount: claimAmount }
+                : item
         );
+
+        setBeneficiaries(updatedBeneficiaries);
+        
+        // Store the updated beneficiary data
+        await storeBeneficiaryData(updatedBeneficiaries);
+        
         setEditBeneficiaryModalVisible(false);
         setNewBeneficiary({ name: "", relationship: "", illness: "", amount: "" });
     };
@@ -551,8 +816,12 @@ const EditClaimIntimation1 = ({ route }) => {
                 {
                     text: "Delete",
                     style: "destructive",
-                    onPress: () => {
-                        setBeneficiaries((prev) => prev.filter((item) => item.id !== id));
+                    onPress: async () => {
+                        const updatedBeneficiaries = beneficiaries.filter((item) => item.id !== id);
+                        setBeneficiaries(updatedBeneficiaries);
+                        
+                        // Store the updated beneficiary data
+                        await storeBeneficiaryData(updatedBeneficiaries);
                     },
                 },
             ]
@@ -577,7 +846,11 @@ const EditClaimIntimation1 = ({ route }) => {
     // Edit document
     const handleEditDocument = (document) => {
         setSelectedDocument(document);
-        setNewDocument(document);
+        setNewDocument({
+            type: document.type,
+            date: document.date,
+            amount: document.amount,
+        });
         setEditDocumentModalVisible(true);
     };
 
@@ -592,8 +865,16 @@ const EditClaimIntimation1 = ({ route }) => {
         setNewDocument({ type: "", date: "", amount: "" });
     };
 
-    // Delete document
-    const handleDeleteDocument = (id) => {
+    // Updated Delete document function with API integration
+    const handleDeleteDocument = (documentId) => {
+        // Find the document to get its details
+        const documentToDelete = documents.find(doc => doc.id === documentId);
+        
+        if (!documentToDelete) {
+            Alert.alert("Error", "Document not found.");
+            return;
+        }
+
         Alert.alert(
             "Confirm Delete",
             "Are you sure you want to delete this document?",
@@ -602,8 +883,50 @@ const EditClaimIntimation1 = ({ route }) => {
                 {
                     text: "Delete",
                     style: "destructive",
-                    onPress: () => {
-                        setDocuments((prev) => prev.filter((item) => item.id !== id));
+                    onPress: async () => {
+                        try {
+                            // Show loading indicator (optional)
+                            setDocumentsLoading(true);
+
+                            // Only call API if document has clmMemSeqNo (exists in backend)
+                            if (documentToDelete.clmMemSeqNo) {
+                                console.log('Deleting document from API:', documentToDelete);
+                                await deleteDocumentFromAPI(documentToDelete);
+                                
+                                // Show success message
+                                Alert.alert("Success", "Document deleted successfully from server.");
+                            }
+
+                            // Remove from local state regardless of API call success
+                            setDocuments((prev) => prev.filter((item) => item.id !== documentId));
+
+                            // Optionally refresh documents from API
+                            const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+                            if (referenceNo) {
+                                await fetchDocuments(referenceNo);
+                            }
+
+                        } catch (error) {
+                            console.error("Error deleting document:", error);
+                            
+                            // Show error but still ask if user wants to remove locally
+                            Alert.alert(
+                                "Delete Error", 
+                                `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                        text: "Remove Locally",
+                                        style: "destructive",
+                                        onPress: () => {
+                                            setDocuments((prev) => prev.filter((item) => item.id !== documentId));
+                                        }
+                                    }
+                                ]
+                            );
+                        } finally {
+                            setDocumentsLoading(false);
+                        }
                     },
                 },
             ]
@@ -637,72 +960,35 @@ const EditClaimIntimation1 = ({ route }) => {
     };
 
     const renderDocumentImage = (document) => {
-        console.log("=== Rendering document image ===");
-        console.log("Document ID:", document.id);
-        console.log("Document type:", document.type);
-        console.log("Has imgContent:", !!document.imgContent);
-        console.log("ImgContent type:", typeof document.imgContent);
-        console.log("ImgContent length:", document.imgContent?.length);
-
-        if (document.imgContent) {
-            // Test if it's valid base64
-            try {
-                const testDecode = atob(document.imgContent.substring(0, 100));
-                console.log("Base64 decode test successful");
-            } catch (error) {
-                console.error("Base64 decode test failed:", error);
-            }
-
-            const imageUri = `data:image/jpeg;base64,${document.imgContent}`;
-            console.log("Image URI length:", imageUri.length);
-            console.log("Image URI preview:", imageUri.substring(0, 50) + "...");
-
-            return (
-                <TouchableOpacity
-                    style={styles.documentImageContainer}
-                    onPress={() => {
+        // Always show small image icon, click to view full image
+        return (
+            <TouchableOpacity
+                style={styles.documentImageIconContainer}
+                onPress={() => {
+                    if (document.hasImage && document.imgContent) {
+                        const imageUri = `data:image/jpeg;base64,${document.imgContent}`;
                         setSelectedImageUri(imageUri);
                         setImageModalVisible(true);
-                    }}
-                >
-                    <Image
-                        source={{ uri: imageUri }}
-                        style={styles.documentImage}
-                        resizeMode="cover"
-                        onError={(error) => {
-                            console.error("❌ Image load error for document:", document.id);
-                            console.error("Error details:", error.nativeEvent?.error);
-                            console.log("Failed image URI length:", imageUri.length);
-                            console.log(
-                                "ImgContent first 50 chars:",
-                                document.imgContent.substring(0, 50)
-                            );
-                            console.log("Original imgContent:", document.originalImgContent);
-                        }}
-                        onLoad={() => {
-                            console.log(
-                                "✅ Image loaded successfully for document:",
-                                document.id
-                            );
-                        }}
-                        onLoadStart={() => {
-                            console.log("🔄 Image load started for document:", document.id);
-                        }}
-                        onLoadEnd={() => {
-                            console.log("🏁 Image load ended for document:", document.id);
-                        }}
+                    } else {
+                        Alert.alert("No Image", "This document doesn't have an associated image.");
+                    }
+                }}
+            >
+                <View style={[
+                    styles.imageIconWrapper,
+                    { backgroundColor: document.hasImage ? "#4DD0E1" : "#E0E0E0" }
+                ]}>
+                    <Ionicons 
+                        name={document.hasImage ? "image" : "document-outline"} 
+                        size={20} 
+                        color={document.hasImage ? "#FFFFFF" : "#999"} 
                     />
-                </TouchableOpacity>
-            );
-        } else {
-            console.log("No image content for document:", document.id);
-            return (
-                <View style={styles.documentImagePlaceholder}>
-                    <Ionicons name="document-outline" size={24} color="#4DD0E1" />
-                    <Text style={styles.noImageText}>No Image</Text>
                 </View>
-            );
-        }
+                <Text style={styles.imageIconText}>
+                    {document.hasImage ? "View" : "No Image"}
+                </Text>
+            </TouchableOpacity>
+        );
     };
 
     const handleDeleteClaim = () => {
@@ -729,6 +1015,14 @@ const EditClaimIntimation1 = ({ route }) => {
         );
     };
 
+    // Show loading screen while initializing
+    if (initialLoading) {
+        return (
+            <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+                <LoadingScreen />
+            </LinearGradient>
+        );
+    }
 
     return (
         <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
@@ -831,7 +1125,6 @@ const EditClaimIntimation1 = ({ route }) => {
                                     </TouchableOpacity>
                                 </View>
                             </View>
-
                         ))
                     ) : (
                         <View style={styles.noBeneficiariesContainer}>
@@ -851,9 +1144,13 @@ const EditClaimIntimation1 = ({ route }) => {
 
                 {/* Documents Section */}
                 <View style={styles.documentsSection}>
-                    {documentsLoading ? (
-                        <View style={styles.loadingContainer}>
-                            <Text style={styles.loadingText}>Loading documents...</Text>
+                    {documentsLoading && !initialLoading ? (
+                        <View style={styles.loadingOverlay}>
+                            <View style={styles.loadingContainer}>
+                                <LoadingIcon />
+                                <Text style={styles.loadingText}>Loading Documents...</Text>
+                                <Text style={styles.loadingSubText}>Please wait a moment</Text>
+                            </View>
                         </View>
                     ) : documents.length > 0 ? (
                         documents.map((document) => (
@@ -919,6 +1216,7 @@ const EditClaimIntimation1 = ({ route }) => {
                 </View>
             </ScrollView>
 
+            {/* Rest of the modals remain the same... */}
             {/* Add Beneficiary Modal */}
             <Modal
                 visible={isAddBeneficiaryModalVisible}
@@ -1069,7 +1367,6 @@ const EditClaimIntimation1 = ({ route }) => {
                 </View>
             </Modal>
 
-
             {/* Add Document Modal */}
             <Modal
                 visible={isAddDocumentModalVisible}
@@ -1175,6 +1472,7 @@ const EditClaimIntimation1 = ({ route }) => {
                     </View>
                 </View>
             </Modal>
+            
             {/* Image Preview Modal */}
             <Modal
                 visible={isImageModalVisible}
@@ -1203,7 +1501,6 @@ const EditClaimIntimation1 = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF",
@@ -1213,6 +1510,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 20,
         paddingTop: 30,
+        marginTop: 20,
         paddingBottom: 20,
         backgroundColor: "transparent",
     },
@@ -1226,6 +1524,54 @@ const styles = StyleSheet.create({
     scrollContainer: {
         paddingHorizontal: 0,
         paddingBottom: 30,
+    },
+
+    // Custom Loading Styles
+    loadingOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 30,
+        minWidth: 200,
+        minHeight: 150,
+    },
+    customLoadingIcon: {
+        marginBottom: 15,
+    },
+    loadingIconOuter: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#16858D',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#6DD3D3',
+    },
+    loadingIconInner: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#17ABB7',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#333',
+        textAlign: 'center',
+        fontWeight: '600',
+        marginBottom: 5,
+    },
+    loadingSubText: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+        fontStyle: 'italic',
     },
 
     // Claim Details Section - Fixed alignment
@@ -1280,7 +1626,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
 
-    // Beneficiaries Section - Fixed alignment
+    // Beneficiaries Section - Updated to match EditClaimIntimation style
     beneficiariesSection: {
         backgroundColor: "white",
         borderRadius: 15,
@@ -1331,57 +1677,28 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         gap: 8,
     },
-    beneficiaryIconButton: {
-        backgroundColor: "rgba(255, 255, 255, 0.9)",
-        borderRadius: 12,
-        padding: 6,
-        alignItems: "center",
-        justifyContent: "center",
-        width: 28,
-        height: 28,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 2,
-    },
     claimDeleteButton: {
         position: "absolute",
         top: 10,
         right: 10,
-        // backgroundColor: "rgba(255, 255, 255, 0.9)",
-        // borderRadius: 15,
-        // padding: 8,
         alignItems: "center",
         justifyContent: "center",
         width: 45,
         height: 45,
-        // shadowColor: "#000",
-        // shadowOffset: { width: 0, height: 1 },
-        // shadowOpacity: 0.2,
-        // shadowRadius: 2,
-        // elevation: 2,
-        // zIndex: 1,
     },
 
     beneficiaryIconButton: {
-        // backgroundColor: "rgba(255, 255, 255, 0.9)",
-        // borderRadius: 12,
         padding: 6,
         alignItems: "center",
         justifyContent: "center",
         width: 45,
         height: 45,
-        // shadowColor: "#000",
-        // shadowOffset: { width: 0, height: 1 },
-        // shadowOpacity: 0.2,
-        // shadowRadius: 2,
-        // elevation: 2,
     },
 
+    // Updated Add More Documents button style to match EditClaimIntimation
     addBeneficiaryButton: {
-        // backgroundColor: "#2E7D7D",
-        // borderRadius: 8,
+        backgroundColor: "#2E7D7D",
+        borderRadius: 8,
         paddingVertical: 8,
         paddingHorizontal: 15,
         alignSelf: "flex-end",
@@ -1426,7 +1743,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: "#4DD0E1",
         fontWeight: "500",
-        width: 120,
+        width: 100,
         flexShrink: 0,
     },
     documentColon: {
@@ -1444,7 +1761,7 @@ const styles = StyleSheet.create({
     },
     documentActionIcons: {
         position: "absolute",
-        Top: 50,
+        top: 70,
         bottom: 10,
         right: 10,
         flexDirection: "row",
@@ -1571,6 +1888,35 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontWeight: "500",
     },
+    // Updated document image styles
+    documentImageIconContainer: {
+        width: 50,
+        height: 60,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 10,
+        marginRight: 10,
+    },
+    imageIconWrapper: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 4,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    imageIconText: {
+        fontSize: 10,
+        color: "#666",
+        textAlign: "center",
+        fontWeight: "500",
+    },
+    // Remove old document image styles
     documentImageContainer: {
         width: 40,
         height: 40,
@@ -1599,7 +1945,7 @@ const styles = StyleSheet.create({
         color: "#666",
         marginTop: 2,
     },
-    // Add these to the existing styles object
+    // Image Modal styles
     imageModalOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.9)",
@@ -1674,6 +2020,25 @@ const styles = StyleSheet.create({
         color: "#2E7D7D",
         fontWeight: "500",
     },
+    noBeneficiariesContainer: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    noBeneficiariesText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+    },
+    noDocumentsContainer: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    noDocumentsText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+    },
 });
 
 export default EditClaimIntimation1;
+

@@ -95,6 +95,7 @@ const EditClaimIntimation = ({ route }) => {
       return newStates;
     });
   };
+
   const LoadingIcon = () => {
     const [rotateAnim] = useState(new Animated.Value(0));
     const [scaleAnim] = useState(new Animated.Value(1));
@@ -187,71 +188,79 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Fetch documents from API
-  const fetchDocuments = async (referenceNo) => {
+  // Helper function to parse clmMemSeqNo
+  const parseClmMemSeqNo = (clmMemSeqNo) => {
     try {
-      console.log("Fetching documents for referenceNo:", referenceNo);
+      if (!clmMemSeqNo || typeof clmMemSeqNo !== 'string') {
+        console.warn('Invalid clmMemSeqNo:', clmMemSeqNo);
+        return { memId: 0, seqNo: 0 };
+      }
+
+      const parts = clmMemSeqNo.split('-');
+      if (parts.length !== 2) {
+        console.warn('Invalid clmMemSeqNo format:', clmMemSeqNo);
+        return { memId: 0, seqNo: 0 };
+      }
+
+      const memId = parseInt(parts[0], 10);
+      const seqNo = parseInt(parts[1], 10);
+
+      if (isNaN(memId) || isNaN(seqNo)) {
+        console.warn('Invalid numeric values in clmMemSeqNo:', clmMemSeqNo);
+        return { memId: 0, seqNo: 0 };
+      }
+
+      return { memId, seqNo };
+    } catch (error) {
+      console.error('Error parsing clmMemSeqNo:', error);
+      return { memId: 0, seqNo: 0 };
+    }
+  };
+
+  // Delete document from API
+  const deleteDocumentFromAPI = async (document) => {
+    try {
+      const { memId, seqNo } = parseClmMemSeqNo(document.clmMemSeqNo);
+      
+      console.log('Deleting document with:', {
+        claimNo: claimDetails.referenceNo,
+        memId,
+        seqNo,
+        originalClmMemSeqNo: document.clmMemSeqNo
+      });
+
+      const requestBody = {
+        claimNo: claimDetails.referenceNo,
+        memId: memId,
+        seqNo: seqNo
+      };
 
       const response = await fetch(
-         `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
+        `${API_BASE_URL}/Document/deletedocument`,
         {
-          method: "GET",
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          body: JSON.stringify(requestBody),
         }
       );
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Documents API Error Response:", errorText);
+        console.error("Delete Document API Error Response:", errorText);
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
 
       const result = await response.json();
+      console.log('Delete document API response:', result);
 
-      if (result.success && result.data && Array.isArray(result.data)) {
-        // Transform API data to match component structure
-        const transformedDocuments = result.data.map((doc, index) => {
-          return {
-            id: doc.clmMemSeqNo || `doc_${index}`,
-            type: doc.docType || "Unknown",
-            date: formatDate(doc.docDate),
-            amount: doc.docAmount ? doc.docAmount.toString() : "0.00",
-            imagePath: doc.imagePath || "0",
-            // Convert byte array to base64 string if imgContent exists
-            imgContent: doc.imgContent
-              ? arrayBufferToBase64(doc.imgContent)
-              : null,
-            originalImgContent: doc.imgContent, // Keep original for debugging
-          };
-        });
-
-        setDocuments(transformedDocuments);
-      } else {
-        setDocuments([]);
-      }
+      return result;
     } catch (error) {
-      console.error("Error fetching documents:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        referenceNo: referenceNo,
-      });
-
-      // Show user-friendly error message
-      Alert.alert(
-        "Documents Loading Error",
-        `Unable to fetch documents. Error: ${error.message}`
-      );
-
-      // Set empty documents array as fallback
-      setDocuments([]);
-    } finally {
-      setDocumentsLoading(false);
-      updateLoadingState('documents', false);
+      console.error("Error deleting document from API:", error);
+      throw error;
     }
   };
 
@@ -322,6 +331,75 @@ const EditClaimIntimation = ({ route }) => {
     } catch (error) {
       console.error("Error converting buffer to base64:", error);
       return null;
+    }
+  };
+
+  // Fetch documents from API
+  const fetchDocuments = async (referenceNo) => {
+    try {
+      console.log("Fetching documents for referenceNo:", referenceNo);
+
+      const response = await fetch(
+         `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Documents API Error Response:", errorText);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data && Array.isArray(result.data)) {
+        // Transform API data to match component structure
+        const transformedDocuments = result.data.map((doc, index) => {
+          return {
+            id: doc.clmMemSeqNo || `doc_${index}`,
+            clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API
+            type: doc.docType || "Unknown",
+            date: formatDate(doc.docDate),
+            amount: doc.docAmount ? doc.docAmount.toString() : "0.00",
+            imagePath: doc.imagePath || "0",
+            // Convert byte array to base64 string if imgContent exists
+            imgContent: doc.imgContent
+              ? arrayBufferToBase64(doc.imgContent)
+              : null,
+            originalImgContent: doc.imgContent, // Keep original for debugging
+          };
+        });
+
+        setDocuments(transformedDocuments);
+      } else {
+        setDocuments([]);
+      }
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        referenceNo: referenceNo,
+      });
+
+      // Show user-friendly error message
+      Alert.alert(
+        "Documents Loading Error",
+        `Unable to fetch documents. Error: ${error.message}`
+      );
+
+      // Set empty documents array as fallback
+      setDocuments([]);
+    } finally {
+      setDocumentsLoading(false);
+      updateLoadingState('documents', false);
     }
   };
 
@@ -651,7 +729,11 @@ const EditClaimIntimation = ({ route }) => {
   // Edit document
   const handleEditDocument = (document) => {
     setSelectedDocument(document);
-    setNewDocument(document);
+    setNewDocument({
+      type: document.type,
+      date: document.date,
+      amount: document.amount,
+    });
     setEditDocumentModalVisible(true);
   };
 
@@ -666,8 +748,16 @@ const EditClaimIntimation = ({ route }) => {
     setNewDocument({ type: "", date: "", amount: "" });
   };
 
-  // Delete document
-  const handleDeleteDocument = (id) => {
+  // Updated Delete document function with API integration
+  const handleDeleteDocument = (documentId) => {
+    // Find the document to get its details
+    const documentToDelete = documents.find(doc => doc.id === documentId);
+    
+    if (!documentToDelete) {
+      Alert.alert("Error", "Document not found.");
+      return;
+    }
+
     Alert.alert(
       "Confirm Delete",
       "Are you sure you want to delete this document?",
@@ -676,8 +766,50 @@ const EditClaimIntimation = ({ route }) => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            setDocuments((prev) => prev.filter((item) => item.id !== id));
+          onPress: async () => {
+            try {
+              // Show loading indicator (optional)
+              setDocumentsLoading(true);
+
+              // Only call API if document has clmMemSeqNo (exists in backend)
+              if (documentToDelete.clmMemSeqNo) {
+                console.log('Deleting document from API:', documentToDelete);
+                await deleteDocumentFromAPI(documentToDelete);
+                
+                // Show success message
+                Alert.alert("Success", "Document deleted successfully from server.");
+              }
+
+              // Remove from local state regardless of API call success
+              setDocuments((prev) => prev.filter((item) => item.id !== documentId));
+
+              // Optionally refresh documents from API
+              const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+              if (referenceNo) {
+                await fetchDocuments(referenceNo);
+              }
+
+            } catch (error) {
+              console.error("Error deleting document:", error);
+              
+              // Show error but still ask if user wants to remove locally
+              Alert.alert(
+                "Delete Error", 
+                `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Remove Locally",
+                    style: "destructive",
+                    onPress: () => {
+                      setDocuments((prev) => prev.filter((item) => item.id !== documentId));
+                    }
+                  }
+                ]
+              );
+            } finally {
+              setDocumentsLoading(false);
+            }
           },
         },
       ]
@@ -1168,6 +1300,7 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </View>
       </Modal>
+      
       {/* Image Preview Modal */}
       <Modal
         visible={isImageModalVisible}
@@ -1199,12 +1332,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    },
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 30,  marginTop:20,
+    paddingTop: 30,
+    marginTop: 20,
     paddingBottom: 20,
     backgroundColor: "transparent",
   },
@@ -1450,7 +1584,7 @@ const styles = StyleSheet.create({
   },
   documentActionIcons: {
     position: "absolute",
-    Top: 50,
+    top: 50,
     bottom: 10,
     right: 10,
     flexDirection: "row",
@@ -1605,7 +1739,7 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 2,
   },
-  // Add these to the existing styles object
+  // Image Modal styles
   imageModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.9)",

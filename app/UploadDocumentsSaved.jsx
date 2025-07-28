@@ -22,7 +22,7 @@ import {
   View,
 } from "react-native";
 
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 const UploadDocumentsSaved = ({ route }) => {
@@ -697,6 +697,8 @@ const UploadDocumentsSaved = ({ route }) => {
     }
   };
 
+  // Add this updated handleAddDocument function to your UploadDocumentsSaved component
+
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
       Alert.alert("Validation Error", "Please upload at least one document");
@@ -777,8 +779,11 @@ const UploadDocumentsSaved = ({ route }) => {
         {
           text: "OK",
           onPress: () => {
+            // Navigate back to EditClaimIntimation1 with updated data
+            // Don't pass claim data as it should retrieve from storage
             navigation.navigate("EditClaimIntimation1", {
               submittedData: documentInfo,
+              // Remove claim from params to force retrieval from storage
             });
           },
         },
@@ -869,7 +874,7 @@ const UploadDocumentsSaved = ({ route }) => {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#13646D" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upload Documents</Text>
+        <Text style={styles.headerTitle}>Upload Documents Saved</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -1705,7 +1710,6 @@ const styles = StyleSheet.create({
   radioButtonDisabled: {
     borderColor: "#ccc",
   },
-
 });
 
 export default UploadDocumentsSaved;
