@@ -404,7 +404,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       }
 
       // Navigate to edit screen
-      navigation.navigate("EditClaimIntimation", {
+      navigation.navigate("EditClaimIntimation1", {
         claimData: claim,
         onUpdate: (updatedClaim) => {
           setPendingClaims((prev) =>
