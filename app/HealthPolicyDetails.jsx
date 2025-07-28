@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   Modal,
@@ -14,11 +13,9 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import {
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 // Import your separate page components
 import BankDetailsSum from "./BankDetailsSum";
@@ -95,7 +92,7 @@ const HealthPolicyDetails = () => {
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
+      outputRange: ["0deg", "360deg"],
     });
 
     return (
@@ -190,7 +187,7 @@ const HealthPolicyDetails = () => {
             policyNumber: policyNumber,
             status: "Unknown",
             effectiveDate: "Not Available",
-            expiryDate: "Not Available"
+            expiryDate: "Not Available",
           };
         }
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -198,11 +195,13 @@ const HealthPolicyDetails = () => {
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        console.warn("Empty response from policy info server, using default values");
+        console.warn(
+          "Empty response from policy info server, using default values"
+        );
         return {
           name: "Policy Information Not Available",
           policyNumber: policyNumber,
-          status: "Unknown"
+          status: "Unknown",
         };
       }
 
@@ -219,7 +218,7 @@ const HealthPolicyDetails = () => {
       return {
         name: "Policy Information Not Available",
         policyNumber: policyNumber,
-        status: "Unknown"
+        status: "Unknown",
       };
     } catch (err) {
       console.error("Error fetching policy info:", err);
@@ -228,7 +227,7 @@ const HealthPolicyDetails = () => {
         name: "Policy Information Unavailable",
         policyNumber: policyNumber || "Unknown",
         status: "Unable to retrieve",
-        error: err.message
+        error: err.message,
       };
     }
   };
@@ -263,7 +262,7 @@ const HealthPolicyDetails = () => {
             address: "Not Available",
             emergencyContact: "Not Available",
             relationship: "Not Available",
-            emergencyPhone: "Not Available"
+            emergencyPhone: "Not Available",
           };
         }
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -271,16 +270,18 @@ const HealthPolicyDetails = () => {
 
       const responseText = await response.text();
       if (!responseText || responseText.trim() === "") {
-        console.warn("Empty response from employee info server, using default values");
+        console.warn(
+          "Empty response from employee info server, using default values"
+        );
         return {
           memberName: "Member Information Not Available",
           memberNumber: memberNumber,
-          employeeId: "Not Available"
+          employeeId: "Not Available",
         };
       }
 
       const result = JSON.parse(responseText);
-      
+
       // Ensure we have a valid result object
       if (result && typeof result === "object") {
         // Fill in missing fields with appropriate defaults
@@ -288,7 +289,7 @@ const HealthPolicyDetails = () => {
           memberName: result.memberName || "Member Name Not Available",
           memberNumber: result.memberNumber || memberNumber,
           employeeId: result.employeeId || "Not Available",
-          department: result.department || "Not Available", 
+          department: result.department || "Not Available",
           designation: result.designation || "Not Available",
           joinDate: result.joinDate || "Not Available",
           email: result.email || "Not Available",
@@ -297,7 +298,7 @@ const HealthPolicyDetails = () => {
           emergencyContact: result.emergencyContact || "Not Available",
           relationship: result.relationship || "Not Available",
           emergencyPhone: result.emergencyPhone || "Not Available",
-          ...result // Spread original result to preserve any additional fields
+          ...result, // Spread original result to preserve any additional fields
         };
       }
 
@@ -305,7 +306,7 @@ const HealthPolicyDetails = () => {
       return {
         memberName: "Member Information Not Available",
         memberNumber: memberNumber,
-        employeeId: "Not Available"
+        employeeId: "Not Available",
       };
     } catch (err) {
       console.error("Error fetching employee info:", err);
@@ -316,7 +317,7 @@ const HealthPolicyDetails = () => {
         employeeId: "Unable to retrieve",
         department: "Unable to retrieve",
         designation: "Unable to retrieve",
-        error: err.message
+        error: err.message,
       };
     }
   };
@@ -347,7 +348,9 @@ const HealthPolicyDetails = () => {
 
         // Only set error if both failed completely (both would have error property)
         if (policyData?.error && employeeData?.error) {
-          setError("Unable to load policy and member information. Please check your connection and try again.");
+          setError(
+            "Unable to load policy and member information. Please check your connection and try again."
+          );
         }
       } catch (err) {
         console.error("Error initializing data:", err);
@@ -372,7 +375,11 @@ const HealthPolicyDetails = () => {
     }
 
     // Add member name (from employee info or stored data)
-    if (employeeInfo?.memberName && employeeInfo.memberName !== "Member Information Not Available" && employeeInfo.memberName !== "Member Information Unavailable") {
+    if (
+      employeeInfo?.memberName &&
+      employeeInfo.memberName !== "Member Information Not Available" &&
+      employeeInfo.memberName !== "Member Information Unavailable"
+    ) {
       info.push(`${employeeInfo.memberName}`);
     } else if (storedData.memberName) {
       info.push(`${storedData.memberName}`);
@@ -381,7 +388,11 @@ const HealthPolicyDetails = () => {
     }
 
     // Add company name from policy info
-    if (policyInfo?.name && policyInfo.name !== "Policy Information Not Available" && policyInfo.name !== "Policy Information Unavailable") {
+    if (
+      policyInfo?.name &&
+      policyInfo.name !== "Policy Information Not Available" &&
+      policyInfo.name !== "Policy Information Unavailable"
+    ) {
       info.push(`${policyInfo.name}`);
     } else {
       info.push("Company Name is Not Available.");
@@ -509,6 +520,12 @@ const HealthPolicyDetails = () => {
         return;
       }
 
+      // Check if the button is disabled
+      if (buttonLabel === "Online Claim Intimations") {
+        console.log("Online Claim Intimations button is disabled");
+        return;
+      }
+
       setCurrentPage(buttonLabel);
       setModalVisible(true);
 
@@ -632,7 +649,9 @@ const HealthPolicyDetails = () => {
 
         // Only set error if both failed completely
         if (policyData?.error && employeeData?.error) {
-          setError("Unable to load policy and member information. Please check your connection and try again.");
+          setError(
+            "Unable to load policy and member information. Please check your connection and try again."
+          );
         }
       } catch (err) {
         console.error("Error initializing data:", err);
@@ -643,6 +662,11 @@ const HealthPolicyDetails = () => {
     };
 
     initializeData();
+  }, []);
+
+  // Check if a button should be disabled
+  const isButtonDisabled = useCallback((buttonLabel) => {
+    return buttonLabel === "Online Claim Intimations";
   }, []);
 
   // Memoize buttons array
@@ -665,10 +689,7 @@ const HealthPolicyDetails = () => {
   // Show loading screen with custom animation
   if (loading) {
     return (
-      <LinearGradient
-        colors={["#FFFFFF", "#6DD3D3"]}
-        style={styles.container}
-      >
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <LoadingScreen />
       </LinearGradient>
     );
@@ -677,10 +698,7 @@ const HealthPolicyDetails = () => {
   // Show error screen only for critical errors (not 404s which are now handled)
   if (error) {
     return (
-      <LinearGradient
-        colors={["#FFFFFF", "#6DD3D3"]}
-        style={styles.container}
-      >
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
         <View style={styles.errorContainer}>
           <Icon name="exclamation-triangle" size={60} color="#FF6B6B" />
           <Text style={styles.errorTitle}>Error Loading Policy</Text>
@@ -726,17 +744,28 @@ const HealthPolicyDetails = () => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {buttons.map((label, index) => (
-              <TouchableOpacity
-                key={`button-${index}`}
-                style={styles.button}
-                onPress={() => handleButtonPress(label)}
-                accessible={true}
-                accessibilityLabel={label}
-              >
-                <Text style={styles.buttonText}>{label}</Text>
-              </TouchableOpacity>
-            ))}
+            {buttons.map((label, index) => {
+              const disabled = isButtonDisabled(label);
+              return (
+                <TouchableOpacity
+                  key={`button-${index}`}
+                  style={[styles.button, disabled && styles.disabledButton]}
+                  onPress={() => handleButtonPress(label)}
+                  accessible={true}
+                  accessibilityLabel={label}
+                  disabled={disabled}
+                >
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      disabled && styles.disabledButtonText,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </View>
@@ -880,6 +909,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "AbhayaLibreMedium",
     fontWeight: "500",
+  },
+  disabledButton: {
+    backgroundColor: "#CCCCCC",
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: "#888888",
   },
   overlay: {
     flex: 1,

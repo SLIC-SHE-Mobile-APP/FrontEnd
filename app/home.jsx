@@ -14,17 +14,14 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
+  View
 } from "react-native";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import ClaimTypeSelection from "./NewClaim.jsx";
-import ClaimHistory from "./ClaimHistory";
-import PendingIntimations from "./PendingIntimations";
-import PendingRequirement from "./PendingRequirement";
 import { API_BASE_URL } from "../constants/index.js";
+import ClaimHistory from "./ClaimHistory";
+import ClaimTypeSelection from "./NewClaim.jsx";
+import PendingRequirement from "./PendingRequirement";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -830,27 +827,13 @@ export default function PolicyHome() {
     console.log("Button pressed:", type);
     console.log("Normalized type:", normalizedType);
 
-    if (normalizedType === "New Claim") {
-      console.log("Opening New Claim modal");
+    // Check if the button is disabled
+    if (normalizedType === "New Claim" || normalizedType === "Saved Claims") {
+      Alert.alert("Feature Unavailable", "This feature is currently disabled.");
+      return;
+    }
 
-      // Removed member selection requirement - directly open New Claim modal
-      setModalVisible(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else if (normalizedType === "Saved Claims") {
-      console.log("Saved Claims pressed");
-
-      // Remove member selection requirement - directly open Saved Claims
-      setShowPendingIntimations(true);
-      Animated.timing(pendingIntimationsSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else if (normalizedType === "Claim History") {
+    if (normalizedType === "Claim History") {
       console.log("Claim History pressed");
 
       // Remove member selection requirement - directly open Claim History
@@ -998,20 +981,25 @@ export default function PolicyHome() {
     }).start();
   };
 
-  const renderType = (label, imageSource, onPress) => (
+  const renderType = (label, imageSource, onPress, isDisabled = false) => (
     <TouchableOpacity
-      style={styles.typeItem}
+      style={[styles.typeItem, isDisabled && styles.disabledTypeItem]}
       key={label}
       onPress={() => onPress(label)}
+      disabled={isDisabled}
     >
-      <View style={styles.iconCircle}>
+      <View
+        style={[styles.iconCircle, isDisabled && styles.disabledIconCircle]}
+      >
         <Image
           source={imageSource}
-          style={styles.typeIcon}
+          style={[styles.typeIcon, isDisabled && styles.disabledTypeIcon]}
           resizeMode="contain"
         />
       </View>
-      <Text style={styles.typeText}>{label}</Text>
+      <Text style={[styles.typeText, isDisabled && styles.disabledTypeText]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -1255,12 +1243,14 @@ export default function PolicyHome() {
           {renderType(
             "New\nClaim",
             require("../assets/images/newclaimicon.png"),
-            handleTypePress
+            handleTypePress,
+            true // Disabled
           )}
           {renderType(
             "Saved\nClaims",
             require("../assets/images/savedclaimicon.png"),
-            handleTypePress
+            handleTypePress,
+            true // Disabled
           )}
           {renderType(
             "Claim\nHistory",
@@ -1398,7 +1388,7 @@ export default function PolicyHome() {
         </View>
       </Modal>
 
-      {/* Claim Type Selection Modal */}
+      {/* Claim Type Selection Modal - Only show if not disabled */}
       <Modal
         visible={modalVisible}
         transparent
@@ -1420,30 +1410,7 @@ export default function PolicyHome() {
         </Animated.View>
       </Modal>
 
-      {/* PendingIntimations Modal */}
-      <View style={{ backgroundColor: "" }}>
-        <Modal
-          visible={showPendingIntimations}
-          style={{ minHeight: 200 }}
-          transparent
-          animationType="none"
-          onRequestClose={handleClosePendingIntimations}
-        >
-          <TouchableOpacity
-            style={styles.overlayTouchable}
-            activeOpacity={1}
-            onPress={handleClosePendingIntimations}
-          />
-          <Animated.View
-            style={[
-              styles.animatedModal,
-              { transform: [{ translateY: pendingIntimationsSlideAnim }] },
-            ]}
-          >
-            <PendingIntimations onClose={handleClosePendingIntimations} />
-          </Animated.View>
-        </Modal>
-      </View>
+      {/* PendingIntimations Modal - Removed since Saved Claims is disabled */}
 
       {/* Claim History Modal */}
       <Modal
@@ -1822,6 +1789,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     marginHorizontal: 3,
   },
+  disabledTypeItem: {
+    opacity: 0.5,
+  },
   iconCircle: {
     width: 50,
     height: 50,
@@ -1833,15 +1803,24 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.1,
   },
+  disabledIconCircle: {
+    backgroundColor: "#F5F5F5",
+  },
   typeIcon: {
     width: 30,
     height: 30,
+  },
+  disabledTypeIcon: {
+    opacity: 0.6,
   },
   typeText: {
     fontSize: 12,
     color: "#333",
     textAlign: "center",
     lineHeight: 16,
+  },
+  disabledTypeText: {
+    color: "#999",
   },
   healthCardWrapper: {
     width: screenWidth - 40,

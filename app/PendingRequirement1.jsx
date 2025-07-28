@@ -4,11 +4,11 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import * as ImageManipulator from "expo-image-manipulator";
 import {
   ActivityIndicator,
-  Alert,
+  Animated,
   Dimensions,
   Image,
   Modal,
@@ -19,16 +19,224 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { API_BASE_URL } from '../constants/index.js';
+import Icon from "react-native-vector-icons/FontAwesome";
+import { API_BASE_URL } from "../constants/index.js";
 
 const { width, height } = Dimensions.get("window");
+
+// Custom Loading Animation Component
+const LoadingIcon = () => {
+  const [rotateAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(1));
+
+  useEffect(() => {
+    const createRotateAnimation = () => {
+      return Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      );
+    };
+
+    const createPulseAnimation = () => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1.2,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const rotateAnimation = createRotateAnimation();
+    const pulseAnimation = createPulseAnimation();
+
+    rotateAnimation.start();
+    pulseAnimation.start();
+
+    return () => {
+      rotateAnimation.stop();
+      pulseAnimation.stop();
+    };
+  }, []);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.customLoadingIcon,
+        {
+          transform: [{ rotate: spin }, { scale: scaleAnim }],
+        },
+      ]}
+    >
+      <View style={styles.loadingIconOuter}>
+        <View style={styles.loadingIconInner}>
+          <Icon name="heartbeat" size={24} color="#FFFFFF" />
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+// Loading Screen Component with Custom Icon
+const LoadingScreen = ({ loadingMessage = "Loading Pending requirement data..." }) => (
+  <View style={styles.loadingOverlay}>
+    <View style={styles.loadingContainer}>
+      <LoadingIcon />
+      <Text style={styles.loadingText}>{loadingMessage}</Text>
+      <Text style={styles.loadingSubText}>Please wait a moment</Text>
+    </View>
+  </View>
+);
+
+// Custom Popup Component
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const PendingRequirement1 = () => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState("");
   const [selectedDocumentCode, setSelectedDocumentCode] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false); // Track if initial data is loaded
+  const [loadingMessage, setLoadingMessage] = useState("Loading requirement data...");
   const [requirementData, setRequirementData] = useState({
     claimNumber: "G/010/12334/525",
     requiredDocuments: ["Prescription"],
@@ -46,8 +254,41 @@ const PendingRequirement1 = () => {
   const [isDocumentImageModalOpen, setIsDocumentImageModalOpen] =
     useState(false);
 
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
+
   // Get requirement data from route params
   const params = useLocalSearchParams();
+
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
 
   // Enhanced logging function
   const logWithTimestamp = (label, data) => {
@@ -58,113 +299,50 @@ const PendingRequirement1 = () => {
   const loadRequirementData = async () => {
     try {
       setLoading(true);
+      setLoadingMessage("Loading requirement data...");
       logWithTimestamp("=== STARTING DATA LOAD PROCESS ===", {
         dataSource: params?.dataSource,
       });
 
-      // Check if data should be loaded from SecureStore
       if (params?.dataSource === "securestore") {
         logWithTimestamp(
           "=== LOADING DATA FROM SECURESTORE ===",
           "Starting SecureStore retrieval"
         );
 
-        // Load all data from SecureStore with detailed logging
         const claimNumber = await SecureStore.getItemAsync(
           "current_claim_number"
         );
-        logWithTimestamp("SecureStore - Claim Number", {
-          raw: claimNumber,
-          type: typeof claimNumber,
-          length: claimNumber?.length,
-        });
-
         const polNo = await SecureStore.getItemAsync("current_pol_no");
-        logWithTimestamp("SecureStore - Policy Number", {
-          raw: polNo,
-          type: typeof polNo,
-          length: polNo?.length,
-        });
-
         const trnsNo = await SecureStore.getItemAsync("current_trns_no");
-        logWithTimestamp("SecureStore - Transaction Number", {
-          raw: trnsNo,
-          type: typeof trnsNo,
-          length: trnsNo?.length,
-        });
-
         const requiredDate = await SecureStore.getItemAsync(
           "current_required_date"
         );
-        logWithTimestamp("SecureStore - Required Date", {
-          raw: requiredDate,
-          type: typeof requiredDate,
-          length: requiredDate?.length,
-        });
-
         const originalReqDate = await SecureStore.getItemAsync(
           "current_original_req_date"
         );
-        logWithTimestamp("SecureStore - Original Required Date", {
-          raw: originalReqDate,
-          type: typeof originalReqDate,
-          length: originalReqDate?.length,
-        });
-
         const requirementId = await SecureStore.getItemAsync(
           "current_requirement_id"
         );
-        logWithTimestamp("SecureStore - Requirement ID", {
-          raw: requirementId,
-          type: typeof requirementId,
-          length: requirementId?.length,
-        });
-
         const documentsStr = await SecureStore.getItemAsync(
           "current_documents"
         );
-        logWithTimestamp("SecureStore - Documents String", {
-          raw: documentsStr,
-          type: typeof documentsStr,
-          length: documentsStr?.length,
-        });
+        const requiredDocumentsStr = await SecureStore.getItemAsync(
+          "current_required_documents"
+        );
 
         let documents = [];
         try {
           documents = documentsStr ? JSON.parse(documentsStr) : [];
-          logWithTimestamp("SecureStore - Documents Parsed", {
-            parsed: documents,
-            type: typeof documents,
-            isArray: Array.isArray(documents),
-            length: documents?.length,
-            firstItem: documents[0],
-          });
         } catch (parseError) {
           logWithTimestamp("SecureStore - Documents Parse Error", parseError);
         }
-
-        const requiredDocumentsStr = await SecureStore.getItemAsync(
-          "current_required_documents"
-        );
-        logWithTimestamp("SecureStore - Required Documents String", {
-          raw: requiredDocumentsStr,
-          type: typeof requiredDocumentsStr,
-          length: requiredDocumentsStr?.length,
-        });
 
         let requiredDocuments = [];
         try {
           requiredDocuments = requiredDocumentsStr
             ? JSON.parse(requiredDocumentsStr)
             : [];
-          logWithTimestamp("SecureStore - Required Documents Parsed", {
-            parsed: requiredDocuments,
-            type: typeof requiredDocuments,
-            isArray: Array.isArray(requiredDocuments),
-            length: requiredDocuments?.length,
-            firstItemType: typeof requiredDocuments[0],
-            firstItem: requiredDocuments[0],
-          });
         } catch (parseError) {
           logWithTimestamp(
             "SecureStore - Required Documents Parse Error",
@@ -172,23 +350,6 @@ const PendingRequirement1 = () => {
           );
         }
 
-        // Comprehensive SecureStore data summary
-        const allSecureStoreData = {
-          claimNumber,
-          polNo,
-          trnsNo,
-          requiredDate,
-          originalReqDate,
-          requirementId,
-          documents,
-          requiredDocuments,
-        };
-        logWithTimestamp(
-          "=== COMPLETE SECURESTORE DATA SUMMARY ===",
-          allSecureStoreData
-        );
-
-        // Set the requirement data
         const newRequirementData = {
           claimNumber: claimNumber || params?.claimNumber,
           polNo: polNo,
@@ -200,32 +361,18 @@ const PendingRequirement1 = () => {
           documents: documents,
         };
 
-        logWithTimestamp(
-          "=== FINAL REQUIREMENT DATA (SecureStore) ===",
-          newRequirementData
-        );
         setRequirementData(newRequirementData);
       } else {
-        // Load from params (fallback)
         logWithTimestamp(
           "=== LOADING DATA FROM PARAMS ===",
           "Starting params retrieval"
         );
-        logWithTimestamp("Raw Route Params", params);
 
         let requiredDocuments = [];
         try {
           requiredDocuments = params?.requiredDocuments
             ? JSON.parse(params.requiredDocuments)
             : [];
-          logWithTimestamp("Params - Required Documents Parsed", {
-            parsed: requiredDocuments,
-            type: typeof requiredDocuments,
-            isArray: Array.isArray(requiredDocuments),
-            length: requiredDocuments?.length,
-            firstItemType: typeof requiredDocuments[0],
-            firstItem: requiredDocuments[0],
-          });
         } catch (parseError) {
           logWithTimestamp(
             "Params - Required Documents Parse Error",
@@ -239,42 +386,24 @@ const PendingRequirement1 = () => {
           requiredDate: params?.requiredDate,
           requirementId: params?.requirementId,
         };
-        logWithTimestamp("=== PARAMS DATA SUMMARY ===", paramsData);
 
-        setRequirementData((prevData) => {
-          const updatedData = { ...prevData, ...paramsData };
-          logWithTimestamp(
-            "=== FINAL REQUIREMENT DATA (Params) ===",
-            updatedData
-          );
-          return updatedData;
-        });
+        setRequirementData((prevData) => ({ ...prevData, ...paramsData }));
       }
+      
+      setInitialDataLoaded(true);
     } catch (error) {
-      logWithTimestamp("=== DATA LOAD ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
+      logWithTimestamp("=== DATA LOAD ERROR ===", error);
       console.error("Error loading requirement data:", error);
-      Alert.alert("Error", "Failed to load requirement data");
-    } finally {
-      setLoading(false);
-      logWithTimestamp(
-        "=== DATA LOAD PROCESS COMPLETED ===",
-        "Loading finished"
-      );
+      showPopup("Error", "Failed to load requirement data", "error");
+      setInitialDataLoaded(true);
     }
   };
 
   const fetchPendingDocuments = async () => {
     try {
+      setLoadingMessage("Loading pending documents...");
       setLoadingDocuments(true);
-      logWithTimestamp("=== FETCHING PENDING DOCUMENTS ===", {
-        polNo: requirementData.polNo,
-        clmNo: requirementData.claimNumber,
-      });
-
+      
       const cacheBuster = Date.now();
       const response = await fetch(
         `${API_BASE_URL}/UploadDocumentRespo/pending-documents?polNo=${encodeURIComponent(
@@ -293,35 +422,21 @@ const PendingRequirement1 = () => {
 
       if (response.ok) {
         const data = await response.json();
-        logWithTimestamp("=== PENDING DOCUMENTS RESPONSE ===", data);
         setPendingDocuments(data);
-      } else {
-        logWithTimestamp("=== PENDING DOCUMENTS ERROR ===", {
-          status: response.status,
-          statusText: response.statusText,
-        });
       }
     } catch (error) {
-      logWithTimestamp("=== PENDING DOCUMENTS FETCH ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       console.error("Error fetching pending documents:", error);
     } finally {
       setLoadingDocuments(false);
+      // Only set main loading to false after all initial data is loaded
+      if (initialDataLoaded) {
+        setLoading(false);
+      }
     }
   };
 
   const fetchDocumentViewInfo = async (polNo, clmNo, docCode, seqNo) => {
     try {
-      logWithTimestamp("=== FETCHING DOCUMENT VIEW INFO ===", {
-        polNo,
-        clmNo,
-        docCode,
-        seqNo,
-      });
-
-      // Enhanced cache busting with multiple parameters
       const cacheBuster = `${Date.now()}_${Math.random()
         .toString(36)
         .substr(2, 9)}`;
@@ -332,7 +447,6 @@ const PendingRequirement1 = () => {
           docCode
         )}&seqNo=${seqNo}&t=${cacheBuster}`,
         {
-          // Enhanced cache control headers
           headers: {
             "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
             Pragma: "no-cache",
@@ -344,40 +458,22 @@ const PendingRequirement1 = () => {
 
       if (response.ok) {
         const data = await response.json();
-        logWithTimestamp("=== DOCUMENT VIEW INFO RESPONSE ===", data);
-
-        // Enhanced cache busting for the returned URL
         const viewUrl = data.viewUrl;
         const separator = viewUrl.includes("?") ? "&" : "?";
-        const urlWithCacheBuster = `${viewUrl}${separator}t=${cacheBuster}&doc=${docCode}&seq=${seqNo}`;
-
-        return urlWithCacheBuster;
-      } else {
-        logWithTimestamp("=== DOCUMENT VIEW INFO ERROR ===", {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        return null;
+        return `${viewUrl}${separator}t=${cacheBuster}&doc=${docCode}&seq=${seqNo}`;
       }
+      return null;
     } catch (error) {
-      logWithTimestamp("=== DOCUMENT VIEW INFO FETCH ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       console.error("Error fetching document view info:", error);
       return null;
     }
   };
 
   const handleDocumentImageClick = async (document) => {
-    logWithTimestamp("=== DOCUMENT IMAGE CLICKED ===", document);
-
-    // Clear previous state immediately
     setDocumentImageUrl("");
     setViewingDocument(null);
     setIsDocumentImageModalOpen(false);
 
-    // Small delay to ensure state is cleared
     setTimeout(async () => {
       const viewUrl = await fetchDocumentViewInfo(
         document.PolNo,
@@ -387,279 +483,137 @@ const PendingRequirement1 = () => {
       );
 
       if (viewUrl) {
-        logWithTimestamp("=== SETTING NEW DOCUMENT IMAGE URL ===", {
-          viewUrl,
-          document: document,
-        });
-
         setDocumentImageUrl(viewUrl);
         setViewingDocument(document);
         setIsDocumentImageModalOpen(true);
       } else {
-        Alert.alert("Error", "Failed to load document image");
+        showPopup("Error", "Failed to load document image", "error");
       }
     }, 100);
   };
 
   const handleDeletePendingDocument = async (document) => {
-    try {
-      logWithTimestamp("=== DELETE PENDING DOCUMENT INITIATED ===", document);
+    showPopup(
+      "Delete Document",
+      "Are you sure you want to delete this document?",
+      "warning",
+      true,
+      async () => {
+        try {
+          hidePopup();
+          setLoadingDocuments(true);
 
-      Alert.alert(
-        "Delete Document",
-        "Are you sure you want to delete this document?",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setLoadingDocuments(true);
+          const requestBody = {
+            polNo: document.PolNo,
+            claimNo: document.ClaimNo,
+            docCode: document.DocCode,
+            seqNo: document.SeqNo,
+          };
 
-                const requestBody = {
-                  polNo: document.PolNo,
-                  claimNo: document.ClaimNo,
-                  docCode: document.DocCode,
-                  seqNo: document.SeqNo,
-                };
+          const response = await fetch(
+            `${API_BASE_URL}/UploadPendingDocumentCon/delete`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                Pragma: "no-cache",
+              },
+              body: JSON.stringify(requestBody),
+            }
+          );
 
-                logWithTimestamp("=== DELETE API REQUEST ===", requestBody);
+          if (response.ok) {
+            if (
+              viewingDocument &&
+              viewingDocument.DocCode === document.DocCode &&
+              viewingDocument.SeqNo === document.SeqNo
+            ) {
+              handleCloseDocumentImageModal();
+            }
 
-                const response = await fetch(
-                  `${API_BASE_URL}/UploadPendingDocumentCon/delete`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      // Add cache busting headers for delete request
-                      "Cache-Control": "no-cache, no-store, must-revalidate",
-                      Pragma: "no-cache",
-                    },
-                    body: JSON.stringify(requestBody),
-                  }
-                );
+            setPendingDocuments((prevDocs) =>
+              prevDocs.filter(
+                (doc) =>
+                  !(
+                    doc.DocCode === document.DocCode &&
+                    doc.SeqNo === document.SeqNo
+                  )
+              )
+            );
 
-                logWithTimestamp("=== DELETE API RESPONSE ===", {
-                  status: response.status,
-                  statusText: response.statusText,
-                });
-
-                if (response.ok) {
-                  const responseData = await response.json();
-                  logWithTimestamp("=== DELETE API SUCCESS ===", responseData);
-
-                  // Clear any cached image URL if it matches the deleted document
-                  if (
-                    viewingDocument &&
-                    viewingDocument.DocCode === document.DocCode &&
-                    viewingDocument.SeqNo === document.SeqNo
-                  ) {
-                    handleCloseDocumentImageModal();
-                  }
-
-                  // Remove the document from the local state
-                  setPendingDocuments((prevDocs) =>
-                    prevDocs.filter(
-                      (doc) =>
-                        !(
-                          doc.DocCode === document.DocCode &&
-                          doc.SeqNo === document.SeqNo
-                        )
-                    )
-                  );
-
-                  // Refresh pending documents to ensure consistency
-                  await fetchPendingDocuments();
-
-                  Alert.alert("Success", "Document deleted successfully!");
-                } else {
-                  const errorData = await response.text();
-                  logWithTimestamp("=== DELETE API ERROR ===", {
-                    status: response.status,
-                    error: errorData,
-                  });
-                  Alert.alert(
-                    "Error",
-                    "Failed to delete document. Please try again."
-                  );
-                }
-              } catch (error) {
-                logWithTimestamp("=== DELETE API EXCEPTION ===", {
-                  error: error.message,
-                  stack: error.stack,
-                });
-                Alert.alert(
-                  "Error",
-                  "Failed to delete document. Please check your connection."
-                );
-              } finally {
-                setLoadingDocuments(false);
-              }
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      logWithTimestamp("=== DELETE PENDING DOCUMENT ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
-      console.error("Error deleting pending document:", error);
-    }
+            await fetchPendingDocuments();
+            showPopup("Success", "Document deleted successfully!", "success");
+          } else {
+            showPopup(
+              "Error",
+              "Failed to delete document. Please try again.",
+              "error"
+            );
+          }
+        } catch (error) {
+          showPopup(
+            "Error",
+            "Failed to delete document. Please check your connection.",
+            "error"
+          );
+        } finally {
+          setLoadingDocuments(false);
+        }
+      }
+    );
   };
 
   const handleCloseDocumentImageModal = () => {
-    logWithTimestamp("=== CLOSING DOCUMENT IMAGE MODAL ===", {
-      currentUrl: documentImageUrl,
-      viewingDocument: viewingDocument,
-    });
-
     setIsDocumentImageModalOpen(false);
     setDocumentImageUrl("");
     setViewingDocument(null);
-
-    // Force garbage collection of the image URL
-    setTimeout(() => {
-      setDocumentImageUrl("");
-    }, 100);
   };
-
-  const renderPendingDocument = (document, index) => (
-    <View
-      key={`${document.DocCode}-${document.SeqNo}`}
-      style={styles.documentRow}
-    >
-      <View style={styles.documentDescriptionCell}>
-        <Text style={styles.documentCellText}>{document.DocDescription}</Text>
-      </View>
-      <View style={styles.documentImageCell}>
-        <TouchableOpacity onPress={() => handleDocumentImageClick(document)}>
-          <Ionicons name="image-outline" size={30} color="#00ADBB" />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.documentDeleteCell}>
-        <TouchableOpacity onPress={() => handleDeletePendingDocument(document)}>
-          <Ionicons name="trash" size={20} color="#D32F2F" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  useEffect(() => {
-    if (requirementData.polNo && requirementData.claimNumber) {
-      fetchPendingDocuments();
-    }
-  }, [requirementData.polNo, requirementData.claimNumber]);
-
-  // Load data when component mounts
-  useEffect(() => {
-    logWithTimestamp("=== COMPONENT MOUNTED ===", "Starting data load");
-    loadRequirementData();
-  }, []);
-
-  // Enhanced logging for state changes
-  useEffect(() => {
-    logWithTimestamp("=== REQUIREMENT DATA STATE CHANGED ===", requirementData);
-  }, [requirementData]);
-
-  useEffect(() => {
-    logWithTimestamp("=== SELECTED DOCUMENT CHANGED ===", {
-      selectedDocument,
-      selectedDocumentCode,
-      timestamp: new Date().toISOString(),
-    });
-  }, [selectedDocument, selectedDocumentCode]);
-
-  useEffect(() => {
-    logWithTimestamp("=== UPLOADED DOCUMENTS CHANGED ===", {
-      count: uploadedDocuments.length,
-      documents: uploadedDocuments.map((doc) => ({
-        id: doc.id,
-        name: doc.name,
-        documentType: doc.documentType,
-        documentCode: doc.documentCode,
-        type: doc.type,
-        size: doc.size,
-      })),
-    });
-  }, [uploadedDocuments]);
-
-  const handleClose = () => {
-    logWithTimestamp("=== HANDLE CLOSE CALLED ===", "Navigating back");
-    router.back();
-  };
-
-  const allowedFormats = ["JPG", "JPEG", "TIFF", "PNG"];
 
   const handleBrowseFiles = async () => {
-    logWithTimestamp("=== BROWSE FILES INITIATED ===", {
-      selectedDocument,
-      selectedDocumentCode,
-    });
-
     if (!selectedDocument) {
-      logWithTimestamp("=== BROWSE FILES ERROR ===", "No document selected");
-      Alert.alert(
+      showPopup(
         "Select Document",
-        "Please select a required document first."
+        "Please select a required document first.",
+        "warning"
       );
       return;
     }
 
     try {
       setLoading(true);
-      logWithTimestamp(
-        "=== DOCUMENT PICKER LAUNCHING ===",
-        "Opening document picker"
-      );
+      setLoadingMessage("Processing document...");
+      
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/jpeg", "image/jpg", "image/png", "image/tiff"],
         copyToCacheDirectory: false,
       });
 
-      logWithTimestamp("=== DOCUMENT PICKER RESULT ===", {
-        canceled: result.canceled,
-        assets: result.assets,
-        assetsCount: result.assets?.length,
-      });
-
       if (!result.canceled && result.assets?.length > 0) {
         const file = result.assets[0];
-        logWithTimestamp("=== SELECTED FILE DETAILS ===", {
-          name: file.name,
-          uri: file.uri,
-          mimeType: file.mimeType,
-          size: file.size,
-        });
 
-        // Check and resize image if needed
         const processedImageUri = await resizeImageIfNeeded(
           file.uri,
           file.size
         );
         if (!processedImageUri) {
-          // Image was too large or processing failed
           return;
         }
 
-        // Get max sequence number
         const maxSeqNo = await getMaxSeqNo(
           requirementData.claimNumber,
           selectedDocumentCode
         );
         if (maxSeqNo === null) {
-          Alert.alert(
+          showPopup(
             "Error",
-            "Failed to get sequence number. Please try again."
+            "Failed to get sequence number. Please try again.",
+            "error"
           );
           return;
         }
 
         const newSeqNo = maxSeqNo + 1;
-        logWithTimestamp("=== NEW SEQ NO ===", { maxSeqNo, newSeqNo });
-
-        // Upload to API with processed image
         const uploadResult = await uploadDocumentToAPI(
           requirementData.polNo,
           requirementData.claimNumber,
@@ -671,119 +625,86 @@ const PendingRequirement1 = () => {
         );
 
         if (uploadResult.success) {
-          // Only refresh pending documents - don't store locally
           await fetchPendingDocuments();
-          Alert.alert("Success", "Document uploaded successfully!");
+          showPopup("Success", "Document uploaded successfully!", "success");
         } else {
-          Alert.alert(
+          showPopup(
             "Error",
-            `Failed to upload document: ${uploadResult.error}`
+            `Failed to upload document: ${uploadResult.error}`,
+            "error"
           );
         }
       }
     } catch (error) {
-      logWithTimestamp("=== BROWSE FILES ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       console.error("Error picking document:", error);
-      Alert.alert("Error", "Failed to upload document. Please try again.");
+      showPopup(
+        "Error",
+        "Failed to upload document. Please try again.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Replace the handleTakePhoto function
   const handleTakePhoto = async () => {
-    logWithTimestamp("=== TAKE PHOTO INITIATED ===", {
-      selectedDocument,
-      selectedDocumentCode,
-    });
-
     if (!selectedDocument) {
-      logWithTimestamp("=== TAKE PHOTO ERROR ===", "No document selected");
-      Alert.alert(
+      showPopup(
         "Select Document",
-        "Please select a required document first."
+        "Please select a required document first.",
+        "warning"
       );
       return;
     }
 
     try {
       setLoading(true);
-      logWithTimestamp(
-        "=== REQUESTING CAMERA PERMISSION ===",
-        "Requesting permission"
-      );
+      setLoadingMessage("Processing photo...");
+      
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      logWithTimestamp("=== CAMERA PERMISSION RESULT ===", { status });
 
       if (status !== "granted") {
-        logWithTimestamp(
-          "=== CAMERA PERMISSION DENIED ===",
-          "Permission not granted"
-        );
-        Alert.alert(
+        showPopup(
           "Permission needed",
-          "Camera permission is required to take photos"
+          "Camera permission is required to take photos",
+          "warning"
         );
         return;
       }
 
-      logWithTimestamp("=== LAUNCHING CAMERA ===", "Opening camera");
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
         quality: 0.8,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
 
-      logWithTimestamp("=== CAMERA RESULT ===", {
-        canceled: result.canceled,
-        assets: result.assets,
-        assetsCount: result.assets?.length,
-      });
-
       if (!result.canceled && result.assets?.length > 0) {
         const photo = result.assets[0];
-        logWithTimestamp("=== CAPTURED PHOTO DETAILS ===", {
-          uri: photo.uri,
-          fileSize: photo.fileSize,
-          width: photo.width,
-          height: photo.height,
-        });
 
-        // Check and resize image if needed
         const processedImageUri = await resizeImageIfNeeded(
           photo.uri,
           photo.fileSize
         );
         if (!processedImageUri) {
-          // Image was too large or processing failed
           return;
         }
 
-        // Get max sequence number
         const maxSeqNo = await getMaxSeqNo(
           requirementData.claimNumber,
           selectedDocumentCode
         );
         if (maxSeqNo === null) {
-          Alert.alert(
+          showPopup(
             "Error",
-            "Failed to get sequence number. Please try again."
+            "Failed to get sequence number. Please try again.",
+            "error"
           );
           return;
         }
 
         const newSeqNo = maxSeqNo + 1;
         const fileName = `${selectedDocument}_${Date.now()}.jpg`;
-        logWithTimestamp("=== NEW SEQ NO ===", {
-          maxSeqNo,
-          newSeqNo,
-          fileName,
-        });
 
-        // Upload to API with processed image
         const uploadResult = await uploadDocumentToAPI(
           requirementData.polNo,
           requirementData.claimNumber,
@@ -795,20 +716,19 @@ const PendingRequirement1 = () => {
         );
 
         if (uploadResult.success) {
-          // Only refresh pending documents - don't store locally
           await fetchPendingDocuments();
-          Alert.alert("Success", "Photo uploaded successfully!");
+          showPopup("Success", "Photo uploaded successfully!", "success");
         } else {
-          Alert.alert("Error", `Failed to upload photo: ${uploadResult.error}`);
+          showPopup(
+            "Error",
+            `Failed to upload photo: ${uploadResult.error}`,
+            "error"
+          );
         }
       }
     } catch (error) {
-      logWithTimestamp("=== TAKE PHOTO ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       console.error("Error taking photo:", error);
-      Alert.alert("Error", "Failed to upload photo. Please try again.");
+      showPopup("Error", "Failed to upload photo. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -816,11 +736,6 @@ const PendingRequirement1 = () => {
 
   const getMaxSeqNo = async (claimNo, docCode) => {
     try {
-      logWithTimestamp("=== FETCHING MAX SEQ NO ===", {
-        claimNo,
-        docCode,
-      });
-
       const response = await fetch(
         `${API_BASE_URL}/UploadPendingDocument/max-seqno?clmNo=${encodeURIComponent(
           claimNo
@@ -829,20 +744,10 @@ const PendingRequirement1 = () => {
 
       if (response.ok) {
         const data = await response.json();
-        logWithTimestamp("=== MAX SEQ NO RESPONSE ===", data);
         return data.maxSeqNo;
-      } else {
-        logWithTimestamp("=== MAX SEQ NO ERROR ===", {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        return null;
       }
+      return null;
     } catch (error) {
-      logWithTimestamp("=== MAX SEQ NO FETCH ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       console.error("Error fetching max seq no:", error);
       return null;
     }
@@ -858,15 +763,6 @@ const PendingRequirement1 = () => {
     mimeType
   ) => {
     try {
-      logWithTimestamp("=== UPLOADING DOCUMENT TO API ===", {
-        polNo,
-        claimNo,
-        docCode,
-        seqNo,
-        fileName,
-        mimeType,
-      });
-
       const formData = new FormData();
       formData.append("PolNo", polNo);
       formData.append("ClaimNo", claimNo);
@@ -889,255 +785,132 @@ const PendingRequirement1 = () => {
         }
       );
 
-      logWithTimestamp("=== UPLOAD API RESPONSE ===", {
-        status: response.status,
-        statusText: response.statusText,
-      });
-
       if (response.ok) {
         const responseData = await response.json();
-        logWithTimestamp("=== UPLOAD API SUCCESS ===", responseData);
         return { success: true, data: responseData };
       } else {
         const errorData = await response.text();
-        logWithTimestamp("=== UPLOAD API ERROR ===", {
-          status: response.status,
-          error: errorData,
-        });
         return { success: false, error: errorData };
       }
     } catch (error) {
-      logWithTimestamp("=== UPLOAD API EXCEPTION ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       return { success: false, error: error.message };
     }
   };
 
   const handleSubmit = async () => {
-    logWithTimestamp("=== SUBMIT INITIATED ===", {
-      documentCount: pendingDocuments.length,
-      documents: pendingDocuments,
-    });
-
     if (pendingDocuments.length === 0) {
-      logWithTimestamp("=== SUBMIT ERROR ===", "No documents uploaded");
-      Alert.alert(
+      showPopup(
         "No Documents",
-        "Please upload at least one document before submitting."
+        "Please upload at least one document before submitting.",
+        "warning"
       );
       return;
     }
 
-    // Enhanced logging for submitted documents
-    logWithTimestamp(
-      "=== SUBMITTING DOCUMENTS DETAILED ===",
-      "Processing documents for submission"
-    );
-    pendingDocuments.forEach((doc, index) => {
-      logWithTimestamp(`=== DOCUMENT ${index + 1} SUBMISSION DATA ===`, {
-        documentType: doc.DocDescription,
-        documentCode: doc.DocCode,
-        docNo: doc.DocNo,
-        seqNo: doc.SeqNo,
-        polNo: doc.PolNo,
-        claimNo: doc.ClaimNo,
-      });
-    });
-
-    // Summary of submission
-    const submissionSummary = {
-      totalDocuments: pendingDocuments.length,
-      documentTypes: [
-        ...new Set(pendingDocuments.map((doc) => doc.DocDescription)),
-      ],
-      documentCodes: [...new Set(pendingDocuments.map((doc) => doc.DocCode))],
-      claimNumber: requirementData.claimNumber,
-      requirementId: requirementData.requirementId,
-    };
-    logWithTimestamp("=== SUBMISSION SUMMARY ===", submissionSummary);
-
-    Alert.alert(
+    showPopup(
       "Submit Documents",
       `Are you sure you want to submit ${pendingDocuments.length} document(s)?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Submit",
-          onPress: async () => {
-            try {
-              setLoading(true);
-              logWithTimestamp(
-                "=== SUBMIT CONFIRMED ===",
-                "Starting API calls"
-              );
+      "warning",
+      true,
+      async () => {
+        try {
+          hidePopup();
+          setLoading(true);
+          setLoadingMessage("Submitting documents...");
 
-              // Get unique document codes from pending documents
-              const uniqueDocCodes = [
-                ...new Set(pendingDocuments.map((doc) => doc.DocCode)),
-              ];
+          const uniqueDocCodes = [
+            ...new Set(pendingDocuments.map((doc) => doc.DocCode)),
+          ];
 
-              logWithTimestamp("=== UNIQUE DOC CODES ===", {
-                codes: uniqueDocCodes,
-                totalCodes: uniqueDocCodes.length,
-              });
+          const submitPromises = uniqueDocCodes.map(async (docCode) => {
+            const requestBody = {
+              claimNo: requirementData.claimNumber,
+              docCode: docCode,
+              polNo: requirementData.polNo,
+            };
 
-              // Call the SubmitDocs API for each unique document code
-              const submitPromises = uniqueDocCodes.map(async (docCode) => {
-                const requestBody = {
-                  claimNo: requirementData.claimNumber,
-                  docCode: docCode,
-                  polNo: requirementData.polNo,
-                };
-
-                logWithTimestamp("=== SUBMIT DOCS API REQUEST ===", {
-                  docCode,
-                  requestBody,
-                });
-
-                const response = await fetch(
-                  `${API_BASE_URL}/DocumentLog/SubmitDocs`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Cache-Control": "no-cache, no-store, must-revalidate",
-                      Pragma: "no-cache",
-                    },
-                    body: JSON.stringify(requestBody),
-                  }
-                );
-
-                logWithTimestamp("=== SUBMIT DOCS API RESPONSE ===", {
-                  docCode,
-                  status: response.status,
-                  statusText: response.statusText,
-                });
-
-                if (response.ok) {
-                  const responseData = await response.json();
-                  logWithTimestamp("=== SUBMIT DOCS API SUCCESS ===", {
-                    docCode,
-                    responseData,
-                  });
-                  return { success: true, docCode, data: responseData };
-                } else {
-                  const errorData = await response.text();
-                  logWithTimestamp("=== SUBMIT DOCS API ERROR ===", {
-                    docCode,
-                    status: response.status,
-                    error: errorData,
-                  });
-                  return { success: false, docCode, error: errorData };
-                }
-              });
-
-              // Wait for all API calls to complete
-              const results = await Promise.all(submitPromises);
-
-              logWithTimestamp("=== ALL SUBMIT RESULTS ===", results);
-
-              // Check if all submissions were successful
-              const successfulSubmissions = results.filter(
-                (result) => result.success
-              );
-              const failedSubmissions = results.filter(
-                (result) => !result.success
-              );
-
-              if (failedSubmissions.length === 0) {
-                // All submissions successful
-                logWithTimestamp("=== ALL SUBMISSIONS SUCCESSFUL ===", {
-                  successCount: successfulSubmissions.length,
-                  totalCount: results.length,
-                });
-
-                // Refresh pending documents to reflect the changes
-                await fetchPendingDocuments();
-
-                Alert.alert(
-                  "Success",
-                  `All ${successfulSubmissions.length} document type(s) submitted successfully!`,
-                  [{ text: "OK", onPress: handleClose }]
-                );
-              } else {
-                // Some submissions failed
-                logWithTimestamp("=== SOME SUBMISSIONS FAILED ===", {
-                  successCount: successfulSubmissions.length,
-                  failedCount: failedSubmissions.length,
-                  failedDocCodes: failedSubmissions.map((f) => f.docCode),
-                });
-
-                const failedDocCodes = failedSubmissions
-                  .map((f) => f.docCode)
-                  .join(", ");
-                Alert.alert(
-                  "Partial Success",
-                  `${successfulSubmissions.length} document type(s) submitted successfully.\n\nFailed to submit: ${failedDocCodes}\n\nPlease try again for the failed documents.`
-                );
-
-                // Refresh pending documents to show current state
-                await fetchPendingDocuments();
+            const response = await fetch(
+              `${API_BASE_URL}/DocumentLog/SubmitDocs`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  Pragma: "no-cache",
+                },
+                body: JSON.stringify(requestBody),
               }
-            } catch (error) {
-              logWithTimestamp("=== SUBMIT API EXCEPTION ===", {
-                error: error.message,
-                stack: error.stack,
-              });
-              Alert.alert(
-                "Error",
-                "Failed to submit documents. Please check your connection and try again."
-              );
-            } finally {
-              setLoading(false);
+            );
+
+            if (response.ok) {
+              const responseData = await response.json();
+              return { success: true, docCode, data: responseData };
+            } else {
+              const errorData = await response.text();
+              return { success: false, docCode, error: errorData };
             }
-          },
-        },
-      ]
+          });
+
+          const results = await Promise.all(submitPromises);
+          const successfulSubmissions = results.filter(
+            (result) => result.success
+          );
+          const failedSubmissions = results.filter((result) => !result.success);
+
+          if (failedSubmissions.length === 0) {
+            await fetchPendingDocuments();
+            showPopup(
+              "Success",
+              `All ${successfulSubmissions.length} document type(s) submitted successfully!`,
+              "success",
+              false,
+              () => {
+                hidePopup();
+                handleClose();
+              }
+            );
+          } else {
+            const failedDocCodes = failedSubmissions
+              .map((f) => f.docCode)
+              .join(", ");
+            showPopup(
+              "Partial Success",
+              `${successfulSubmissions.length} document type(s) submitted successfully.\n\nFailed to submit: ${failedDocCodes}\n\nPlease try again for the failed documents.`,
+              "warning"
+            );
+            await fetchPendingDocuments();
+          }
+        } catch (error) {
+          showPopup(
+            "Error",
+            "Failed to submit documents. Please check your connection and try again.",
+            "error"
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
     );
   };
 
   const resizeImageIfNeeded = async (imageUri, originalSize) => {
     try {
-      logWithTimestamp("=== CHECKING IMAGE SIZE ===", {
-        originalSize,
-        originalSizeMB: (originalSize / (1024 * 1024)).toFixed(2),
-      });
-
-      // Check if image is larger than 5MB
       if (originalSize > 5 * 1024 * 1024) {
-        logWithTimestamp(
-          "=== IMAGE TOO LARGE ===",
-          "Image size exceeds 5MB limit"
-        );
-        Alert.alert(
+        showPopup(
           "Image Too Large",
-          "The selected image is larger than 5MB. Please select a smaller image."
+          "The selected image is larger than 5MB. Please select a smaller image.",
+          "warning"
         );
         return null;
       }
 
-      // If image is larger than 1MB, resize it
       if (originalSize > 1 * 1024 * 1024) {
-        logWithTimestamp(
-          "=== RESIZING IMAGE ===",
-          "Image size > 1MB, resizing..."
-        );
-
-        // Calculate compression ratio to get under 1MB
         let compressionRatio = (1 * 1024 * 1024) / originalSize;
-        // Add some buffer to ensure we stay under 1MB
         compressionRatio = Math.min(compressionRatio * 0.8, 0.8);
-
-        logWithTimestamp("=== COMPRESSION RATIO ===", { compressionRatio });
 
         const resizedImage = await ImageManipulator.manipulateAsync(
           imageUri,
-          [
-            // Optionally resize dimensions if needed
-            { resize: { width: 1920 } }, // Resize to max width of 1920px
-          ],
+          [{ resize: { width: 1920 } }],
           {
             compress: compressionRatio,
             format: ImageManipulator.SaveFormat.JPEG,
@@ -1145,83 +918,82 @@ const PendingRequirement1 = () => {
           }
         );
 
-        logWithTimestamp("=== IMAGE RESIZED ===", {
-          originalUri: imageUri,
-          resizedUri: resizedImage.uri,
-          estimatedNewSize: "Will be checked after processing",
-        });
-
         return resizedImage.uri;
       }
 
-      // Image is already under 1MB, no resizing needed
-      logWithTimestamp("=== IMAGE SIZE OK ===", "Image size is acceptable");
       return imageUri;
     } catch (error) {
-      logWithTimestamp("=== IMAGE RESIZE ERROR ===", {
-        error: error.message,
-        stack: error.stack,
-      });
       throw error;
     }
   };
 
   const handleDocumentSelection = (document) => {
-    logWithTimestamp("=== DOCUMENT SELECTION INITIATED ===", {
-      selectedDocument: document,
-      type: typeof document,
-      hasDescription: !!document.description,
-      hasCode: !!document.code,
-    });
-
     if (document.description) {
-      logWithTimestamp("=== DOCUMENT SELECTION (WITH CODE) ===", {
-        description: document.description,
-        code: document.code,
-        fullDocument: document,
-      });
       setSelectedDocument(document.description);
       setSelectedDocumentCode(document.code);
     } else {
-      logWithTimestamp("=== DOCUMENT SELECTION (WITHOUT CODE) ===", {
-        document: document,
-        type: typeof document,
-      });
       setSelectedDocument(document);
       setSelectedDocumentCode("");
     }
-
     setIsDropdownOpen(false);
-    logWithTimestamp("=== DOCUMENT SELECTION COMPLETED ===", {
-      selectedDocument: document.description || document,
-      selectedDocumentCode: document.code || "",
-    });
   };
 
-  // Show loading indicator while loading data
-  if (loading) {
+  const handleClose = () => {
+    router.back();
+  };
+
+  const allowedFormats = ["JPG", "JPEG", "TIFF", "PNG"];
+
+  const renderPendingDocument = (document, index) => (
+    <View
+      key={`${document.DocCode}-${document.SeqNo}`}
+      style={styles.documentRow}
+    >
+      <View style={styles.documentDescriptionCell}>
+        <Text style={styles.documentCellText}>{document.DocDescription}</Text>
+      </View>
+      <View style={styles.documentImageCell}>
+        <TouchableOpacity onPress={() => handleDocumentImageClick(document)}>
+          <Ionicons name="image-outline" size={30} color="#00ADBB" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.documentDeleteCell}>
+        <TouchableOpacity onPress={() => handleDeletePendingDocument(document)}>
+          <Ionicons name="trash" size={20} color="#D32F2F" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Enhanced useEffect for initial data loading
+  useEffect(() => {
+    const initializeData = async () => {
+      await loadRequirementData();
+    };
+    
+    initializeData();
+  }, []);
+
+  // Effect to fetch pending documents after requirement data is loaded
+  useEffect(() => {
+    if (initialDataLoaded && requirementData.polNo && requirementData.claimNumber) {
+      fetchPendingDocuments();
+    }
+  }, [initialDataLoaded, requirementData.polNo, requirementData.claimNumber]);
+
+  // Show loading screen while initial data is being loaded or during operations
+  if (loading || !initialDataLoaded) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <LinearGradient
           colors={["#FFFFFF", "#6DD3D3"]}
-          style={[styles.container, styles.loadingContainer]}
+          style={styles.container}
         >
-          <ActivityIndicator size="large" color="#00ADBB" />
-          <Text style={styles.loadingText}>Loading requirement data...</Text>
+          <LoadingScreen loadingMessage={loadingMessage} />
         </LinearGradient>
       </SafeAreaView>
     );
   }
-
-  // Log render information
-  logWithTimestamp("=== COMPONENT RENDERING ===", {
-    hasRequirementData: !!requirementData,
-    documentsCount: requirementData.documents?.length || 0,
-    requiredDocumentsCount: requirementData.requiredDocuments?.length || 0,
-    uploadedDocumentsCount: uploadedDocuments.length,
-    selectedDocument,
-    selectedDocumentCode,
-  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -1240,7 +1012,7 @@ const PendingRequirement1 = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* Claim Info - Only show claim number and date */}
+          {/* Claim Info */}
           <View style={styles.claimCard}>
             <View style={styles.claimRow}>
               <Text style={styles.claimLabel}>Claim Number</Text>
@@ -1258,6 +1030,7 @@ const PendingRequirement1 = () => {
             </View>
           </View>
 
+          {/* Document Upload Section */}
           <View style={styles.documentSection}>
             <Text style={styles.documentTitle}>Document Upload</Text>
 
@@ -1268,14 +1041,7 @@ const PendingRequirement1 = () => {
               </Text>
               <TouchableOpacity
                 style={styles.dropdown}
-                onPress={() => {
-                  logWithTimestamp("=== DROPDOWN OPENED ===", {
-                    documentsAvailable: requirementData.documents?.length || 0,
-                    requiredDocumentsAvailable:
-                      requirementData.requiredDocuments?.length || 0,
-                  });
-                  setIsDropdownOpen(true);
-                }}
+                onPress={() => setIsDropdownOpen(true)}
               >
                 <Text style={styles.dropdownText}>
                   {selectedDocument || "Choose document type..."}
@@ -1360,41 +1126,16 @@ const PendingRequirement1 = () => {
           visible={isDropdownOpen}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => {
-            logWithTimestamp("=== DROPDOWN CLOSED ===", "Modal closed");
-            setIsDropdownOpen(false);
-          }}
+          onRequestClose={() => setIsDropdownOpen(false)}
         >
           <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
-            onPress={() => {
-              logWithTimestamp(
-                "=== DROPDOWN OVERLAY PRESSED ===",
-                "Closing dropdown"
-              );
-              setIsDropdownOpen(false);
-            }}
+            onPress={() => setIsDropdownOpen(false)}
           >
             <View style={styles.modalContent}>
-              {(() => {
-                logWithTimestamp("=== DROPDOWN MODAL RENDERING ===", {
-                  documentsLength: requirementData.documents?.length || 0,
-                  requiredDocumentsLength:
-                    requirementData.requiredDocuments?.length || 0,
-                  documents: requirementData.documents,
-                  requiredDocuments: requirementData.requiredDocuments,
-                });
-                return null;
-              })()}
-
               {requirementData.documents && requirementData.documents.length > 0
-                ? requirementData.documents.map((doc, index) => {
-                  logWithTimestamp(
-                    `=== RENDERING DOCUMENT OPTION ${index} ===`,
-                    doc
-                  );
-                  return (
+                ? requirementData.documents.map((doc, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.modalItem}
@@ -1404,58 +1145,36 @@ const PendingRequirement1 = () => {
                         {doc.description}
                       </Text>
                     </TouchableOpacity>
-                  );
-                })
+                  ))
                 : pendingDocuments.length > 0
-                  ? pendingDocuments.map((doc, index) => {
-                    logWithTimestamp(
-                      `=== RENDERING PENDING DOCUMENT OPTION ${index} ===`,
-                      doc
-                    );
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.modalItem}
-                        onPress={() => {
-                          logWithTimestamp(
-                            "=== PENDING DOCUMENT SELECTED ===",
-                            doc
-                          );
-                          setSelectedDocument(doc.DocDescription);
-                          setSelectedDocumentCode(doc.DocCode);
-                          setIsDropdownOpen(false);
-                        }}
-                      >
-                        <Text style={styles.modalItemText}>
-                          {doc.DocDescription}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })
-                  : // Fallback to requiredDocuments if both arrays are empty
-                  requirementData.requiredDocuments.map((doc, index) => {
-                    logWithTimestamp(
-                      `=== RENDERING REQUIRED DOCUMENT OPTION ${index} ===`,
-                      doc
-                    );
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.modalItem}
-                        onPress={() => {
-                          logWithTimestamp(
-                            "=== FALLBACK DOCUMENT SELECTED ===",
-                            doc
-                          );
-                          setSelectedDocument(doc);
-                          setSelectedDocumentCode("");
-                          setIsDropdownOpen(false);
-                        }}
-                      >
-                        <Text style={styles.modalItemText}>{doc}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                ? pendingDocuments.map((doc, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        setSelectedDocument(doc.DocDescription);
+                        setSelectedDocumentCode(doc.DocCode);
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>
+                        {doc.DocDescription}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                : requirementData.requiredDocuments.map((doc, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        setSelectedDocument(doc);
+                        setSelectedDocumentCode("");
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{doc}</Text>
+                    </TouchableOpacity>
+                  ))}
             </View>
           </TouchableOpacity>
         </Modal>
@@ -1486,13 +1205,28 @@ const PendingRequirement1 = () => {
                       "=== DOCUMENT IMAGE LOAD ERROR ===",
                       error
                     );
-                    Alert.alert("Error", "Failed to load document image");
+                    showPopup(
+                      "Error",
+                      "Failed to load document image",
+                      "error"
+                    );
                   }}
                 />
               )}
             </View>
           </View>
         </Modal>
+
+        {/* Custom Popup */}
+        <CustomPopup
+          visible={popup.visible}
+          title={popup.title}
+          message={popup.message}
+          type={popup.type}
+          showConfirmButton={popup.showConfirmButton}
+          onClose={hidePopup}
+          onConfirm={popup.onConfirm}
+        />
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1515,6 +1249,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#13646D",
     fontWeight: "500",
+  },
+  // Custom Loading Styles (from DependentDetails)
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#6DD3D3",
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   header: {
     flexDirection: "row",
@@ -1574,30 +1341,6 @@ const styles = StyleSheet.create({
     color: "#13646D",
     flex: 1,
   },
-  requiredDocumentsSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#13646D",
-    marginBottom: 10,
-  },
-  requiredDocumentsBox: {
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 15,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "#00ADBB",
-  },
-  requiredDocItem: {
-    marginBottom: 5,
-  },
-  requiredDocText: {
-    fontSize: 14,
-    color: "#13646D",
-    fontWeight: "500",
-  },
   documentSection: {
     marginBottom: 20,
   },
@@ -1646,7 +1389,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: "rgba(255, 255, 255, 0.7)",
   },
-  uploadIcon: { marginBottom: 15 },
+  uploadIcon: {
+    marginBottom: 15,
+  },
   uploadButtons: {
     flexDirection: "row",
     gap: 15,
@@ -1742,12 +1487,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
-  documentImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    resizeMode: "cover",
-  },
   emptyRow: {
     backgroundColor: "#FFFFFF",
     padding: 20,
@@ -1793,7 +1532,7 @@ const styles = StyleSheet.create({
     color: "#13646D",
     textAlign: "center",
   },
-  // New styles for image modal
+  // Image modal styles
   imageModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
@@ -1822,6 +1561,102 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 10,
+  },
+  // Popup Styles
+  popupOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  backdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
