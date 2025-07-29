@@ -28,7 +28,7 @@ import { API_BASE_URL } from "../constants/index.js";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
-export default function PolicyHome() {
+export default function PolicyHome({ route }) {
   const navigation = useNavigation();
   const [modalVisible, setModalVisible] = useState(false);
   const [policyDetails, setPolicyDetails] = useState(null);
@@ -65,6 +65,23 @@ export default function PolicyHome() {
   const [isLoadingPolicySelection, setIsLoadingPolicySelection] =
     useState(false);
 
+  useEffect(() => {
+    if (route?.params?.showPendingIntimations) {
+      // Clear the parameter to prevent repeated triggers
+      navigation.setParams({ showPendingIntimations: undefined });
+
+      // Show PendingIntimations modal with animation
+      setTimeout(() => {
+        setShowPendingIntimations(true);
+        Animated.timing(pendingIntimationsSlideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, 100); // Small delay to ensure component is ready
+    }
+  }, [route?.params?.showPendingIntimations]);
+
   useFocusEffect(
     React.useCallback(() => {
       const refreshPageData = async () => {
@@ -74,9 +91,17 @@ export default function PolicyHome() {
             "should_refresh_home"
           );
 
-          if (shouldRefresh === "true") {
+          // Also check for refresh parameter from navigation
+          const shouldRefreshFromNav = route?.params?.refreshPendingClaims;
+
+          if (shouldRefresh === "true" || shouldRefreshFromNav) {
             // Clear the refresh flag
             await SecureStore.deleteItemAsync("should_refresh_home");
+
+            // Clear navigation parameter
+            if (shouldRefreshFromNav) {
+              navigation.setParams({ refreshPendingClaims: undefined });
+            }
 
             // Show loading and refresh all data
             setIsLoadingPolicySelection(true);
@@ -107,7 +132,7 @@ export default function PolicyHome() {
       };
 
       refreshPageData();
-    }, [])
+    }, [route?.params?.refreshPendingClaims])
   );
 
   const fetchPolicyInfo = async () => {
