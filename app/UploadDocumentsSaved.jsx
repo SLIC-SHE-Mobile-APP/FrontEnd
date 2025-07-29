@@ -774,17 +774,14 @@ const UploadDocumentsSaved = ({ route }) => {
 
       console.log("All documents uploaded successfully:", documentInfo);
 
-      // Show success alert and navigate on OK
+      // Show success alert and go back to previous screen
       Alert.alert("Success", "All documents uploaded successfully!", [
         {
           text: "OK",
           onPress: () => {
-            // Navigate back to EditClaimIntimation1 with updated data
-            // Don't pass claim data as it should retrieve from storage
-            navigation.navigate("EditClaimIntimation1", {
-              submittedData: documentInfo,
-              // Remove claim from params to force retrieval from storage
-            });
+            // Set a flag before going back
+            navigation.setParams({ fromUploadDocuments: true });
+            navigation.goBack();
           },
         },
       ]);
