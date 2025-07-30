@@ -413,27 +413,27 @@ const EditClaimIntimation = ({ route }) => {
       // Validate referenceNo before making API call
       if (!referenceNo || referenceNo.trim() === "") {
         console.warn("Invalid referenceNo provided to fetchClaimAmount:", referenceNo);
-        
+
         // Try to get referenceNo from different sources
-        const fallbackReferenceNo = 
+        const fallbackReferenceNo =
           await SecureStore.getItemAsync("stored_claim_seq_no") ||
           await SecureStore.getItemAsync("edit_referenceNo") ||
           claimDetails.referenceNo;
-        
+
         if (!fallbackReferenceNo || fallbackReferenceNo.trim() === "") {
           console.warn("No valid referenceNo found, skipping claim amount fetch");
           return "0.00";
         }
-        
+
         referenceNo = fallbackReferenceNo;
       }
-  
+
       console.log("Fetching claim amount for referenceNo:", referenceNo);
-  
+
       const requestBody = {
-        seqNo: referenceNo.trim(),
+        seqNo: referenceNo.trim(), // Ensure no whitespace
       };
-  
+
       const response = await fetch(
         `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
         {
@@ -444,36 +444,58 @@ const EditClaimIntimation = ({ route }) => {
           body: JSON.stringify(requestBody),
         }
       );
-  
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("API Error Response:", errorText);
-        
+
         // Handle 404 specifically for "No claim amount found"
         if (response.status === 404) {
           console.warn("No claim amount found for referenceNo:", referenceNo);
           return "0.00"; // Return default without showing error alert
         }
-        
+
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
-  
+
       const data = await response.json();
       console.log("Claim Amount API Response:", data);
-  
+
+      // Handle different response formats
+      let claimAmount = "0.00";
+
+      if (data && typeof data === 'object') {
+        // If response has claimAmount property
+        if (data.claimAmount !== undefined && data.claimAmount !== null) {
+          claimAmount = data.claimAmount.toString();
+        }
+        // If response has amount property
+        else if (data.amount !== undefined && data.amount !== null) {
+          claimAmount = data.amount.toString();
+        }
+        // If response has totalAmount property
+        else if (data.totalAmount !== undefined && data.totalAmount !== null) {
+          claimAmount = data.totalAmount.toString();
+        }
+      }
+      // If response is a direct number/string
+      else if (typeof data === 'number' || typeof data === 'string') {
+        claimAmount = data.toString();
+      }
+
+      // Format the amount (ensure it has .00 if it's a whole number)
+      const formattedAmount = claimAmount.includes('.')
+        ? claimAmount
+        : `${claimAmount}.00`;
+
       // Update claimDetails state with the fetched amount
-      const formattedAmount = data.claimAmount 
-        ? `${data.claimAmount}.00`
-        : "0.00";
-  
-      // Update the claimDetails state
       setClaimDetails((prev) => ({
         ...prev,
         claimAmount: formattedAmount,
       }));
-  
+
       return formattedAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
@@ -482,7 +504,7 @@ const EditClaimIntimation = ({ route }) => {
         stack: error.stack,
         referenceNo: referenceNo,
       });
-  
+
       // Only show alert for non-404 errors
       if (!error.message.includes("404")) {
         Alert.alert(
@@ -490,10 +512,11 @@ const EditClaimIntimation = ({ route }) => {
           `Unable to fetch claim amount. Using default amount. Error: ${error.message}`
         );
       }
-  
+
       return "0.00"; // Default fallback amount
     }
   };
+
 
   // Retrieve claim details from SecureStore
   const retrieveClaimDetails = async () => {
@@ -538,50 +561,54 @@ const EditClaimIntimation = ({ route }) => {
 
   // Retrieve beneficiary data from SecureStore
   // Retrieve beneficiary data from SecureStore
-const retrieveBeneficiaryData = async (referenceNo) => {
-  try {
-    // First try to get from stored patient details (from NewClaim page)
-    const [storedPatientName, storedIllness, storedRelationship] = await Promise.all([
-      SecureStore.getItemAsync('stored_patient_name'),
-      SecureStore.getItemAsync('stored_illness_description'), 
-      SecureStore.getItemAsync('stored_relationship')
-    ]);
-    
-    // Fallback to edit-specific stored data
-    const [storedEnteredBy, storedEditRelationship, storedEditIllness] = await Promise.all([
-      SecureStore.getItemAsync("edit_enteredBy"),
-      SecureStore.getItemAsync("edit_relationship"),
-      SecureStore.getItemAsync("edit_illness")
-    ]);
+  const retrieveBeneficiaryData = async (referenceNo) => {
+    try {
+      // First try to get from stored patient details (from NewClaim page)
+      const [storedPatientName, storedIllness, storedRelationship] = await Promise.all([
+        SecureStore.getItemAsync('stored_patient_name'),
+        SecureStore.getItemAsync('stored_illness_description'),
+        SecureStore.getItemAsync('stored_relationship')
+      ]);
 
-    // Use stored patient details first, then fallback to edit data
-    const finalPatientName = storedPatientName || storedEnteredBy;
-    const finalIllness = storedIllness || storedEditIllness;
-    const finalRelationship = storedRelationship || storedEditRelationship;
+      // Fallback to edit-specific stored data
+      const [storedEnteredBy, storedEditRelationship, storedEditIllness] = await Promise.all([
+        SecureStore.getItemAsync("edit_enteredBy"),
+        SecureStore.getItemAsync("edit_relationship"),
+        SecureStore.getItemAsync("edit_illness")
+      ]);
 
-    // If we have patient data, create a beneficiary object
-    if (finalPatientName && finalRelationship) {
-      // Fetch claim amount for this beneficiary
-      const claimAmount = await fetchClaimAmount(referenceNo);
+      // Use stored patient details first, then fallback to edit data
+      const finalPatientName = storedPatientName || storedEnteredBy;
+      const finalIllness = storedIllness || storedEditIllness;
+      const finalRelationship = storedRelationship || storedEditRelationship;
 
-      const beneficiary = {
-        id: "1",
-        name: finalPatientName,
-        relationship: finalRelationship,
-        illness: finalIllness || "",
-        amount: claimAmount, // Set amount from API
-      };
-      setBeneficiaries([beneficiary]);
-    } else {
-      // If no stored data, initialize with empty array
+      // If we have patient data, create a beneficiary object
+      if (finalPatientName && finalRelationship) {
+        // Fetch claim amount for this beneficiary
+        const claimAmount = await fetchClaimAmount(referenceNo);
+
+        const beneficiary = {
+          id: "1",
+          name: finalPatientName,
+          relationship: finalRelationship,
+          illness: finalIllness || "",
+          amount: claimAmount, // Set amount from API
+        };
+
+        // Store beneficiary amount in SecureStore
+        await SecureStore.setItemAsync('stored_beneficiary_amount', claimAmount);
+        setBeneficiaries([beneficiary]);
+      } else {
+        // If no stored data, initialize with empty array
+        setBeneficiaries([]);
+      }
+    } catch (error) {
+      console.error("Error retrieving beneficiary data:", error);
       setBeneficiaries([]);
+    } finally {
+      updateLoadingState('beneficiaryData', false);
     }
-  } catch (error) {
-    console.error("Error retrieving beneficiary data:", error);
-    setBeneficiaries([]);
-  } finally {
-    updateLoadingState('beneficiaryData', false);
-  }};
+  };
 
   // Fetch employee information
   const fetchEmployeeInfo = async () => {
@@ -666,7 +693,7 @@ const retrieveBeneficiaryData = async (referenceNo) => {
 
         // Start all loading operations in parallel
         const loadingPromises = [
-          retrieveBeneficiaryData(referenceNo),
+          retrieveBeneficiaryData(referenceNo), // This will call fetchClaimAmount internally
           fetchEmployeeInfo(),
           storeClaimDetails(),
         ];
@@ -722,60 +749,80 @@ const retrieveBeneficiaryData = async (referenceNo) => {
   // Add beneficiary
   const handleAddBeneficiary = async () => {
     if (newBeneficiary.name && newBeneficiary.relationship) {
-      // Fetch claim amount for the new beneficiary
-      const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
-
-      setBeneficiaries((prev) => [
-        ...prev,
-        {
+      try {
+        // Show loading state while fetching amount
+        const loadingBeneficiary = {
           id: Date.now().toString(),
           ...newBeneficiary,
-          amount: claimAmount, // Set amount from API
-        },
-      ]);
-      setNewBeneficiary({
-        name: "",
-        relationship: "",
-        illness: "",
-        amount: "",
-      });
-      setAddBeneficiaryModalVisible(false);
+          amount: "Loading...", // Show loading text
+        };
+
+        setBeneficiaries((prev) => [...prev, loadingBeneficiary]);
+
+        // Fetch claim amount for the new beneficiary
+        const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+
+        // Update the beneficiary with the actual amount
+        setBeneficiaries((prev) =>
+          prev.map((item) =>
+            item.id === loadingBeneficiary.id
+              ? { ...item, amount: claimAmount }
+              : item
+          )
+        );
+
+        // Store beneficiary amount in SecureStore
+        await SecureStore.setItemAsync('stored_beneficiary_amount', claimAmount);
+
+        setNewBeneficiary({
+          name: "",
+          relationship: "",
+          illness: "",
+          amount: "",
+        });
+        setAddBeneficiaryModalVisible(false);
+      } catch (error) {
+        console.error("Error adding beneficiary:", error);
+        Alert.alert("Error", "Failed to add beneficiary. Please try again.");
+      }
     }
   };
 
   // Save beneficiary edit
   const handleSaveBeneficiaryEdit = async () => {
-    // Fetch updated claim amount
-    const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+    try {
+      // Update beneficiary with loading state
+      setBeneficiaries((prev) =>
+        prev.map((item) =>
+          item.id === selectedBeneficiary.id
+            ? { ...item, ...newBeneficiary, amount: "Loading..." }
+            : item
+        )
+      );
 
-    setBeneficiaries((prev) =>
-      prev.map((item) =>
-        item.id === selectedBeneficiary.id
-          ? { ...item, ...newBeneficiary, amount: claimAmount }
-          : item
-      )
-    );
-    setEditBeneficiaryModalVisible(false);
-    setNewBeneficiary({ name: "", relationship: "", illness: "", amount: "" });
+      // Fetch updated claim amount
+      const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+
+      // Update with actual amount
+      setBeneficiaries((prev) =>
+        prev.map((item) =>
+          item.id === selectedBeneficiary.id
+            ? { ...item, ...newBeneficiary, amount: claimAmount }
+            : item
+        )
+      );
+
+      // Store beneficiary amount in SecureStore
+      await SecureStore.setItemAsync('stored_beneficiary_amount', claimAmount);
+
+      setEditBeneficiaryModalVisible(false);
+      setNewBeneficiary({ name: "", relationship: "", illness: "", amount: "" });
+    } catch (error) {
+      console.error("Error updating beneficiary:", error);
+      Alert.alert("Error", "Failed to update beneficiary. Please try again.");
+    }
   };
 
-  // Delete beneficiary
-  const handleDeleteBeneficiary = (id) => {
-    Alert.alert(
-      "Confirm Delete",
-      "Are you sure you want to delete this beneficiary?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setBeneficiaries((prev) => prev.filter((item) => item.id !== id));
-          },
-        },
-      ]
-    );
-  };
 
   // Add document
   const handleAddDocument = () => {
@@ -1041,7 +1088,7 @@ const retrieveBeneficiaryData = async (referenceNo) => {
                   </View>
                 </View>
                 <View style={styles.beneficiaryActionIcons}>
-                  
+
                 </View>
               </View>
             ))

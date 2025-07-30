@@ -58,6 +58,7 @@ const UploadDocuments = ({ route }) => {
   const [storedPatientName, setStoredPatientName] = useState("");
   const [storedClaimType, setStoredClaimType] = useState("");
   const [storedIllness, setStoredIllness] = useState("");
+  const [storedBeneficiaryAmount, setStoredBeneficiaryAmount] = useState("0");
 
 
   // Sample images with local image sources
@@ -134,6 +135,8 @@ const UploadDocuments = ({ route }) => {
         const storedPatientNameFromStore = await SecureStore.getItemAsync("stored_patient_name");
         const storedClaimTypeFromStore = await SecureStore.getItemAsync("stored_claim_type");
         const storedIllnessFromStore = await SecureStore.getItemAsync("stored_illness_description");
+        // ADD THIS LINE
+        const storedBeneficiaryAmountFromStore = await SecureStore.getItemAsync("stored_beneficiary_amount");
 
         setStoredReferenceNo(referenceNo || "");
         setStoredNic(nic || "");
@@ -142,13 +145,17 @@ const UploadDocuments = ({ route }) => {
         setStoredPatientName(patientName || storedPatientNameFromStore || "");
         setStoredClaimType(claimType || storedClaimTypeFromStore || "");
         setStoredIllness(illness || storedIllnessFromStore || "");
+        // ADD THIS LINE
+        setStoredBeneficiaryAmount(storedBeneficiaryAmountFromStore || "0");
 
         console.log("Loaded stored values:", {
           referenceNo,
           nic,
           patientName: patientName || storedPatientNameFromStore,
           claimType: claimType || storedClaimTypeFromStore,
-          illness: illness || storedIllnessFromStore
+          illness: illness || storedIllnessFromStore,
+          // ADD THIS LINE
+          beneficiaryAmount: storedBeneficiaryAmountFromStore || "0"
         });
       } catch (error) {
         console.error("Error loading stored values:", error);
@@ -209,7 +216,26 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
+  const isDocumentTypeDisabled = (docTypeId) => {
+    // Disable BILL (O01) if beneficiary amount is greater than 0
+    if (docTypeId === "O01") {
+      const beneficiaryAmount = parseFloat(storedBeneficiaryAmount || "0");
+      return beneficiaryAmount > 0;
+    }
+    return false;
+  };
+
+  // 4. Update the handleDocumentTypeSelect function
   const handleDocumentTypeSelect = (type) => {
+    // Check if document type is disabled
+    if (isDocumentTypeDisabled(type)) {
+      Alert.alert(
+        "Document Type Not Available",
+        "Bill document type is not available when beneficiary amount is greater than 0."
+      );
+      return;
+    }
+
     setSelectedDocumentType(type);
 
     // Store the selected docId temporarily
@@ -811,30 +837,35 @@ const UploadDocuments = ({ route }) => {
         {
           text: "OK",
           onPress: () => {
-            navigation.navigate("EditClaimIntimation", {
-              claim: claimData,
-              // ENSURE THESE KEY PARAMETERS ARE PASSED EXPLICITLY
-              referenceNo: storedReferenceNo,
-              claimType: storedClaimType || patientData.claimType,
-              patientName: storedPatientName || patientData.patientName,
-              illness: storedIllness || patientData.illness,
-              claimId: claimId,
-              userNic: storedNic,
-              // Keep backward compatibility
-              submittedData: {
-                patientData: {
-                  ...patientData,
-                  patientName: storedPatientName || patientData.patientName,
-                  illness: storedIllness || patientData.illness,
-                  claimType: storedClaimType || patientData.claimType,
-                  referenceNo: storedReferenceNo,
-                  claimId: claimId,
+            // Add a slight delay to ensure API calls are completed
+            setTimeout(() => {
+              navigation.navigate("EditClaimIntimation", {
+                claim: claimData,
+                // ENSURE THESE KEY PARAMETERS ARE PASSED EXPLICITLY
+                referenceNo: storedReferenceNo,
+                claimType: storedClaimType || patientData.claimType,
+                patientName: storedPatientName || patientData.patientName,
+                illness: storedIllness || patientData.illness,
+                claimId: claimId,
+                userNic: storedNic,
+                // Add this flag to indicate documents were just uploaded
+                documentsUploaded: true,
+                // Keep backward compatibility
+                submittedData: {
+                  patientData: {
+                    ...patientData,
+                    patientName: storedPatientName || patientData.patientName,
+                    illness: storedIllness || patientData.illness,
+                    claimType: storedClaimType || patientData.claimType,
+                    referenceNo: storedReferenceNo,
+                    claimId: claimId,
+                  },
+                  documents: uploadedDocuments,
+                  uploadResults: results,
+                  metadata: claimData.metadata
                 },
-                documents: uploadedDocuments,
-                uploadResults: results,
-                metadata: claimData.metadata
-              },
-            });
+              });
+            }, 500); // 500ms delay
           },
         },
       ]);
@@ -965,40 +996,46 @@ const UploadDocuments = ({ route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Document Type</Text>
           <View style={styles.documentTypeContainer}>
-            {documentTypes.map((type) => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.documentTypeOption,
-                  selectedDocumentType === type.id &&
-                  styles.documentTypeSelected,
-                ]}
-                onPress={() => handleDocumentTypeSelect(type.id)}
-              >
-                <View style={styles.radioContainer}>
-                  <View
-                    style={[
-                      styles.radioButton,
-                      selectedDocumentType === type.id &&
-                      styles.radioButtonSelected,
-                    ]}
-                  >
-                    {selectedDocumentType === type.id && (
-                      <View style={styles.radioButtonInner} />
-                    )}
+            {documentTypes.map((type) => {
+              const isDisabled = isDocumentTypeDisabled(type.id);
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.documentTypeOption,
+                    selectedDocumentType === type.id && styles.documentTypeSelected,
+                    isDisabled && styles.documentTypeDisabled, // Add disabled style
+                  ]}
+                  onPress={() => handleDocumentTypeSelect(type.id)}
+                  disabled={isDisabled} // Disable touch
+                >
+                  <View style={styles.radioContainer}>
+                    <View
+                      style={[
+                        styles.radioButton,
+                        selectedDocumentType === type.id && styles.radioButtonSelected,
+                        isDisabled && styles.radioButtonDisabled, // Add disabled style
+                      ]}
+                    >
+                      {selectedDocumentType === type.id && (
+                        <View style={styles.radioButtonInner} />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.documentTypeText,
+                        selectedDocumentType === type.id && styles.documentTypeTextSelected,
+                        isDisabled && styles.documentTypeTextDisabled, // Add disabled style
+                      ]}
+                    >
+                      {type.label}
+                      {isDisabled && " (Not Available)"}
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.documentTypeText,
-                      selectedDocumentType === type.id &&
-                      styles.documentTypeTextSelected,
-                    ]}
-                  >
-                    {type.label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
+
           </View>
         </View>
 
@@ -1611,6 +1648,16 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     flex: 1,
   },
+  documentTypeDisabled: {
+  opacity: 0.5,
+},
+radioButtonDisabled: {
+  borderColor: "#CCC",
+  backgroundColor: "#F5F5F5",
+},
+documentTypeTextDisabled: {
+  color: "#999",
+},
   expandIcon: {
     marginLeft: 5,
   },
