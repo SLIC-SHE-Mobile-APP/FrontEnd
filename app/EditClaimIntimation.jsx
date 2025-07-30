@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState, useEffect } from "react";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Animated,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,23 +14,22 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Image,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from '../constants/index.js';
 
 const EditClaimIntimation = ({ route }) => {
   const navigation = useNavigation();
-  const { claim } = route?.params || {};
+  const { claim, referenceNo, claimNumber, claimType, patientName, illness, createdOn, claimAmount } = route?.params || {};
 
   // State for claim details
   const [claimDetails, setClaimDetails] = useState({
-    referenceNo: claim?.referenceNo,
-    enteredBy: "Loading...",
+    referenceNo: referenceNo || claimNumber || claim?.referenceNo || "",
+    enteredBy: patientName || claim?.enteredBy || "Loading...",
     status: "Submission for Approval Pending",
-    claimType: claim?.claimType,
-    createdOn: claim?.createdOn,
+    claimType: claimType || claim?.claimType || "",
+    createdOn: createdOn || claim?.createdOn || new Date().toLocaleDateString('en-GB'),
+    claimAmount: claimAmount || claim?.claimAmount || "0.00"
   });
 
   // Employee info state
@@ -36,7 +37,8 @@ const EditClaimIntimation = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  
+
+
   // Track all loading states
   const [loadingStates, setLoadingStates] = useState({
     claimDetails: true,
@@ -65,6 +67,8 @@ const EditClaimIntimation = ({ route }) => {
 
   const [isImageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [claimTypes, setClaimType] = useState("");
+  const [referenceNo2, setReferenceNo] = useState("");
 
   // New beneficiary form
   const [newBeneficiary, setNewBeneficiary] = useState({
@@ -85,13 +89,13 @@ const EditClaimIntimation = ({ route }) => {
   const updateLoadingState = (key, value) => {
     setLoadingStates(prev => {
       const newStates = { ...prev, [key]: value };
-      
+
       // Check if all loading states are false
       const allLoaded = Object.values(newStates).every(state => !state);
       if (allLoaded) {
         setInitialLoading(false);
       }
-      
+
       return newStates;
     });
   };
@@ -221,7 +225,7 @@ const EditClaimIntimation = ({ route }) => {
   const deleteDocumentFromAPI = async (document) => {
     try {
       const { memId, seqNo } = parseClmMemSeqNo(document.clmMemSeqNo);
-      
+
       console.log('Deleting document with:', {
         claimNo: claimDetails.referenceNo,
         memId,
@@ -340,7 +344,7 @@ const EditClaimIntimation = ({ route }) => {
       console.log("Fetching documents for referenceNo:", referenceNo);
 
       const response = await fetch(
-         `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
+        `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
         {
           method: "GET",
           headers: {
@@ -406,12 +410,30 @@ const EditClaimIntimation = ({ route }) => {
   // Fetch claim amount from API
   const fetchClaimAmount = async (referenceNo) => {
     try {
+      // Validate referenceNo before making API call
+      if (!referenceNo || referenceNo.trim() === "") {
+        console.warn("Invalid referenceNo provided to fetchClaimAmount:", referenceNo);
+        
+        // Try to get referenceNo from different sources
+        const fallbackReferenceNo = 
+          await SecureStore.getItemAsync("stored_claim_seq_no") ||
+          await SecureStore.getItemAsync("edit_referenceNo") ||
+          claimDetails.referenceNo;
+        
+        if (!fallbackReferenceNo || fallbackReferenceNo.trim() === "") {
+          console.warn("No valid referenceNo found, skipping claim amount fetch");
+          return "0.00";
+        }
+        
+        referenceNo = fallbackReferenceNo;
+      }
+  
       console.log("Fetching claim amount for referenceNo:", referenceNo);
-
+  
       const requestBody = {
-        seqNo: referenceNo,
+        seqNo: referenceNo.trim(),
       };
-
+  
       const response = await fetch(
         `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
         {
@@ -422,21 +444,36 @@ const EditClaimIntimation = ({ route }) => {
           body: JSON.stringify(requestBody),
         }
       );
-
+  
       if (!response.ok) {
         const errorText = await response.text();
         console.error("API Error Response:", errorText);
+        
+        // Handle 404 specifically for "No claim amount found"
+        if (response.status === 404) {
+          console.warn("No claim amount found for referenceNo:", referenceNo);
+          return "0.00"; // Return default without showing error alert
+        }
+        
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
-
+  
       const data = await response.json();
-
-      const formattedAmount = data.claimAmount
+      console.log("Claim Amount API Response:", data);
+  
+      // Update claimDetails state with the fetched amount
+      const formattedAmount = data.claimAmount 
         ? `${data.claimAmount}.00`
         : "0.00";
-
+  
+      // Update the claimDetails state
+      setClaimDetails((prev) => ({
+        ...prev,
+        claimAmount: formattedAmount,
+      }));
+  
       return formattedAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
@@ -445,13 +482,15 @@ const EditClaimIntimation = ({ route }) => {
         stack: error.stack,
         referenceNo: referenceNo,
       });
-
-      // Show user-friendly error message
-      Alert.alert(
-        "Network Error",
-        `Unable to fetch claim amount. Using default amount. Error: ${error.message}`
-      );
-
+  
+      // Only show alert for non-404 errors
+      if (!error.message.includes("404")) {
+        Alert.alert(
+          "Network Error",
+          `Unable to fetch claim amount. Using default amount. Error: ${error.message}`
+        );
+      }
+  
       return "0.00"; // Default fallback amount
     }
   };
@@ -459,70 +498,90 @@ const EditClaimIntimation = ({ route }) => {
   // Retrieve claim details from SecureStore
   const retrieveClaimDetails = async () => {
     try {
-      const storedReferenceNo = await SecureStore.getItemAsync(
-        "edit_referenceNo"
-      );
+      const storedReferenceNo = await SecureStore.getItemAsync("edit_referenceNo");
       const storedClaimType = await SecureStore.getItemAsync("edit_claimType");
       const storedCreatedOn = await SecureStore.getItemAsync("edit_createdOn");
 
-      // Update state with retrieved values, fallback to route params or defaults
+      // Prioritize route params, then stored values, then defaults
+      const finalReferenceNo = referenceNo || claimNumber || storedReferenceNo || claim?.referenceNo || "";
+      const finalClaimType = claimType || storedClaimType || claim?.claimType || "";
+      const finalCreatedOn = createdOn || storedCreatedOn || claim?.createdOn || new Date().toLocaleDateString('en-GB');
+
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: storedReferenceNo || claim?.referenceNo,
-        claimType: storedClaimType || claim?.claimType,
-        createdOn: storedCreatedOn || claim?.createdOn,
+        referenceNo: finalReferenceNo,
+        claimType: finalClaimType,
+        createdOn: finalCreatedOn,
       }));
 
-      // Return the reference number for use in other functions
-      return storedReferenceNo || claim?.referenceNo;
+      console.log("Retrieved claim details:", {
+        referenceNo: finalReferenceNo,
+        claimType: finalClaimType,
+        createdOn: finalCreatedOn
+      });
+
+      return finalReferenceNo;
     } catch (error) {
       console.error("Error retrieving claim details:", error);
-      // Fallback to route params or defaults if SecureStore fails
+      const fallbackReferenceNo = referenceNo || claimNumber || claim?.referenceNo || "";
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: claim?.referenceNo,
-        claimType: claim?.claimType,
-        createdOn: claim?.createdOn,
+        referenceNo: fallbackReferenceNo,
+        claimType: claimType || claim?.claimType || "",
+        createdOn: createdOn || claim?.createdOn || new Date().toLocaleDateString('en-GB'),
       }));
-      return claim?.referenceNo;
+      return fallbackReferenceNo;
     } finally {
       updateLoadingState('claimDetails', false);
     }
   };
 
   // Retrieve beneficiary data from SecureStore
-  const retrieveBeneficiaryData = async (referenceNo) => {
-    try {
-      const storedEnteredBy = await SecureStore.getItemAsync("edit_enteredBy");
-      const storedRelationship = await SecureStore.getItemAsync(
-        "edit_relationship"
-      );
-      const storedIllness = await SecureStore.getItemAsync("edit_illness");
+  // Retrieve beneficiary data from SecureStore
+const retrieveBeneficiaryData = async (referenceNo) => {
+  try {
+    // First try to get from stored patient details (from NewClaim page)
+    const [storedPatientName, storedIllness, storedRelationship] = await Promise.all([
+      SecureStore.getItemAsync('stored_patient_name'),
+      SecureStore.getItemAsync('stored_illness_description'), 
+      SecureStore.getItemAsync('stored_relationship')
+    ]);
+    
+    // Fallback to edit-specific stored data
+    const [storedEnteredBy, storedEditRelationship, storedEditIllness] = await Promise.all([
+      SecureStore.getItemAsync("edit_enteredBy"),
+      SecureStore.getItemAsync("edit_relationship"),
+      SecureStore.getItemAsync("edit_illness")
+    ]);
 
-      // If we have stored beneficiary data, create a beneficiary object
-      if (storedEnteredBy && storedRelationship) {
-        // Fetch claim amount for this beneficiary
-        const claimAmount = await fetchClaimAmount(referenceNo);
+    // Use stored patient details first, then fallback to edit data
+    const finalPatientName = storedPatientName || storedEnteredBy;
+    const finalIllness = storedIllness || storedEditIllness;
+    const finalRelationship = storedRelationship || storedEditRelationship;
 
-        const beneficiary = {
-          id: "1",
-          name: storedEnteredBy,
-          relationship: storedRelationship,
-          illness: storedIllness || "",
-          amount: claimAmount, // Set amount from API
-        };
-        setBeneficiaries([beneficiary]);
-      } else {
-        // If no stored data, initialize with empty array
-        setBeneficiaries([]);
-      }
-    } catch (error) {
-      console.error("Error retrieving beneficiary data:", error);
+    // If we have patient data, create a beneficiary object
+    if (finalPatientName && finalRelationship) {
+      // Fetch claim amount for this beneficiary
+      const claimAmount = await fetchClaimAmount(referenceNo);
+
+      const beneficiary = {
+        id: "1",
+        name: finalPatientName,
+        relationship: finalRelationship,
+        illness: finalIllness || "",
+        amount: claimAmount, // Set amount from API
+      };
+      setBeneficiaries([beneficiary]);
+    } else {
+      // If no stored data, initialize with empty array
       setBeneficiaries([]);
-    } finally {
-      updateLoadingState('beneficiaryData', false);
     }
-  };
+  } catch (error) {
+    console.error("Error retrieving beneficiary data:", error);
+    setBeneficiaries([]);
+  } finally {
+    updateLoadingState('beneficiaryData', false);
+  }};
 
   // Fetch employee information
   const fetchEmployeeInfo = async () => {
@@ -571,6 +630,11 @@ const EditClaimIntimation = ({ route }) => {
 
   // Store claim details in SecureStore
   const storeClaimDetails = async () => {
+
+
+    console.log("Claim Type--------------------------------------------------------", await SecureStore.getItemAsync("stored_claim_type"));
+    setClaimType(await SecureStore.getItemAsync("stored_claim_type"));
+    setReferenceNo(await SecureStore.getItemAsync("stored_claim_seq_no"));
     try {
       // Method 1: Convert individual values to strings
       const referenceNo = claimDetails.referenceNo
@@ -586,6 +650,8 @@ const EditClaimIntimation = ({ route }) => {
       await SecureStore.setItemAsync("edit_referenceNo", referenceNo);
       await SecureStore.setItemAsync("edit_claimType", claimType);
       await SecureStore.setItemAsync("edit_createdOn", createdOn);
+
+      claimDetails.claimType = await SecureStore.getItemAsync("stored_claim_type");
     } catch (error) {
       console.error("Error storing claim details:", error);
     }
@@ -597,14 +663,14 @@ const EditClaimIntimation = ({ route }) => {
       try {
         // First retrieve stored claim details
         const referenceNo = await retrieveClaimDetails();
-        
+
         // Start all loading operations in parallel
         const loadingPromises = [
           retrieveBeneficiaryData(referenceNo),
           fetchEmployeeInfo(),
           storeClaimDetails(),
         ];
-        
+
         // Add document fetching if referenceNo is available
         if (referenceNo) {
           loadingPromises.push(fetchDocuments(referenceNo));
@@ -612,10 +678,10 @@ const EditClaimIntimation = ({ route }) => {
           // If no referenceNo, mark documents as loaded
           updateLoadingState('documents', false);
         }
-        
+
         // Wait for all operations to complete
         await Promise.all(loadingPromises);
-        
+
       } catch (error) {
         console.error("Error initializing component:", error);
         // Ensure loading screen disappears even on error
@@ -645,7 +711,7 @@ const EditClaimIntimation = ({ route }) => {
 
   // Navigate to UploadDocuments page
   const handleNavigateToUploadDocuments = () => {
-    navigation.navigate("UploadDocumentsSaved", {
+    navigation.navigate("UploadDocuments", {
       claim: claim,
       beneficiaries: beneficiaries,
       documents: documents,
@@ -752,7 +818,7 @@ const EditClaimIntimation = ({ route }) => {
   const handleDeleteDocument = (documentId) => {
     // Find the document to get its details
     const documentToDelete = documents.find(doc => doc.id === documentId);
-    
+
     if (!documentToDelete) {
       Alert.alert("Error", "Document not found.");
       return;
@@ -775,7 +841,7 @@ const EditClaimIntimation = ({ route }) => {
               if (documentToDelete.clmMemSeqNo) {
                 console.log('Deleting document from API:', documentToDelete);
                 await deleteDocumentFromAPI(documentToDelete);
-                
+
                 // Show success message
                 Alert.alert("Success", "Document deleted successfully from server.");
               }
@@ -791,10 +857,10 @@ const EditClaimIntimation = ({ route }) => {
 
             } catch (error) {
               console.error("Error deleting document:", error);
-              
+
               // Show error but still ask if user wants to remove locally
               Alert.alert(
-                "Delete Error", 
+                "Delete Error",
                 `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
                 [
                   { text: "Cancel", style: "cancel" },
@@ -865,10 +931,10 @@ const EditClaimIntimation = ({ route }) => {
             source={{ uri: imageUri }}
             style={styles.documentImage}
             resizeMode="cover"
-            onError={(error) => {}}
-            onLoad={() => {}}
-            onLoadStart={() => {}}
-            onLoadEnd={() => {}}
+            onError={(error) => { }}
+            onLoad={() => { }}
+            onLoadStart={() => { }}
+            onLoadEnd={() => { }}
           />
         </TouchableOpacity>
       );
@@ -885,14 +951,14 @@ const EditClaimIntimation = ({ route }) => {
   // Show loading screen while initializing
   if (initialLoading) {
     return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <LoadingScreen />
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -908,7 +974,7 @@ const EditClaimIntimation = ({ route }) => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Reference No</Text>
             <Text style={styles.colon}>:</Text>
-            <Text style={styles.detailValue}>{claimDetails.referenceNo}</Text>
+            <Text style={styles.detailValue}>{referenceNo2}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Entered By</Text>
@@ -925,7 +991,7 @@ const EditClaimIntimation = ({ route }) => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Claim Type</Text>
             <Text style={styles.colon}>:</Text>
-            <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
+            <Text style={styles.detailValue}>{claimTypes}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Created on</Text>
@@ -974,7 +1040,9 @@ const EditClaimIntimation = ({ route }) => {
                     </Text>
                   </View>
                 </View>
-                <View style={styles.beneficiaryActionIcons}></View>
+                <View style={styles.beneficiaryActionIcons}>
+                  
+                </View>
               </View>
             ))
           ) : (
@@ -993,8 +1061,9 @@ const EditClaimIntimation = ({ route }) => {
           </TouchableOpacity>
         </View>
 
+
         {/* Documents Section */}
-        <View style={styles.documentsSection}>
+        {/* <View style={styles.documentsSection}>
           {documentsLoading && !initialLoading ? (
             <View style={styles.loadingOverlay}>
               <View style={styles.loadingContainer}>
@@ -1045,7 +1114,7 @@ const EditClaimIntimation = ({ route }) => {
               <Text style={styles.noDocumentsText}>No documents found.</Text>
             </View>
           )}
-        </View>
+        </View> */}
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
@@ -1300,7 +1369,7 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </View>
       </Modal>
-      
+
       {/* Image Preview Modal */}
       <Modal
         visible={isImageModalVisible}

@@ -31,6 +31,11 @@ const UploadDocuments = ({ route }) => {
     memberNo = "",
     policyNo = "",
     patientData: initialPatientData = {},
+    // ADD THESE NEW PARAMETERS
+    claimId = "",
+    patientName = "",
+    illness = "",
+    claimType = "",
   } = route?.params || {};
 
   const patientData = route?.params?.patientData || {};
@@ -50,6 +55,10 @@ const UploadDocuments = ({ route }) => {
   const [storedReferenceNo, setStoredReferenceNo] = useState("");
   const [storedNic, setStoredNic] = useState("");
   const [selectedDocId, setSelectedDocId] = useState("");
+  const [storedPatientName, setStoredPatientName] = useState("");
+  const [storedClaimType, setStoredClaimType] = useState("");
+  const [storedIllness, setStoredIllness] = useState("");
+
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -121,18 +130,33 @@ const UploadDocuments = ({ route }) => {
       try {
         const referenceNo = await SecureStore.getItemAsync("stored_claim_seq_no");
         const nic = await SecureStore.getItemAsync("user_nic");
+        // LOAD ADDITIONAL STORED VALUES
+        const storedPatientNameFromStore = await SecureStore.getItemAsync("stored_patient_name");
+        const storedClaimTypeFromStore = await SecureStore.getItemAsync("stored_claim_type");
+        const storedIllnessFromStore = await SecureStore.getItemAsync("stored_illness_description");
 
         setStoredReferenceNo(referenceNo || "");
         setStoredNic(nic || "");
 
-        console.log("Loaded stored values:", { referenceNo, nic });
+        // SET VALUES FROM ROUTE PARAMS OR STORED VALUES
+        setStoredPatientName(patientName || storedPatientNameFromStore || "");
+        setStoredClaimType(claimType || storedClaimTypeFromStore || "");
+        setStoredIllness(illness || storedIllnessFromStore || "");
+
+        console.log("Loaded stored values:", {
+          referenceNo,
+          nic,
+          patientName: patientName || storedPatientNameFromStore,
+          claimType: claimType || storedClaimTypeFromStore,
+          illness: illness || storedIllnessFromStore
+        });
       } catch (error) {
         console.error("Error loading stored values:", error);
       }
     };
 
     loadStoredValues();
-  }, []);
+  }, [patientName, claimType, illness]);
 
   const formatDateForAPI = (date) => {
     const day = date.getDate().toString().padStart(2, "0");
@@ -747,22 +771,69 @@ const UploadDocuments = ({ route }) => {
         return;
       }
 
-      // All uploads successful
-      const documentInfo = {
-        patientData,
-        documents: uploadedDocuments,
-        uploadResults: results,
+      // All uploads successful - UPDATED TO PASS COMPREHENSIVE DATA
+      const claimData = {
+        referenceNo: storedReferenceNo,
+        enteredBy: storedPatientName || patientData.patientName || "Unknown",
+        status: "Submission for Approval Pending",
+        claimType: storedClaimType || patientData.claimType || "Unknown",
+        createdOn: new Date().toLocaleDateString('en-GB'),
+        // Add beneficiary data
+        beneficiaries: [{
+          id: "1",
+          name: storedPatientName || patientData.patientName || "Unknown",
+          relationship: "Self",
+          illness: storedIllness || patientData.illness || "",
+          amount: "0.00"
+        }],
+        // Add document data
+        documents: uploadedDocuments.map(doc => ({
+          id: doc.id,
+          type: getDocumentTypeLabel(doc.documentType),
+          date: doc.date,
+          amount: doc.amount,
+          documentType: doc.documentType,
+          uri: doc.uri,
+          imgContent: null
+        })),
+        // Metadata
+        metadata: {
+          userNic: storedNic,
+          totalDocuments: uploadedDocuments.length,
+          uploadTimestamp: new Date().toISOString(),
+        }
       };
 
-      console.log("All documents uploaded successfully:", documentInfo);
+      console.log("All documents uploaded successfully. Passing data:", claimData);
 
-      // Show success alert and navigate on OK
+      // Show success alert and navigate with comprehensive data
       Alert.alert("Success", "All documents uploaded successfully!", [
         {
           text: "OK",
           onPress: () => {
-            navigation.navigate("EditClaimIntimation1", {
-              submittedData: documentInfo,
+            navigation.navigate("EditClaimIntimation", {
+              claim: claimData,
+              // ENSURE THESE KEY PARAMETERS ARE PASSED EXPLICITLY
+              referenceNo: storedReferenceNo,
+              claimType: storedClaimType || patientData.claimType,
+              patientName: storedPatientName || patientData.patientName,
+              illness: storedIllness || patientData.illness,
+              claimId: claimId,
+              userNic: storedNic,
+              // Keep backward compatibility
+              submittedData: {
+                patientData: {
+                  ...patientData,
+                  patientName: storedPatientName || patientData.patientName,
+                  illness: storedIllness || patientData.illness,
+                  claimType: storedClaimType || patientData.claimType,
+                  referenceNo: storedReferenceNo,
+                  claimId: claimId,
+                },
+                documents: uploadedDocuments,
+                uploadResults: results,
+                metadata: claimData.metadata
+              },
             });
           },
         },
@@ -774,6 +845,23 @@ const UploadDocuments = ({ route }) => {
         "An unexpected error occurred while uploading documents. Please try again."
       );
     }
+  };
+
+
+
+  const handleAddDocumentButton = async () => {
+    // Log all the details that will be passed
+    console.log("Reference Number:", storedReferenceNo);
+    console.log("Patient Name:", storedPatientName || patientData.patientName);
+    console.log("Claim Type:", storedClaimType);
+    console.log("Illness:", storedIllness || patientData.illness);
+    console.log("User NIC:", storedNic);
+    console.log("Claim ID:", claimId);
+    console.log("Total Documents:", uploadedDocuments.length);
+    console.log("=====================================");
+
+    // Call the main function
+    await handleAddDocument();
   };
 
   const handleBackPress = () => {
@@ -883,7 +971,7 @@ const UploadDocuments = ({ route }) => {
                 style={[
                   styles.documentTypeOption,
                   selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                  styles.documentTypeSelected,
                 ]}
                 onPress={() => handleDocumentTypeSelect(type.id)}
               >
@@ -892,7 +980,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.radioButton,
                       selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                      styles.radioButtonSelected,
                     ]}
                   >
                     {selectedDocumentType === type.id && (
@@ -903,7 +991,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.documentTypeText,
                       selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                      styles.documentTypeTextSelected,
                     ]}
                   >
                     {type.label}
@@ -927,8 +1015,8 @@ const UploadDocuments = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.textInputError,
+              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+              styles.textInputError,
             ]}
             placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
             placeholderTextColor="#B0B0B0"
@@ -947,7 +1035,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                  styles.errorText,
+                styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1059,7 +1147,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1078,7 +1166,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1093,7 +1181,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1112,7 +1200,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1169,7 +1257,7 @@ const UploadDocuments = ({ route }) => {
         {/* Add Document Button */}
         <TouchableOpacity
           style={styles.addDocumentButton}
-          onPress={handleAddDocument}
+          onPress={handleAddDocumentButton}
         >
           <Text style={styles.addDocumentButtonText}>Add Document</Text>
         </TouchableOpacity>
@@ -1236,7 +1324,7 @@ const UploadDocuments = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                      editDocumentType.slice(1)
+                    editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1261,7 +1349,7 @@ const UploadDocuments = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                editDocumentType === "diagnosis" ? (
+                  editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
