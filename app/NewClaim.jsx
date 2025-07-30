@@ -161,7 +161,7 @@ const NewClaim = ({ onClose, onEditClaim }) => {
       try {
         setIsLoading(true); // Start loading
         setLoadingMembers(true);
-        
+
         const url = `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${encodeURIComponent(policyNo)}&memberNo=${encodeURIComponent(memberNo)}`;
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error(`Server responded ${res.status}`);
@@ -210,12 +210,14 @@ const NewClaim = ({ onClose, onEditClaim }) => {
         SecureStore.setItemAsync('stored_claim_type', claimType),
         SecureStore.setItemAsync('stored_patient_name', name),
         SecureStore.setItemAsync('stored_illness_description', illnessDesc),
+        // ADD THIS LINE TO RESET BENEFICIARY AMOUNT
+        SecureStore.setItemAsync('stored_beneficiary_amount', '0'),
       ];
-      
+
       if (clmSeqNo) {
         storePromises.push(SecureStore.setItemAsync('stored_claim_seq_no', clmSeqNo));
       }
-      
+
       await Promise.all(storePromises);
       console.log('Patient details stored successfully in SecureStore');
     } catch (error) {
@@ -279,7 +281,7 @@ const NewClaim = ({ onClose, onEditClaim }) => {
       }
 
       const data = await res.json();
-      
+
       // Fetch claim details using member number and store clmSeqNo
       const memberNumber = await SecureStore.getItemAsync('selected_member_number');
       if (memberNumber) {
@@ -296,7 +298,7 @@ const NewClaim = ({ onClose, onEditClaim }) => {
           console.warn('Failed to fetch or store claim details:', error);
         }
       }
-      
+
       if (onClose) onClose();
       router.push({
         pathname: '/UploadDocuments',
@@ -413,11 +415,11 @@ const NewClaim = ({ onClose, onEditClaim }) => {
         </View>
       )}
 
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView} 
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -606,16 +608,16 @@ const styles = StyleSheet.create({
     shadowRadius: 25,
     elevation: 10,
   },
-  inputContainer: { 
+  inputContainer: {
     marginBottom: 25,
   },
-  inputLabel: { 
-    fontSize: 15, 
-    fontWeight: '500', 
-    color: '#2E7D7D', 
-    marginBottom: 10 
+  inputLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#2E7D7D',
+    marginBottom: 10
   },
-  inputWrapper: { 
+  inputWrapper: {
     position: 'relative',
     zIndex: 1000,
   },
@@ -632,20 +634,20 @@ const styles = StyleSheet.create({
   multilineInput: {
     height: 80,
   },
-  textInputError: { 
-    borderColor: '#FF6B6B', 
-    borderWidth: 2 
+  textInputError: {
+    borderColor: '#FF6B6B',
+    borderWidth: 2
   },
-  dropdownSelectInput: { 
-    justifyContent: 'center', 
-    paddingRight: 50 
+  dropdownSelectInput: {
+    justifyContent: 'center',
+    paddingRight: 50
   },
-  dropdownSelectText: { 
-    fontSize: 15, 
-    color: '#333' 
+  dropdownSelectText: {
+    fontSize: 15,
+    color: '#333'
   },
-  placeholderText: { 
-    color: '#B0B0B0' 
+  placeholderText: {
+    color: '#B0B0B0'
   },
   dropdownButton: {
     position: 'absolute',
@@ -696,30 +698,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 15
   },
-  dropdownMemberInfo: { 
-    flex: 1 
+  dropdownMemberInfo: {
+    flex: 1
   },
-  dropdownMemberName: { 
-    fontSize: 14, 
-    fontWeight: '500', 
-    color: '#333' 
+  dropdownMemberName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333'
   },
-  dropdownMemberRelationship: { 
-    fontSize: 12, 
-    color: '#666', 
-    marginTop: 2 
+  dropdownMemberRelationship: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2
   },
-  errorText: { 
-    color: '#FF6B6B', 
-    fontSize: 12, 
-    marginTop: 5, 
-    marginLeft: 5 
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5
   },
-  claimTypeGrid: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    flexWrap: 'wrap', 
-    marginTop: 10 
+  claimTypeGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginTop: 10
   },
   claimTypeButton: {
     width: '22%',
@@ -732,33 +734,33 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E8E8E8',
   },
-  selectedClaimType: { 
-    backgroundColor: '#00C4CC', 
-    borderColor: '#00C4CC' 
+  selectedClaimType: {
+    backgroundColor: '#00C4CC',
+    borderColor: '#00C4CC'
   },
-  disabledClaimType: { 
-    backgroundColor: '#F0F0F0', 
-    borderColor: '#D0D0D0', 
-    opacity: 0.6 
+  disabledClaimType: {
+    backgroundColor: '#F0F0F0',
+    borderColor: '#D0D0D0',
+    opacity: 0.6
   },
-  claimTypeIcon: { 
-    fontSize: 20, 
-    marginBottom: 5 
+  claimTypeIcon: {
+    fontSize: 20,
+    marginBottom: 5
   },
-  disabledIcon: { 
-    opacity: 0.5 
+  disabledIcon: {
+    opacity: 0.5
   },
-  claimTypeLabel: { 
-    fontSize: 11, 
-    color: '#666', 
-    fontWeight: '500', 
-    textAlign: 'center' 
+  claimTypeLabel: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center'
   },
-  selectedClaimTypeLabel: { 
-    color: '#fff' 
+  selectedClaimTypeLabel: {
+    color: '#fff'
   },
-  disabledClaimTypeLabel: { 
-    color: '#999' 
+  disabledClaimTypeLabel: {
+    color: '#999'
   },
   nextButton: {
     backgroundColor: '#00C4CC',
@@ -771,11 +773,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  nextButtonText: { 
-    color: '#fff', 
-    fontSize: 16, 
-    fontWeight: '600', 
-    textAlign: 'center' 
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center'
   },
 });
 
