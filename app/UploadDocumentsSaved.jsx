@@ -7,9 +7,9 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
+  Animated,
   Dimensions,
   Image,
   Modal,
@@ -24,6 +24,132 @@ import {
 
 import { API_BASE_URL } from "../constants/index.js";
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
+// Custom Popup Component
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={showConfirmButton ? undefined : onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const UploadDocumentsSaved = ({ route }) => {
   const navigation = useNavigation();
@@ -52,6 +178,16 @@ const UploadDocumentsSaved = ({ route }) => {
   const [selectedDocId, setSelectedDocId] = useState("");
   const [storedDocAmount, setStoredDocAmount] = useState(0);
 
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
+
   // Sample images with local image sources
   const [sampleImages] = useState([
     {
@@ -71,12 +207,34 @@ const UploadDocumentsSaved = ({ route }) => {
     },
   ]);
 
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
+
   // Fetch document types from API
   useEffect(() => {
     const fetchDocumentTypes = async () => {
       try {
         setLoading(true);
-        // You can make this dynamic based on request type if needed
         const response = await fetch(
           `${API_BASE_URL}/RequiredDocumentsCon/Outdoor`
         );
@@ -86,8 +244,6 @@ const UploadDocumentsSaved = ({ route }) => {
         }
 
         const data = await response.json();
-
-        // Transform API response to match the expected format
         const transformedDocumentTypes = data.map((doc) => ({
           id: doc.docId,
           label: doc.docDesc,
@@ -97,9 +253,10 @@ const UploadDocumentsSaved = ({ route }) => {
         setDocumentTypes(transformedDocumentTypes);
       } catch (error) {
         console.error("Error fetching document types:", error);
-        Alert.alert(
+        showPopup(
           "Error",
-          "Failed to load document types. Please try again."
+          "Failed to load document types. Please try again.",
+          "error"
         );
 
         // Fallback to hardcoded types if API fails
@@ -117,7 +274,6 @@ const UploadDocumentsSaved = ({ route }) => {
     fetchDocumentTypes();
   }, []);
 
-  // In the useEffect where you load stored values, update it to:
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
@@ -129,10 +285,8 @@ const UploadDocumentsSaved = ({ route }) => {
 
         setStoredReferenceNo(referenceNo || "");
         setStoredNic(nic || "");
-
-        // Parse docamount and store it in a new state variable
         const parsedDocAmount = parseFloat(docamount) || 0;
-        setStoredDocAmount(parsedDocAmount); // Add this new state variable
+        setStoredDocAmount(parsedDocAmount);
 
         console.log("Loaded stored values:", {
           referenceNo,
@@ -151,14 +305,12 @@ const UploadDocumentsSaved = ({ route }) => {
   const formatDateForAPI = (date) => {
     const day = date.getDate().toString().padStart(2, "0");
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits
+    const year = date.getFullYear().toString().slice(-2);
     return `${day}-${month}-${year}`;
   };
 
   const createFormDataForDocument = async (document) => {
     const formData = new FormData();
-
-    // Add the image file
     const fileUri = document.uri;
     const fileName = document.name;
     const fileType = document.type || "image/jpeg";
@@ -169,7 +321,6 @@ const UploadDocumentsSaved = ({ route }) => {
       name: fileName,
     });
 
-    // Add other required fields
     formData.append("ClmSeqNo", storedReferenceNo);
     formData.append("DocType", document.documentType);
     formData.append("ImgName", fileName);
@@ -183,7 +334,6 @@ const UploadDocumentsSaved = ({ route }) => {
     return formData;
   };
 
-  // Helper function to get appropriate icon for document type
   const getIconForDocType = (docDesc) => {
     switch (docDesc.toUpperCase()) {
       case "BILL":
@@ -200,11 +350,11 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const handleDocumentTypeSelect = (type) => {
-    // Prevent selection of O01 (BILL) if docamount > 0
     if (type === "O01" && storedDocAmount > 0) {
-      Alert.alert(
+      showPopup(
         "Document Type Unavailable",
-        "Bill type is not available when there is an existing document amount."
+        "Bill type is not available when there is an existing document amount.",
+        "warning"
       );
       return;
     }
@@ -213,7 +363,6 @@ const UploadDocumentsSaved = ({ route }) => {
     setSelectedDocId(type);
     console.log("Selected document type ID:", type);
 
-    // Set amount based on document type
     if (type === "O02" || type === "O03") {
       setAmount("0.00");
     } else if (type === "O01") {
@@ -241,24 +390,17 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const handleAmountChange = (text) => {
-    // If document type is prescription or diagnosis, don't allow editing
     if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return;
     }
 
-    // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
 
-    // Format the amount
     let formattedAmount = cleanedText;
-
-    // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
@@ -268,34 +410,28 @@ const UploadDocumentsSaved = ({ route }) => {
     setAmount(formattedAmount);
   };
 
-  // Add image compression function
   const compressImage = async (imageUri) => {
     try {
-      // Get file info to check size
       const fileInfo = await FileSystem.getInfoAsync(imageUri);
       const fileSizeInMB = fileInfo.size / (1024 * 1024);
 
       console.log(`Original image size: ${fileSizeInMB.toFixed(2)} MB`);
 
-      // If image is already less than 1MB, return as is
       if (fileSizeInMB < 1) {
         console.log("Image is already under 1MB, no compression needed");
         return imageUri;
       }
 
-      // If image is larger than 5MB, show error
       if (fileSizeInMB > 5) {
-        Alert.alert(
+        showPopup(
           "File Too Large",
-          "Image size cannot exceed 5MB. Please select a smaller image."
+          "Image size cannot exceed 5MB. Please select a smaller image.",
+          "error"
         );
         return null;
       }
 
-      // Compress image to target 1MB
-      let compress = 0.8; // Start with 80% quality
-
-      // Calculate compression based on file size
+      let compress = 0.8;
       if (fileSizeInMB > 3) {
         compress = 0.3;
       } else if (fileSizeInMB > 2) {
@@ -306,10 +442,7 @@ const UploadDocumentsSaved = ({ route }) => {
 
       const compressedImage = await ImageManipulator.manipulateAsync(
         imageUri,
-        [
-          // Resize if image is too large
-          { resize: { width: 1200 } }, // Resize to max width of 1200px
-        ],
+        [{ resize: { width: 1200 } }],
         {
           compress: compress,
           format: ImageManipulator.SaveFormat.JPEG,
@@ -317,7 +450,6 @@ const UploadDocumentsSaved = ({ route }) => {
         }
       );
 
-      // Check compressed file size
       const compressedFileInfo = await FileSystem.getInfoAsync(
         compressedImage.uri
       );
@@ -328,30 +460,27 @@ const UploadDocumentsSaved = ({ route }) => {
       return compressedImage.uri;
     } catch (error) {
       console.error("Error compressing image:", error);
-      Alert.alert("Error", "Failed to compress image. Please try again.");
+      showPopup(
+        "Error",
+        "Failed to compress image. Please try again.",
+        "error"
+      );
       return null;
     }
   };
 
   const handleEditAmountChange = (text) => {
-    // If document type is prescription or diagnosis, don't allow editing
     if (editDocumentType === "O02" || editDocumentType === "O03") {
       return;
     }
 
-    // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
 
-    // Format the amount
     let formattedAmount = cleanedText;
-
-    // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
@@ -362,12 +491,10 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const validateAmount = (amountString) => {
-    // For prescription and diagnosis, 0.00 is valid
     if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return true;
     }
 
-    // For bill type, amount must be greater than 0
     if (selectedDocumentType === "O01") {
       if (!amountString || amountString.trim() === "") {
         return false;
@@ -381,7 +508,6 @@ const UploadDocumentsSaved = ({ route }) => {
       return true;
     }
 
-    // For other types, any valid number is acceptable
     if (!amountString || amountString.trim() === "") {
       return false;
     }
@@ -403,42 +529,43 @@ const UploadDocumentsSaved = ({ route }) => {
     return amount.toFixed(2);
   };
 
-  // FIXED: Check if maximum documents reached based on document type
   const canAddMoreDocuments = () => {
     if (selectedDocumentType === "O01") {
-      // BILL
-      // Count only bill-type documents
       const billDocuments = uploadedDocuments.filter(
         (doc) => doc.documentType === "O01"
       );
-      return billDocuments.length < 1; // Only 1 bill document allowed
+      return billDocuments.length < 1;
     }
-    return true; // No limit for other document types
+    return true;
   };
 
   const handleBrowseFiles = async () => {
-    // Add validation for document type
     if (!selectedDocumentType) {
-      Alert.alert("Validation Error", "Please select a document type first");
+      showPopup(
+        "Validation Error",
+        "Please select a document type first",
+        "warning"
+      );
       return;
     }
 
-    // Add validation for bill amount
     if (
       selectedDocumentType === "O01" &&
       (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
     ) {
-      Alert.alert(
+      showPopup(
         "Validation Error",
-        "Please enter a valid amount greater than 0 for Bill type"
+        "Please enter a valid amount greater than 0 for Bill type",
+        "warning"
       );
       return;
     }
 
     if (!canAddMoreDocuments()) {
-      Alert.alert(
+      showPopup(
         "Document Limit",
-        "You can only upload 1 document for Bill type."
+        "You can only upload 1 document for Bill type.",
+        "warning"
       );
       return;
     }
@@ -451,24 +578,20 @@ const UploadDocumentsSaved = ({ route }) => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-
         let finalUri = file.uri;
 
-        // If it's an image, compress it
         if (file.mimeType && file.mimeType.startsWith("image/")) {
           const compressedUri = await compressImage(file.uri);
           if (!compressedUri) {
-            return; // Compression failed or file too large
+            return;
           }
           finalUri = compressedUri;
         }
 
-        // Get document type label for custom name
         const docTypeLabel =
           documentTypes.find((type) => type.id === selectedDocumentType)
             ?.label || selectedDocumentType;
 
-        // Generate custom name based on document type
         const fileExtension = file.name.split(".").pop();
         const customName = `${docTypeLabel}.${fileExtension}`;
 
@@ -484,42 +607,53 @@ const UploadDocumentsSaved = ({ route }) => {
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
 
-        // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
 
-        Alert.alert("Success", "Document uploaded successfully!");
+        showPopup(
+          "Success",
+          "Document uploaded successfully!",
+          "success"
+        );
       }
     } catch (error) {
       console.error("Error picking document:", error);
-      Alert.alert("Error", "Failed to pick document");
+      showPopup(
+        "Error",
+        "Failed to pick document",
+        "error"
+      );
     }
   };
 
   const handleTakePhoto = async () => {
-    // Add validation for document type
     if (!selectedDocumentType) {
-      Alert.alert("Validation Error", "Please select a document type first");
+      showPopup(
+        "Validation Error",
+        "Please select a document type first",
+        "warning"
+      );
       return;
     }
 
-    // Add validation for bill amount
     if (
       selectedDocumentType === "O01" &&
       (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
     ) {
-      Alert.alert(
+      showPopup(
         "Validation Error",
-        "Please enter a valid amount greater than 0 for Bill type"
+        "Please enter a valid amount greater than 0 for Bill type",
+        "warning"
       );
       return;
     }
 
     if (!canAddMoreDocuments()) {
-      Alert.alert(
+      showPopup(
         "Document Limit",
-        "You can only upload 1 document for Bill type."
+        "You can only upload 1 document for Bill type.",
+        "warning"
       );
       return;
     }
@@ -527,9 +661,10 @@ const UploadDocumentsSaved = ({ route }) => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
+        showPopup(
           "Permission Required",
-          "Camera permission is required to take photos"
+          "Camera permission is required to take photos",
+          "warning"
         );
         return;
       }
@@ -543,23 +678,23 @@ const UploadDocumentsSaved = ({ route }) => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const photo = result.assets[0];
 
-        Alert.alert(
+        showPopup(
           "Processing Image",
-          "Please wait while we optimize your image..."
+          "Please wait while we optimize your image...",
+          "info"
         );
 
-        // Compress the captured photo
         const compressedUri = await compressImage(photo.uri);
         if (!compressedUri) {
-          return; // Compression failed or file too large
+          return;
         }
 
-        // Get document type label for custom name
+        hidePopup(); // Hide the processing message
+
         const docTypeLabel =
           documentTypes.find((type) => type.id === selectedDocumentType)
             ?.label || selectedDocumentType;
 
-        // Generate custom name based on document type
         const customName = `${docTypeLabel}.jpg`;
 
         const newDocument = {
@@ -574,48 +709,60 @@ const UploadDocumentsSaved = ({ route }) => {
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
 
-        // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
 
-        Alert.alert("Success", "Photo captured and uploaded successfully!");
+        showPopup(
+          "Success",
+          "Photo captured and uploaded successfully!",
+          "success"
+        );
       }
     } catch (error) {
       console.error("Error taking photo:", error);
-      Alert.alert("Error", "Failed to take photo");
+      showPopup(
+        "Error",
+        "Failed to take photo",
+        "error"
+      );
     }
   };
 
   const handleRemoveDocument = (documentId) => {
-    Alert.alert(
+    showPopup(
       "Delete Document",
       "Are you sure you want to delete this document? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setUploadedDocuments((prev) =>
-              prev.filter((doc) => doc.id !== documentId)
-            );
-            Alert.alert("Success", "Document deleted successfully.");
-          },
-        },
-      ]
+      "warning",
+      true,
+      () => {
+        setUploadedDocuments((prev) =>
+          prev.filter((doc) => doc.id !== documentId)
+        );
+        hidePopup();
+        showPopup(
+          "Success",
+          "Document deleted successfully.",
+          "success"
+        );
+      }
     );
   };
 
   const handleSaveEdit = () => {
     if (!validateEditAmount(editAmount)) {
       if (editDocumentType === "O01") {
-        Alert.alert(
+        showPopup(
           "Validation Error",
-          "Please enter a valid amount greater than 0 for Bill type"
+          "Please enter a valid amount greater than 0 for Bill type",
+          "warning"
         );
       } else {
-        Alert.alert("Validation Error", "Please enter a valid amount");
+        showPopup(
+          "Validation Error",
+          "Please enter a valid amount",
+          "warning"
+        );
       }
       return;
     }
@@ -632,16 +779,18 @@ const UploadDocumentsSaved = ({ route }) => {
     setEditingDocument(null);
     setEditAmount("");
     setEditDocumentType("");
-    Alert.alert("Success", "Document details updated successfully.");
+    showPopup(
+      "Success",
+      "Document details updated successfully.",
+      "success"
+    );
   };
 
   const validateEditAmount = (amountString) => {
-    // For prescription and diagnosis, 0.00 is valid
     if (editDocumentType === "O02" || editDocumentType === "O03") {
       return true;
     }
 
-    // For bill type, amount must be greater than 0
     if (editDocumentType === "O01") {
       if (!amountString || amountString.trim() === "") {
         return false;
@@ -655,7 +804,6 @@ const UploadDocumentsSaved = ({ route }) => {
       return true;
     }
 
-    // For other types, any valid number is acceptable
     if (!amountString || amountString.trim() === "") {
       return false;
     }
@@ -697,19 +845,21 @@ const UploadDocumentsSaved = ({ route }) => {
     }
   };
 
-  // Add this updated handleAddDocument function to your UploadDocumentsSaved component
-
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
-      Alert.alert("Validation Error", "Please upload at least one document");
+      showPopup(
+        "Validation Error",
+        "Please upload at least one document",
+        "warning"
+      );
       return;
     }
 
-    // Validate stored values
     if (!storedReferenceNo || !storedNic) {
-      Alert.alert(
+      showPopup(
         "Error",
-        "Missing required information. Please ensure you have a valid reference number and user identification."
+        "Missing required information. Please ensure you have a valid reference number and user identification.",
+        "error"
       );
       return;
     }
@@ -730,15 +880,19 @@ const UploadDocumentsSaved = ({ route }) => {
     });
 
     if (invalidDocuments.length > 0) {
-      Alert.alert(
+      showPopup(
         "Validation Error",
-        "Some uploaded documents have invalid information. Please check and re-upload if necessary."
+        "Some uploaded documents have invalid information. Please check and re-upload if necessary.",
+        "warning"
       );
       return;
     }
 
-    // Show loading alert
-    Alert.alert("Uploading", "Please wait while we upload your documents...");
+    showPopup(
+      "Uploading",
+      "Please wait while we upload your documents...",
+      "info"
+    );
 
     try {
       const uploadPromises = uploadedDocuments.map((doc) =>
@@ -746,26 +900,18 @@ const UploadDocumentsSaved = ({ route }) => {
       );
       const results = await Promise.all(uploadPromises);
 
-      // Check if all uploads were successful
       const failedUploads = results.filter((result) => !result.success);
 
       if (failedUploads.length > 0) {
-        Alert.alert(
+        hidePopup();
+        showPopup(
           "Upload Error",
           `Failed to upload ${failedUploads.length} document(s). Please try again.`,
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                console.error("Failed uploads:", failedUploads);
-              },
-            },
-          ]
+          "error"
         );
         return;
       }
 
-      // All uploads successful
       const documentInfo = {
         patientData,
         documents: uploadedDocuments,
@@ -774,22 +920,25 @@ const UploadDocumentsSaved = ({ route }) => {
 
       console.log("All documents uploaded successfully:", documentInfo);
 
-      // Show success alert and go back to previous screen
-      Alert.alert("Success", "All documents uploaded successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            // Set a flag before going back
-            navigation.setParams({ fromUploadDocuments: true });
-            navigation.goBack();
-          },
-        },
-      ]);
+      hidePopup();
+      showPopup(
+        "Success",
+        "All documents uploaded successfully!",
+        "success",
+        false,
+        () => {
+          hidePopup();
+          navigation.setParams({ fromUploadDocuments: true });
+          navigation.goBack();
+        }
+      );
     } catch (error) {
       console.error("Error during document upload:", error);
-      Alert.alert(
+      hidePopup();
+      showPopup(
         "Error",
-        "An unexpected error occurred while uploading documents. Please try again."
+        "An unexpected error occurred while uploading documents. Please try again.",
+        "error"
       );
     }
   };
@@ -803,13 +952,11 @@ const UploadDocumentsSaved = ({ route }) => {
     }
   };
 
-  // Handle image popup
   const handleImagePress = (image) => {
     setSelectedImage(image);
     setShowImagePopup(true);
   };
 
-  // Handle document image popup
   const handleDocumentImagePress = (document) => {
     if (document.type?.startsWith("image/")) {
       setSelectedImage({
@@ -825,7 +972,6 @@ const UploadDocumentsSaved = ({ route }) => {
     setSelectedImage(null);
   };
 
-  // FIXED: Get upload instruction text based on document type
   const getUploadInstructionText = () => {
     if (selectedDocumentType === "O01") {
       const billDocuments = uploadedDocuments.filter(
@@ -839,7 +985,6 @@ const UploadDocumentsSaved = ({ route }) => {
     return `You can upload multiple documents for this type (${currentTypeDocuments.length} uploaded)`;
   };
 
-  // Check if amount field should be editable
   const isAmountEditable = () => {
     return selectedDocumentType !== "O02" && selectedDocumentType !== "O03";
   };
@@ -848,7 +993,6 @@ const UploadDocumentsSaved = ({ route }) => {
     return editDocumentType !== "O02" && editDocumentType !== "O03";
   };
 
-  // Get document type label by ID
   const getDocumentTypeLabel = (docId) => {
     const docType = documentTypes.find((type) => type.id === docId);
     return docType ? docType.label : docId;
@@ -905,7 +1049,7 @@ const UploadDocumentsSaved = ({ route }) => {
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
                       styles.documentTypeSelected,
-                    isDisabled && styles.documentTypeDisabled, // Add this style
+                    isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
                   disabled={isDisabled}
@@ -916,7 +1060,7 @@ const UploadDocumentsSaved = ({ route }) => {
                         styles.radioButton,
                         selectedDocumentType === type.id &&
                           styles.radioButtonSelected,
-                        isDisabled && styles.radioButtonDisabled, // Add this style
+                        isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
                       {selectedDocumentType === type.id && (
@@ -928,7 +1072,7 @@ const UploadDocumentsSaved = ({ route }) => {
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
                           styles.documentTypeTextSelected,
-                        isDisabled && styles.documentTypeTextDisabled, // Add this style
+                        isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
                       {type.label}
@@ -1004,7 +1148,7 @@ const UploadDocumentsSaved = ({ route }) => {
               is24Hour={true}
               display="default"
               onChange={handleDateChange}
-              maximumDate={new Date()} // Prevent future dates
+              maximumDate={new Date()}
             />
           )}
         </View>
@@ -1053,7 +1197,6 @@ const UploadDocumentsSaved = ({ route }) => {
                 Allowed formats: JPG, JPEG, TIFF, PNG
               </Text>
 
-              {/* Upload instruction based on document type */}
               <Text
                 style={[
                   styles.sectionSubtitle,
@@ -1151,14 +1294,13 @@ const UploadDocumentsSaved = ({ route }) => {
           )}
         </View>
 
-        {/* Uploaded Documents List - Show after document type selection */}
+        {/* Uploaded Documents List */}
         {uploadedDocuments.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Uploaded Documents</Text>
             <View style={styles.uploadedDocuments}>
               {uploadedDocuments.map((doc) => (
                 <View key={doc.id} style={styles.documentItem}>
-                  {/* Show image thumbnail if it's an image */}
                   {doc.type?.startsWith("image/") && (
                     <TouchableOpacity
                       onPress={() => handleDocumentImagePress(doc)}
@@ -1316,6 +1458,17 @@ const UploadDocumentsSaved = ({ route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={popup.onConfirm || hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </LinearGradient>
   );
 };
@@ -1357,6 +1510,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#13646D",
   },
   patientInfoCard: {
     backgroundColor: "#fff",
@@ -1417,6 +1579,9 @@ const styles = StyleSheet.create({
   documentTypeSelected: {
     // Additional styling for selected state if needed
   },
+  documentTypeDisabled: {
+    opacity: 0.5,
+  },
   radioContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1434,6 +1599,9 @@ const styles = StyleSheet.create({
   radioButtonSelected: {
     borderColor: "#00C4CC",
   },
+  radioButtonDisabled: {
+    borderColor: "#ccc",
+  },
   radioButtonInner: {
     width: 10,
     height: 10,
@@ -1447,6 +1615,9 @@ const styles = StyleSheet.create({
   documentTypeTextSelected: {
     color: "#00C4CC",
     fontWeight: "500",
+  },
+  documentTypeTextDisabled: {
+    color: "#ccc",
   },
   inputLabel: {
     fontSize: 15,
@@ -1629,11 +1800,30 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 2,
   },
+  documentType: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 2,
+  },
+  documentAmount: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#00C4CC",
+    marginBottom: 2,
+  },
+  documentDate: {
+    fontSize: 12,
+    color: "#888",
+  },
   documentSize: {
     fontSize: 12,
     color: "#888",
   },
   removeButton: {
+    padding: 5,
+  },
+  deleteButton: {
     padding: 5,
   },
   addDocumentButton: {
@@ -1701,11 +1891,197 @@ const styles = StyleSheet.create({
     color: "#ccc",
     textAlign: "center",
   },
-  documentTypeDisabled: {
-    opacity: 0.5,
+  // Edit Modal styles
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  radioButtonDisabled: {
-    borderColor: "#ccc",
+  editModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    width: screenWidth * 0.9,
+    maxHeight: screenHeight * 0.8,
+  },
+  editModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  editModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#13646D",
+  },
+  editModalCloseButton: {
+    padding: 5,
+  },
+  editModalBody: {
+    marginBottom: 20,
+  },
+  editSection: {
+    marginBottom: 15,
+  },
+  editLabel: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#13646D",
+    marginBottom: 10,
+  },
+  editValue: {
+    fontSize: 15,
+    color: "#333",
+    backgroundColor: "#F5F5F5",
+    padding: 15,
+    borderRadius: 10,
+  },
+  editInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    fontSize: 15,
+    color: "#333",
+  },
+  editInputDisabled: {
+    backgroundColor: "#F5F5F5",
+    color: "#888",
+  },
+  editHelpText: {
+    color: "#666",
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
+  },
+  editModalFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  editCancelButton: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: "center",
+  },
+  editCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  editSaveButton: {
+    flex: 1,
+    backgroundColor: "#00C4CC",
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: "center",
+  },
+  editSaveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  // Popup Styles
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: screenWidth * 0.85,
+    minWidth: screenWidth * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#00C4CC",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#00C4CC",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
