@@ -34,7 +34,7 @@ export default function PolicyHome({ route }) {
   const [policyDetails, setPolicyDetails] = useState(null);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
   const [showPolicySelection, setShowPolicySelection] = useState(false);
-  const [policySelectSlideAnim] = useState(new Animated.Value(screenHeight));
+  const [policySelectSlideAnim] = useState(new Animated.Value(1000)); 
   const [selectedPolicyNumber, setSelectedPolicyNumber] = useState(null);
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [dependents, setDependents] = useState([]);

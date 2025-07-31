@@ -4,7 +4,7 @@
     "slug": "SLIC-SHE-Application",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/general.jpg",
+    "icon": "./assets/images/general.png",
     "scheme": "slicsheapplication",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,8 +13,12 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/general.jpg",
+        "foregroundImage": "./assets/images/general.png",
         "backgroundColor": "#ffffff"
+      },
+      "ios": {
+        "supportsTablet": true,
+        "icon": "./assets/images/general.png"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.SLICSHEApplication"
