@@ -441,7 +441,7 @@ function LoginRequestOTPContent() {
           styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
-            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0,
+            // marginBottom: isKeyboardVisible ? keyboardHeight - 500 : 0,
           },
         ]}
       >
