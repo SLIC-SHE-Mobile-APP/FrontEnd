@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
@@ -98,6 +98,14 @@ const EditClaimIntimation1 = ({ route }) => {
     date: "",
     amount: "",
   });
+
+  // Helper function to format amount to 2 decimal places
+  const formatAmount = (amount) => {
+    if (!amount || isNaN(parseFloat(amount))) {
+      return "0.00";
+    }
+    return parseFloat(amount).toFixed(2);
+  };
 
   // Helper function to update loading states
   const updateLoadingState = (key, value) => {
@@ -413,18 +421,18 @@ const EditClaimIntimation1 = ({ route }) => {
       const result = await response.json();
 
       if (result.success && result.data && Array.isArray(result.data)) {
-        // Transform API data to match component structure without image processing
+        // Transform API data to match component structure WITH image content storage
         const transformedDocuments = result.data.map((doc, index) => {
           return {
             id: doc.clmMemSeqNo || `doc_${index}`,
             clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API and image loading
             type: doc.docType || "Unknown",
             date: formatDate(doc.docDate),
-            amount: doc.docAmount ? doc.docAmount.toString() : "0.00",
+            amount: formatAmount(doc.docAmount), // Format amount with 2 decimal places
             imagePath: doc.imagePath || "0",
-            hasImage: doc.imgContent && doc.imgContent.length > 0, // Check if document has image content
-            imageLoaded: false, // Track if image has been loaded
-            imgContent: null, // Will be populated when user clicks to view
+            hasImage: doc.imgContent && doc.imgContent.length > 0,
+            imageLoaded: false,
+            imgContent: doc.imgContent || null, // Store original image content for API calls
           };
         });
 
@@ -440,13 +448,11 @@ const EditClaimIntimation1 = ({ route }) => {
         referenceNo: referenceNo,
       });
 
-      // Show user-friendly error message
       Alert.alert(
         "Documents Loading Error",
         `Unable to fetch documents. Error: ${error.message}`
       );
 
-      // Set empty documents array as fallback
       setDocuments([]);
     } finally {
       setDocumentsLoading(false);
@@ -545,9 +551,7 @@ const EditClaimIntimation1 = ({ route }) => {
 
       const data = await response.json();
 
-      const formattedAmount = data.claimAmount
-        ? `${data.claimAmount}.00`
-        : "0.00";
+      const formattedAmount = formatAmount(data.claimAmount); // Format with 2 decimal places
 
       return formattedAmount;
     } catch (error) {
@@ -747,7 +751,7 @@ const EditClaimIntimation1 = ({ route }) => {
           name: storedEnteredBy,
           relationship: storedRelationship,
           illness: storedIllness || "",
-          amount: claimAmount, // Set amount from API
+          amount: claimAmount, // Set formatted amount from API
         };
 
         setBeneficiaries([beneficiary]);
@@ -818,6 +822,45 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
+  // Submit final claim API function
+  const submitFinalClaim = async (referenceNo) => {
+    try {
+      console.log("Submitting final claim:", referenceNo);
+
+      const requestBody = {
+        claimSeqNo: referenceNo,
+      };
+
+      console.log("Submit final claim request data:", requestBody);
+
+      const response = await fetch(
+        `${API_BASE_URL}/FinalClaimSub/submitfinalclaim`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Submit Final Claim API Error Response:", errorText);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Submit final claim API response:", result);
+      return result;
+    } catch (error) {
+      console.error("Error submitting final claim:", error);
+      throw error;
+    }
+  };
+
   // useEffect to fetch employee info and retrieve claim details on component mount
   useEffect(() => {
     const initializeComponent = async () => {
@@ -868,13 +911,25 @@ const EditClaimIntimation1 = ({ route }) => {
         if (!initialLoading) {
           console.log("Fetching documents on focus");
           const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-          if (referenceNo) {
-            setDocumentsLoading(true);
-            await fetchDocuments(referenceNo);
 
-            // ADD THIS: Refresh claim amount when returning from upload screen
-            console.log("Refreshing claim amount after navigation...");
-            await refreshClaimAmount();
+          // Check if reference number exists and is not empty
+          if (referenceNo && referenceNo !== "") {
+            setDocumentsLoading(true);
+
+            try {
+              await fetchDocuments(referenceNo);
+
+              // Only refresh claim amount if documents fetch was successful
+              console.log("Refreshing claim amount after navigation...");
+              await refreshClaimAmount();
+            } catch (error) {
+              console.error("Error fetching documents on focus:", error);
+              setDocumentsLoading(false);
+            }
+          } else {
+            console.log(
+              "No valid reference number found, skipping document fetch"
+            );
           }
         }
       };
@@ -938,7 +993,7 @@ const EditClaimIntimation1 = ({ route }) => {
       const newBeneficiaryData = {
         id: Date.now().toString(),
         ...newBeneficiary,
-        amount: claimAmount, // Set amount from API
+        amount: claimAmount, // Set formatted amount from API
       };
 
       setBeneficiaries((prev) => [...prev, newBeneficiaryData]);
@@ -984,24 +1039,236 @@ const EditClaimIntimation1 = ({ route }) => {
     setDropdownVisible(false);
   };
 
+  const updateIntimationAPI = async (beneficiaryData) => {
+    try {
+      console.log("Updating intimation via API:", beneficiaryData);
+
+      // Get required data from SecureStore
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
+      const storedMobile = await SecureStore.getItemAsync("user_mobile");
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+
+      if (!policyNumber || !memberNumber || !storedMobile || !storedNic) {
+        throw new Error("Required user information not found in storage");
+      }
+
+      // Prepare API request data
+      const updateIntimationData = {
+        policyNo: policyNumber,
+        memId: memberNumber,
+        contactNo: storedMobile,
+        createdBy: storedNic,
+        indOut: "O", // Hardcoded as per requirement
+        patientName: beneficiaryData.name,
+        illness: beneficiaryData.illness,
+        relationship: beneficiaryData.relationship,
+        claimSeqNo: claimDetails.referenceNo,
+      };
+
+      console.log("Update intimation request data:", updateIntimationData);
+
+      const response = await fetch(`${API_BASE_URL}/UpdateIntimation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateIntimationData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Update Intimation API Error Response:", errorText);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Update intimation API response:", result);
+      return result;
+    } catch (error) {
+      console.error("Error updating intimation via API:", error);
+      throw error;
+    }
+  };
+
   // Save beneficiary edit
   const handleSaveBeneficiaryEdit = async () => {
-    // Fetch updated claim amount
-    const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+    try {
+      // Validate required fields
+      if (!newBeneficiary.name || !newBeneficiary.relationship) {
+        Alert.alert(
+          "Validation Error",
+          "Patient name and relationship are required."
+        );
+        return;
+      }
 
-    const updatedBeneficiaries = beneficiaries.map((item) =>
-      item.id === selectedBeneficiary.id
-        ? { ...item, ...newBeneficiary, amount: claimAmount }
-        : item
-    );
+      if (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") {
+        Alert.alert("Validation Error", "Illness field is required.");
+        return;
+      }
 
-    setBeneficiaries(updatedBeneficiaries);
+      // Show loading state (optional - you can add a loading indicator here)
+      console.log("Saving beneficiary edit with API integration...");
 
-    // Store the updated beneficiary data
-    await storeBeneficiaryData(updatedBeneficiaries);
+      // Prepare beneficiary data for API call
+      const beneficiaryDataForAPI = {
+        name: newBeneficiary.name,
+        relationship: newBeneficiary.relationship,
+        illness: newBeneficiary.illness.trim(),
+      };
 
-    setEditBeneficiaryModalVisible(false);
-    setNewBeneficiary({ name: "", relationship: "", illness: "", amount: "" });
+      // Call the UpdateIntimation API
+      await updateIntimationAPI(beneficiaryDataForAPI);
+
+      // Fetch updated claim amount
+      const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+
+      // Update local state
+      const updatedBeneficiaries = beneficiaries.map((item) =>
+        item.id === selectedBeneficiary.id
+          ? { ...item, ...newBeneficiary, amount: claimAmount }
+          : item
+      );
+
+      setBeneficiaries(updatedBeneficiaries);
+
+      // Store the updated beneficiary data
+      await storeBeneficiaryData(updatedBeneficiaries);
+
+      // Close modal and reset form
+      setEditBeneficiaryModalVisible(false);
+      setDropdownVisible(false);
+      setSelectedMember(null);
+      setNewBeneficiary({
+        name: "",
+        relationship: "",
+        illness: "",
+        amount: "",
+      });
+
+      // Show success message
+      Alert.alert("Success", "Beneficiary information updated successfully!");
+
+      console.log("Beneficiary edit saved successfully with API integration");
+    } catch (error) {
+      console.error("Error in handleSaveBeneficiaryEdit:", error);
+
+      // Handle different types of errors
+      if (error.message.includes("Required user information not found")) {
+        Alert.alert(
+          "Authentication Error",
+          "User information not found. Please logout and login again.",
+          [{ text: "OK", style: "default" }]
+        );
+      } else if (error.message.includes("404")) {
+        Alert.alert(
+          "Not Found Error",
+          "The claim could not be found in the system. Please refresh and try again.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Refresh",
+              onPress: () => {
+                // You can add refresh logic here if needed
+                setEditBeneficiaryModalVisible(false);
+                setDropdownVisible(false);
+                setSelectedMember(null);
+                setNewBeneficiary({
+                  name: "",
+                  relationship: "",
+                  illness: "",
+                  amount: "",
+                });
+              },
+            },
+          ]
+        );
+      } else if (error.message.includes("400")) {
+        Alert.alert(
+          "Validation Error",
+          "Please check your input data and try again.",
+          [{ text: "OK", style: "default" }]
+        );
+      } else if (error.message.includes("500")) {
+        Alert.alert(
+          "Server Error",
+          "Server is currently unavailable. Please try again later.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Save Locally",
+              onPress: async () => {
+                // Save locally without API call as fallback
+                const claimAmount = await fetchClaimAmount(
+                  claimDetails.referenceNo
+                );
+                const updatedBeneficiaries = beneficiaries.map((item) =>
+                  item.id === selectedBeneficiary.id
+                    ? { ...item, ...newBeneficiary, amount: claimAmount }
+                    : item
+                );
+                setBeneficiaries(updatedBeneficiaries);
+                await storeBeneficiaryData(updatedBeneficiaries);
+                setEditBeneficiaryModalVisible(false);
+                setDropdownVisible(false);
+                setSelectedMember(null);
+                setNewBeneficiary({
+                  name: "",
+                  relationship: "",
+                  illness: "",
+                  amount: "",
+                });
+                Alert.alert(
+                  "Saved",
+                  "Changes saved locally. Will sync when server is available."
+                );
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Update Error",
+          `Failed to update beneficiary information: ${error.message}\n\nWould you like to save locally?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Save Locally",
+              onPress: async () => {
+                // Save locally without API call as fallback
+                const claimAmount = await fetchClaimAmount(
+                  claimDetails.referenceNo
+                );
+                const updatedBeneficiaries = beneficiaries.map((item) =>
+                  item.id === selectedBeneficiary.id
+                    ? { ...item, ...newBeneficiary, amount: claimAmount }
+                    : item
+                );
+                setBeneficiaries(updatedBeneficiaries);
+                await storeBeneficiaryData(updatedBeneficiaries);
+                setEditBeneficiaryModalVisible(false);
+                setDropdownVisible(false);
+                setSelectedMember(null);
+                setNewBeneficiary({
+                  name: "",
+                  relationship: "",
+                  illness: "",
+                  amount: "",
+                });
+                Alert.alert("Saved", "Changes saved locally.");
+              },
+            },
+          ]
+        );
+      }
+    }
   };
 
   // Delete beneficiary
@@ -1036,6 +1303,7 @@ const EditClaimIntimation1 = ({ route }) => {
         {
           id: Date.now().toString(),
           ...newDocument,
+          amount: formatAmount(newDocument.amount), // Format amount
           hasImage: false, // New documents don't have images initially
         },
       ]);
@@ -1069,6 +1337,22 @@ const EditClaimIntimation1 = ({ route }) => {
 
   // Helper functions for document modal
   const handleEditDocTypeSelect = (docType) => {
+    // Check if BILL type already exists and prevent selection
+    if (docType.docId === "O01") {
+      const billExists = documents.some(
+        (doc) => doc.type === "BILL" && doc.id !== selectedDocument?.id
+      );
+
+      if (billExists) {
+        Alert.alert(
+          "Document Type Restriction",
+          "A BILL document already exists. Only one BILL document is allowed per claim.",
+          [{ text: "OK", style: "default" }]
+        );
+        return;
+      }
+    }
+
     setEditDocumentType(docType.docId);
 
     // Update newDocument type with the description
@@ -1140,22 +1424,242 @@ const EditClaimIntimation1 = ({ route }) => {
     return editDocumentType === "O01";
   };
 
+  const updateDocumentAPI = async (documentData) => {
+    try {
+      console.log("Updating document via API:", documentData);
+
+      // Create FormData for multipart/form-data request
+      const formData = new FormData();
+
+      // Add all fields to FormData
+      formData.append("ClmSeqNo", documentData.ClmSeqNo);
+      formData.append("ClmMemSeqNo", documentData.ClmMemSeqNo.toString());
+      formData.append("DocSeq", documentData.DocSeq.toString());
+      formData.append("NewDocRef", documentData.NewDocRef);
+      formData.append("DocDate", documentData.DocDate);
+      formData.append("DocAmount", documentData.DocAmount.toString());
+      formData.append("CreatedBy", documentData.CreatedBy);
+      formData.append("ImgName", documentData.ImgName);
+
+      // Handle image content if available - React Native compatible approach
+      if (documentData.ImgContent && documentData.ImgContent !== "") {
+        try {
+          // For React Native, create file object directly from base64
+          const base64Data = documentData.ImgContent.replace(
+            /^data:image\/[a-z]+;base64,/,
+            ""
+          );
+
+          // Create file object compatible with React Native FormData
+          const imageFile = {
+            uri: `data:image/jpeg;base64,${base64Data}`,
+            type: "image/jpeg",
+            name: documentData.ImgName + ".jpg",
+          };
+
+          formData.append("ImgContent", imageFile);
+          console.log("Image file prepared for upload");
+        } catch (imageError) {
+          console.error("Error processing image:", imageError);
+          // Continue without image if there's an error
+        }
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/UpdateDocuments/UpdateDocument`,
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Update Document API Error Response:", errorText);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Update document API response:", result);
+      return result;
+    } catch (error) {
+      console.error("Error updating document via API:", error);
+      throw error;
+    }
+  };
+
+  const formatDateForAPI = (date) => {
+    try {
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`; // DD/MM/YYYY format for Oracle
+    } catch (error) {
+      console.error("Error formatting date for API:", error);
+      const today = new Date();
+      const day = today.getDate().toString().padStart(2, "0");
+      const month = (today.getMonth() + 1).toString().padStart(2, "0");
+      const year = today.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+  };
+
   // Save document edit with claim amount refresh
   const handleSaveDocumentEdit = async () => {
     try {
+      // Show loading state (optional)
+      // You can add a loading state here if needed
+
+      // Validate required fields
+      if (!editDocumentType) {
+        Alert.alert("Validation Error", "Please select a document type.");
+        return;
+      }
+
+      if (
+        editDocumentType === "O01" &&
+        (!newDocument.amount || parseFloat(newDocument.amount) <= 0)
+      ) {
+        Alert.alert(
+          "Validation Error",
+          "Amount is required and must be greater than 0 for Bill type."
+        );
+        return;
+      }
+
+      // Get stored user NIC
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+      if (!storedNic) {
+        Alert.alert("Error", "User information not found. Please login again.");
+        return;
+      }
+
+      // Parse clmMemSeqNo to get ClmMemSeqNo and DocSeq
+      const { memId: clmMemSeqNo, seqNo: docSeq } = parseClmMemSeqNo(
+        selectedDocument.clmMemSeqNo
+      );
+
+      // Find the original document data to get imgContent
+      const originalDocData = documents.find(
+        (doc) => doc.id === selectedDocument.id
+      );
+
+      // Prepare API request data with correct data types
+      const updateDocumentData = {
+        ClmSeqNo: claimDetails.referenceNo, // string
+        ClmMemSeqNo: parseInt(clmMemSeqNo), // int
+        DocSeq: parseInt(docSeq), // int
+        NewDocRef: editDocumentType, // string - This is the docId (O01, O02, etc.)
+        DocDate: formatDateForAPI(editDocumentDate), // string - Format: YYYY-MM-DD
+        ImgContent: originalDocData?.imgContent || "", // Will be converted to IFormFile
+        DocAmount: parseFloat(newDocument.amount || "0"), // decimal
+        CreatedBy: storedNic, // string
+        ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`, // string - Generate image name
+      };
+
+      console.log("Prepared update document data:", {
+        ...updateDocumentData,
+        ImgContent: updateDocumentData.ImgContent
+          ? "Base64 data present"
+          : "No image data",
+      });
+
+      // Call the update API
+      await updateDocumentAPI(updateDocumentData);
+
+      // Update local state with formatted amount
+      const updatedDocument = {
+        ...newDocument,
+        amount: formatAmount(newDocument.amount), // Format amount
+      };
+
       setDocuments((prev) =>
         prev.map((item) =>
-          item.id === selectedDocument.id ? { ...item, ...newDocument } : item
+          item.id === selectedDocument.id
+            ? { ...item, ...updatedDocument }
+            : item
         )
       );
+
+      // Close modal and reset form
       setEditDocumentModalVisible(false);
       setNewDocument({ type: "", date: "", amount: "" });
+      setEditDocumentType("");
+      setEditDocumentDate(new Date());
+
+      // Show success message
+      Alert.alert("Success", "Document updated successfully!");
+
+      // Refresh documents from API to get latest data
+      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+      if (referenceNo) {
+        await fetchDocuments(referenceNo);
+      }
 
       // Refresh claim amount after editing document
-      console.log("Document edited, refreshing claim amount...");
+      console.log("Document updated, refreshing claim amount...");
       await refreshClaimAmount();
     } catch (error) {
       console.error("Error in handleSaveDocumentEdit:", error);
+
+      // Check if it's a 404 error (document not found)
+      if (error.message.includes("404")) {
+        Alert.alert(
+          "Document Not Found",
+          "The document could not be found in the system. It may have been deleted or moved.\n\nWould you like to refresh the document list?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Refresh Documents",
+              onPress: async () => {
+                const referenceNo =
+                  claimDetails.referenceNo || claim?.referenceNo;
+                if (referenceNo) {
+                  await fetchDocuments(referenceNo);
+                }
+                setEditDocumentModalVisible(false);
+                setNewDocument({ type: "", date: "", amount: "" });
+                setEditDocumentType("");
+                setEditDocumentDate(new Date());
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Update Error",
+          `Failed to update document: ${error.message}\n\nWould you like to save the changes locally?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Save Locally",
+              onPress: () => {
+                // Save locally without API call
+                const updatedDocument = {
+                  ...newDocument,
+                  amount: formatAmount(newDocument.amount), // Format amount
+                };
+                setDocuments((prev) =>
+                  prev.map((item) =>
+                    item.id === selectedDocument.id
+                      ? { ...item, ...updatedDocument }
+                      : item
+                  )
+                );
+                setEditDocumentModalVisible(false);
+                setNewDocument({ type: "", date: "", amount: "" });
+                setEditDocumentType("");
+                setEditDocumentDate(new Date());
+              },
+            },
+          ]
+        );
+      }
     }
   };
 
@@ -1240,15 +1744,60 @@ const EditClaimIntimation1 = ({ route }) => {
     );
   };
 
-  // Handle submit
+  // Handle submit - Updated with API integration
   const handleSubmitClaim = () => {
     Alert.alert("Submit Claim", "Are you sure you want to submit this claim?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Submit",
-        onPress: () => {
-          Alert.alert("Success", "Claim submitted successfully!");
-          navigation?.goBack();
+        onPress: async () => {
+          try {
+            console.log("Submitting claim...");
+
+            // Validate that we have a reference number
+            if (!claimDetails.referenceNo) {
+              Alert.alert("Error", "Claim reference number not found.");
+              return;
+            }
+
+            // Call the submit final claim API
+            await submitFinalClaim(claimDetails.referenceNo);
+
+            // Show success message and navigate back
+            Alert.alert("Success", "Claim submitted successfully!", [
+              {
+                text: "OK",
+                onPress: () => {
+                  navigation?.goBack();
+                },
+              },
+            ]);
+          } catch (error) {
+            console.error("Error submitting claim:", error);
+
+            // Handle different types of errors
+            if (error.message.includes("404")) {
+              Alert.alert(
+                "Claim Not Found",
+                "The claim could not be found in the system. Please refresh and try again."
+              );
+            } else if (error.message.includes("400")) {
+              Alert.alert(
+                "Invalid Request",
+                "The claim cannot be submitted. Please check all required fields and try again."
+              );
+            } else if (error.message.includes("500")) {
+              Alert.alert(
+                "Server Error",
+                "Server is currently unavailable. Please try again later."
+              );
+            } else {
+              Alert.alert(
+                "Submit Error",
+                `Failed to submit claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`
+              );
+            }
+          }
         },
       },
     ]);
@@ -1314,7 +1863,8 @@ const EditClaimIntimation1 = ({ route }) => {
     );
   };
 
-  const handleDeleteClaim = () => {
+  // Delete claim function with API integration
+  const handleDeleteClaim = async () => {
     Alert.alert(
       "Delete Claim",
       "Are you sure you want to delete this claim? This action cannot be undone.",
@@ -1323,15 +1873,114 @@ const EditClaimIntimation1 = ({ route }) => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            Alert.alert("Deleted", "Claim has been deleted successfully.", [
-              {
-                text: "OK",
-                onPress: () => {
-                  navigation?.navigate("PendingIntimations");
+          onPress: async () => {
+            try {
+              // Show loading state (optional - you can add a loading indicator)
+              console.log("Deleting claim:", claimDetails.referenceNo);
+
+              // Validate reference number
+              if (!claimDetails.referenceNo) {
+                Alert.alert("Error", "Claim reference number not found.");
+                return;
+              }
+
+              // Prepare API request data
+              const deleteClaimData = {
+                claimNo: claimDetails.referenceNo,
+              };
+
+              console.log("Delete claim request data:", deleteClaimData);
+
+              // Call the Delete Claim API
+              const response = await fetch(
+                `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify(deleteClaimData),
+                }
+              );
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Delete Claim API Error Response:", errorText);
+                throw new Error(
+                  `HTTP error! status: ${response.status}, message: ${errorText}`
+                );
+              }
+
+              const result = await response.json();
+              console.log("Delete claim API response:", result);
+
+              // Clear stored data after successful deletion
+              try {
+                await SecureStore.deleteItemAsync("edit_referenceNo");
+                await SecureStore.deleteItemAsync("edit_claimType");
+                await SecureStore.deleteItemAsync("edit_createdOn");
+                await SecureStore.deleteItemAsync("edit_enteredBy");
+                await SecureStore.deleteItemAsync("edit_relationship");
+                await SecureStore.deleteItemAsync("edit_illness");
+                await SecureStore.deleteItemAsync("edit_beneficiary_amount");
+                await SecureStore.deleteItemAsync("referenNo");
+              } catch (storageError) {
+                console.warn("Error clearing stored data:", storageError);
+              }
+
+              // Show success message and navigate back
+              Alert.alert("Success", "Claim has been deleted successfully.", [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    // Simply go back - PendingIntimations will auto-refresh
+                    navigation.goBack();
+                  },
                 },
-              },
-            ]);
+              ]);
+            } catch (error) {
+              console.error("Error deleting claim:", error);
+
+              // Handle different types of errors
+              if (error.message.includes("404")) {
+                Alert.alert(
+                  "Not Found",
+                  "The claim could not be found in the system. It may have already been deleted.",
+                  [
+                    {
+                      text: "OK",
+                      onPress: () => {
+                        // Simply go back - PendingIntimations will auto-refresh
+                        navigation.goBack();
+                      },
+                    },
+                  ]
+                );
+              } else if (error.message.includes("400")) {
+                Alert.alert(
+                  "Invalid Request",
+                  "The claim could not be deleted. Please check the claim details and try again."
+                );
+              } else if (error.message.includes("500")) {
+                Alert.alert(
+                  "Server Error",
+                  "Server is currently unavailable. Please try again later."
+                );
+              } else if (
+                error.message.includes("Network request failed") ||
+                error.message.includes("fetch")
+              ) {
+                Alert.alert(
+                  "Network Error",
+                  "Unable to connect to the server. Please check your internet connection and try again."
+                );
+              } else {
+                Alert.alert(
+                  "Delete Error",
+                  `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`
+                );
+              }
+            }
           },
         },
       ]
@@ -1608,7 +2257,7 @@ const EditClaimIntimation1 = ({ route }) => {
         onRequestClose={() => setEditBeneficiaryModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.beneficiaryModalContent}>
             <Text style={styles.modalTitle}>Edit Beneficiary</Text>
 
             {/* Member Name Dropdown */}
@@ -1667,7 +2316,7 @@ const EditClaimIntimation1 = ({ route }) => {
             {/* Illness Field */}
             <Text style={styles.fieldLabel}>Illness</Text>
             <TextInput
-              style={styles.modalInput}
+              style={styles.beneficiaryModalInput}
               value={newBeneficiary.illness}
               onChangeText={(value) =>
                 setNewBeneficiary((prev) => ({ ...prev, illness: value }))
@@ -1677,7 +2326,7 @@ const EditClaimIntimation1 = ({ route }) => {
               numberOfLines={3}
             />
 
-            <View style={styles.modalButtons}>
+            <View style={styles.beneficiaryModalButtons}>
               <TouchableOpacity
                 onPress={() => {
                   setEditBeneficiaryModalVisible(false);
@@ -1707,148 +2356,169 @@ const EditClaimIntimation1 = ({ route }) => {
         onRequestClose={() => setEditDocumentModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Document</Text>
-
-            {/* Document Type Dropdown */}
-            <Text style={styles.fieldLabel}>Document Type</Text>
-            <TouchableOpacity
-              style={[
-                styles.dropdownButton,
-                loadingDocumentTypes && styles.dropdownButtonDisabled,
-              ]}
-              onPress={() =>
-                !loadingDocumentTypes &&
-                setEditDocTypeDropdownVisible(!isEditDocTypeDropdownVisible)
-              }
-              disabled={loadingDocumentTypes}
+          <View style={styles.documentModalContent}>
+            <ScrollView
+              contentContainerStyle={styles.documentModalScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.dropdownButtonText}>
-                {loadingDocumentTypes
-                  ? "Loading document types..."
-                  : editDocumentType
-                  ? documentTypes.find(
-                      (type) => type.docId === editDocumentType
-                    )?.docDesc || "Select Document Type"
-                  : "Select Document Type"}
-              </Text>
-              <Ionicons
-                name={
-                  isEditDocTypeDropdownVisible ? "chevron-up" : "chevron-down"
-                }
-                size={20}
-                color={loadingDocumentTypes ? "#ccc" : "#666"}
-              />
-            </TouchableOpacity>
+              <Text style={styles.modalTitle}>Edit Document</Text>
 
-            {/* Document Type Dropdown Options */}
-            {isEditDocTypeDropdownVisible && !loadingDocumentTypes && (
-              <View style={styles.dropdownOptions}>
-                {documentTypes.map((docType) => (
-                  <TouchableOpacity
-                    key={docType.docId}
-                    style={[
-                      styles.dropdownOption,
-                      editDocumentType === docType.docId &&
-                        styles.selectedDropdownOption,
-                    ]}
-                    onPress={() => handleEditDocTypeSelect(docType)}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownOptionText,
-                        editDocumentType === docType.docId &&
-                          styles.selectedDropdownOptionText,
-                      ]}
-                    >
-                      {docType.docDesc}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Document Date */}
-            <Text style={styles.fieldLabel}>Document Date</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={showEditDatePickerModal}
-            >
-              <Text style={styles.dropdownButtonText}>
-                {formatDate(editDocumentDate)}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-            </TouchableOpacity>
-
-            {showEditDatePicker && (
-              <DateTimePicker
-                testID="editDateTimePicker"
-                value={editDocumentDate}
-                mode="date"
-                is24Hour={true}
-                display="default"
-                onChange={handleEditDateChange}
-                maximumDate={new Date()} // Prevent future dates
-              />
-            )}
-
-            {/* Document Amount */}
-            <Text style={styles.fieldLabel}>
-              Document Amount
-              {editDocumentType === "O01" && (
-                <Text style={styles.requiredAsterisk}> *</Text>
-              )}
-            </Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                !isEditAmountEditable() && styles.textInputDisabled,
-                editDocumentType === "O01" &&
-                  (!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0) &&
-                  styles.textInputError,
-              ]}
-              placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
-              placeholderTextColor="#B0B0B0"
-              value={newDocument.amount}
-              onChangeText={handleEditAmountChange}
-              keyboardType="decimal-pad"
-              editable={isEditAmountEditable()}
-            />
-
-            {/* Help text for amount field */}
-            {editDocumentType === "O02" || editDocumentType === "O03" ? (
-              <Text style={styles.helpText}>
-                Amount is automatically set to 0.00 for{" "}
-                {
-                  documentTypes.find((type) => type.docId === editDocumentType)
-                    ?.docDesc
-                }
-              </Text>
-            ) : editDocumentType === "O01" ? (
-              <Text
+              {/* Document Type Dropdown */}
+              <Text style={styles.documentFieldLabel}>Document Type</Text>
+              <TouchableOpacity
                 style={[
-                  styles.helpText,
-                  (!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0) &&
-                    styles.errorText,
+                  styles.documentDropdownButton,
+                  loadingDocumentTypes && styles.dropdownButtonDisabled,
                 ]}
+                onPress={() =>
+                  !loadingDocumentTypes &&
+                  setEditDocTypeDropdownVisible(!isEditDocTypeDropdownVisible)
+                }
+                disabled={loadingDocumentTypes}
               >
-                {!newDocument.amount ||
-                newDocument.amount.trim() === "" ||
-                parseFloat(newDocument.amount) <= 0
-                  ? "Amount is required and must be greater than 0 for Bill type"
-                  : "Amount is required for Bill type"}
-              </Text>
-            ) : editDocumentType === "O04" ? (
-              <Text style={styles.helpText}>
-                Enter amount for Other document type
-              </Text>
-            ) : null}
+                <Text style={styles.dropdownButtonText}>
+                  {loadingDocumentTypes
+                    ? "Loading document types..."
+                    : editDocumentType
+                    ? documentTypes.find(
+                        (type) => type.docId === editDocumentType
+                      )?.docDesc || "Select Document Type"
+                    : "Select Document Type"}
+                </Text>
+                <Ionicons
+                  name={
+                    isEditDocTypeDropdownVisible ? "chevron-up" : "chevron-down"
+                  }
+                  size={20}
+                  color={loadingDocumentTypes ? "#ccc" : "#666"}
+                />
+              </TouchableOpacity>
 
-            <View style={styles.modalButtons}>
+              {/* Document Type Dropdown Options */}
+              {isEditDocTypeDropdownVisible && !loadingDocumentTypes && (
+                <View style={styles.documentDropdownOptions}>
+                  {documentTypes.map((docType) => {
+                    // Check if BILL type already exists (excluding current document being edited)
+                    const isBillDisabled =
+                      docType.docId === "O01" &&
+                      documents.some(
+                        (doc) =>
+                          doc.type === "BILL" && doc.id !== selectedDocument?.id
+                      );
+
+                    return (
+                      <TouchableOpacity
+                        key={docType.docId}
+                        style={[
+                          styles.documentDropdownOption,
+                          editDocumentType === docType.docId &&
+                            styles.selectedDropdownOption,
+                          isBillDisabled && styles.disabledDropdownOption,
+                        ]}
+                        onPress={() => handleEditDocTypeSelect(docType)}
+                        disabled={isBillDisabled}
+                      >
+                        <Text
+                          style={[
+                            styles.dropdownOptionText,
+                            editDocumentType === docType.docId &&
+                              styles.selectedDropdownOptionText,
+                            isBillDisabled && styles.disabledDropdownOptionText,
+                          ]}
+                        >
+                          {docType.docDesc}
+                          {isBillDisabled && " (Already exists)"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Document Date */}
+              <Text style={styles.documentFieldLabel}>Document Date</Text>
+              <TouchableOpacity
+                style={styles.documentDropdownButton}
+                onPress={showEditDatePickerModal}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {formatDate(editDocumentDate)}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#666" />
+              </TouchableOpacity>
+
+              {showEditDatePicker && (
+                <DateTimePicker
+                  testID="editDateTimePicker"
+                  value={editDocumentDate}
+                  mode="date"
+                  is24Hour={true}
+                  display="default"
+                  onChange={handleEditDateChange}
+                  maximumDate={new Date()} // Prevent future dates
+                />
+              )}
+
+              {/* Document Amount */}
+              <Text style={styles.documentFieldLabel}>
+                Document Amount
+                {editDocumentType === "O01" && (
+                  <Text style={styles.requiredAsterisk}> *</Text>
+                )}
+              </Text>
+              <TextInput
+                style={[
+                  styles.documentModalInput,
+                  !isEditAmountEditable() && styles.textInputDisabled,
+                  editDocumentType === "O01" &&
+                    (!newDocument.amount ||
+                      newDocument.amount.trim() === "" ||
+                      parseFloat(newDocument.amount) <= 0) &&
+                    styles.textInputError,
+                ]}
+                placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                placeholderTextColor="#B0B0B0"
+                value={newDocument.amount}
+                onChangeText={handleEditAmountChange}
+                keyboardType="decimal-pad"
+                editable={isEditAmountEditable()}
+              />
+
+              {/* Help text for amount field */}
+              {editDocumentType === "O02" || editDocumentType === "O03" ? (
+                <Text style={styles.helpText}>
+                  Amount is automatically set to 0.00 for{" "}
+                  {
+                    documentTypes.find(
+                      (type) => type.docId === editDocumentType
+                    )?.docDesc
+                  }
+                </Text>
+              ) : editDocumentType === "O01" ? (
+                <Text
+                  style={[
+                    styles.helpText,
+                    (!newDocument.amount ||
+                      newDocument.amount.trim() === "" ||
+                      parseFloat(newDocument.amount) <= 0) &&
+                      styles.errorText,
+                  ]}
+                >
+                  {!newDocument.amount ||
+                  newDocument.amount.trim() === "" ||
+                  parseFloat(newDocument.amount) <= 0
+                    ? "Amount is required and must be greater than 0 for Bill type"
+                    : "Amount is required for Bill type"}
+                </Text>
+              ) : editDocumentType === "O04" ? (
+                <Text style={styles.helpText}>
+                  Enter amount for Other document type
+                </Text>
+              ) : null}
+            </ScrollView>
+
+            <View style={styles.documentModalButtons}>
               <TouchableOpacity
                 onPress={() => {
                   setEditDocumentModalVisible(false);
@@ -2123,7 +2793,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#4DD0E1",
     position: "relative",
-    minHeight: 120,
+    minHeight: 110, // Decreased from 140 to 110
     flexDirection: "row",
     alignItems: "flex-start",
   },
@@ -2158,7 +2828,7 @@ const styles = StyleSheet.create({
   },
   documentActionIcons: {
     position: "absolute",
-    top: 70,
+    top: 65, // Adjusted position down from 80
     bottom: 10,
     right: 10,
     flexDirection: "row",
@@ -2231,25 +2901,128 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Modal styles
+  // Modal styles - Separate containers for Beneficiary and Document
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  modalContent: {
+
+  // Edit Beneficiary Modal Styles
+  beneficiaryModalContent: {
     width: "90%",
     backgroundColor: "white",
     borderRadius: 15,
     padding: 20,
     elevation: 5,
-    maxHeight: "80%",
+    maxHeight: "75%",
+    minHeight: "40%",
+  },
+  beneficiaryModalInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 15,
+    fontSize: 14,
+    minHeight: 60, // Larger for multiline illness input
+    textAlignVertical: "top",
+  },
+  beneficiaryModalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 15,
+    paddingTop: 10,
+  },
+
+  // Edit Document Modal Styles
+  documentModalContent: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 10,
+    elevation: 5,
+    maxHeight: "60%",
+    minHeight: "50%",
+  },
+  documentModalScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 10,
+  },
+  documentModalInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    fontSize: 14,
+    minHeight: 35,
+  },
+  documentModalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 5,
+    paddingTop: 5,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    backgroundColor: "white",
+  },
+
+  // Document-specific field styles
+  documentFieldLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#2E7D7D",
+    marginBottom: 3,
+    marginTop: 5,
+  },
+  documentDropdownButton: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    minHeight: 35,
+  },
+  documentDropdownOptions: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    marginBottom: 8,
+    maxHeight: 160, // Increased from 120 to 160 to show all options
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  documentDropdownOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  disabledDropdownOption: {
+    backgroundColor: "#f5f5f5",
+    opacity: 0.6,
+  },
+  disabledDropdownOptionText: {
+    color: "#999",
+    fontStyle: "italic",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 20,
+    marginBottom: 15,
     textAlign: "center",
     color: "#2E7D7D",
   },
@@ -2261,30 +3034,34 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 15,
     fontSize: 14,
+    minHeight: 45,
   },
   modalButtons: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 10,
+    marginTop: 15,
+    paddingTop: 10,
   },
   cancelBtn: {
     marginRight: 15,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingVertical: 10, // Increased padding
+    paddingHorizontal: 20, // Increased padding
   },
   cancelText: {
     color: "#888",
     fontWeight: "500",
+    fontSize: 14,
   },
   saveBtn: {
     backgroundColor: "#4DD0E1",
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingVertical: 10, // Increased padding
+    paddingHorizontal: 20, // Increased padding
   },
   saveText: {
     color: "#fff",
     fontWeight: "500",
+    fontSize: 14,
   },
 
   // Document image styles
@@ -2342,7 +3119,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#2E7D7D",
-    marginBottom: 5,
+    marginBottom: 8,
     marginTop: 10,
   },
   dropdownButton: {
@@ -2351,11 +3128,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    marginBottom: 10,
+    marginBottom: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "#fff",
+    minHeight: 45,
   },
   dropdownButtonText: {
     fontSize: 14,

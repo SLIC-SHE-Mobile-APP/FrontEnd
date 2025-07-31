@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
@@ -14,7 +14,7 @@ import {
   Modal,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 const PendingIntimations = ({ onClose, onEditClaim }) => {
   const navigation = useNavigation();
@@ -36,19 +36,27 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   const CustomPopup = () => {
     const getIconName = () => {
       switch (popupType) {
-        case "success": return "checkmark-circle";
-        case "error": return "alert-circle";
-        case "confirm": return "help-circle";
-        default: return "information-circle";
+        case "success":
+          return "checkmark-circle";
+        case "error":
+          return "alert-circle";
+        case "confirm":
+          return "help-circle";
+        default:
+          return "information-circle";
       }
     };
 
     const getIconColor = () => {
       switch (popupType) {
-        case "success": return "#4CAF50";
-        case "error": return "#FF6B6B";
-        case "confirm": return "#FF9800";
-        default: return "#2196F3";
+        case "success":
+          return "#4CAF50";
+        case "error":
+          return "#FF6B6B";
+        case "confirm":
+          return "#FF9800";
+        default:
+          return "#2196F3";
       }
     };
 
@@ -85,9 +93,9 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
                     <Text style={styles.popupTitle}>{popupTitle}</Text>
                   )}
                 </View>
-                
+
                 <Text style={styles.popupMessage}>{popupMessage}</Text>
-                
+
                 {popupActions ? (
                   <View style={styles.popupButtonContainer}>
                     {popupActions.map((action, index) => (
@@ -95,24 +103,33 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
                         key={index}
                         style={[
                           styles.popupButton,
-                          { 
-                            backgroundColor: action.style === 'destructive' ? '#FF6B6B' : 
-                                            action.style === 'cancel' ? '#9E9E9E' : getIconColor(),
+                          {
+                            backgroundColor:
+                              action.style === "destructive"
+                                ? "#FF6B6B"
+                                : action.style === "cancel"
+                                ? "#9E9E9E"
+                                : getIconColor(),
                             marginHorizontal: 5,
-                          }
+                          },
                         ]}
                         onPress={() => {
                           closePopup();
                           if (action.onPress) action.onPress();
                         }}
                       >
-                        <Text style={styles.popupButtonText}>{action.text}</Text>
+                        <Text style={styles.popupButtonText}>
+                          {action.text}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.popupButton, { backgroundColor: getIconColor() }]}
+                    style={[
+                      styles.popupButton,
+                      { backgroundColor: getIconColor() },
+                    ]}
                     onPress={closePopup}
                   >
                     <Text style={styles.popupButtonText}>OK</Text>
@@ -157,7 +174,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
+      outputRange: ["0deg", "360deg"],
     });
 
     return (
@@ -189,6 +206,20 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
     </View>
   );
 
+  // Remove the route params useEffect since we're not using navigate
+  // useEffect for route params removed - using useFocusEffect instead
+
+  // Add useFocusEffect to refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Always refresh when screen comes into focus (when returning from EditClaimIntimation1)
+      console.log("PendingIntimations screen focused, refreshing claims...");
+      if (userId && policyNo) {
+        refreshData();
+      }
+    }, [userId, policyNo])
+  );
+
   // Fetch stored values from SecureStore
   useEffect(() => {
     const getStoredValues = async () => {
@@ -211,73 +242,84 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
     getStoredValues();
   }, []);
 
-  useEffect(() => {
-    const fetchClaims = async () => {
-      // Don't fetch if we don't have the required values yet
-      if (!userId || !policyNo) {
-        return;
+  // Modified fetchClaims function to be reusable
+  const fetchClaims = async (showLoading = true) => {
+    // Don't fetch if we don't have the required values yet
+    if (!userId || !policyNo) {
+      return;
+    }
+
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      setError(null);
+
+      const response = await fetch(
+        `${API_BASE_URL}/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      try {
-        setLoading(true);
-        setError(null);
+      const data = await response.json();
 
-        const response = await fetch(
-          `${API_BASE_URL}/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
+      // Check if data is an array
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid data format received from server");
+      }
+
+      // Transform API data to match component structure
+      const transformedData = data.map((claim, index) => ({
+        id: claim.clmSeqNo || `claim_${index}`,
+        referenceNo: claim.clmSeqNo,
+        enteredBy: claim.patientName,
+        relationship: claim.relationship,
+        claimType: claim.indOut,
+        createdOn: formatDate(claim.createdDate),
+        policyNo: policyNo,
+        illness: claim.illness,
+      }));
+
+      setPendingClaims(transformedData);
+      console.log(`Loaded ${transformedData.length} claims`);
+    } catch (err) {
+      console.error("Error fetching claims:", err);
+      setError(err.message);
+
+      // More specific error messages
+      if (
+        err.message.includes("NetworkError") ||
+        err.message.includes("Failed to fetch")
+      ) {
+        showCustomPopup(
+          "Network Error",
+          "Please check your internet connection and try again.",
+          "error"
         );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Check if data is an array
-        if (!Array.isArray(data)) {
-          throw new Error("Invalid data format received from server");
-        }
-
-        // Transform API data to match component structure
-        const transformedData = data.map((claim, index) => ({
-          id: claim.clmSeqNo || `claim_${index}`,
-          referenceNo: claim.clmSeqNo,
-          enteredBy: claim.patientName,
-          relationship: claim.relationship,
-          claimType: claim.indOut,
-          createdOn: formatDate(claim.createdDate),
-          policyNo: policyNo, // Use the policyNo from params since it's not in API response
-          illness: claim.illness, // Added this field from API
-        }));
-
-        setPendingClaims(transformedData);
-      } catch (err) {
-        console.error("Error fetching claims:", err);
-        setError(err.message);
-
-        // More specific error messages
-        if (
-          err.message.includes("NetworkError") ||
-          err.message.includes("Failed to fetch")
-        ) {
-          showCustomPopup(
-            "Network Error",
-            "Please check your internet connection and try again.",
-            "error"
-          );
-        } else if (err.message.includes("HTTP error")) {
-          showCustomPopup(
-            "Server Error",
-            "The server is currently unavailable. Please try again later.",
-            "error"
-          );
-        } else {
-          showCustomPopup("Error", "Failed to load claims data. Please try again.", "error");
-        }
-      } finally {
+      } else if (err.message.includes("HTTP error")) {
+        showCustomPopup(
+          "Server Error",
+          "The server is currently unavailable. Please try again later.",
+          "error"
+        );
+      } else {
+        showCustomPopup(
+          "Error",
+          "Failed to load claims data. Please try again.",
+          "error"
+        );
+      }
+    } finally {
+      if (showLoading) {
         setLoading(false);
       }
-    };
+    }
+  };
 
+  // Update the initial useEffect to use the new fetchClaims function
+  useEffect(() => {
     fetchClaims();
   }, [userId, policyNo]);
 
@@ -305,93 +347,24 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
     }
   };
 
-  // Refresh data function
+  // Updated refreshData function
   const refreshData = async () => {
     if (!userId || !policyNo) {
       showCustomPopup("Error", "Missing policy information", "error");
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null); // Clear previous errors
-
-      const response = await fetch(
-        `${API_BASE_URL}/SavedclaimlistCon?userid=${userId}&policyNo=${policyNo}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Validate response data
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid data format received from server");
-      }
-
-      const transformedData = data.map((claim, index) => ({
-        id: claim.clmSeqNo || `claim_${index}`,
-        referenceNo: claim.clmSeqNo,
-        enteredBy: claim.patientName,
-        relationship: claim.relationship,
-        claimType: claim.indOut,
-        createdOn: formatDate(claim.createdDate),
-        policyNo: policyNo, // Use the parameter value since it's not in API response
-        illness: claim.illness, // Include illness field from API
-      }));
-
-      setPendingClaims(transformedData);
-
-      // Optional: Show success message
-      // showCustomPopup("Success", "Claims data refreshed successfully", "success");
-    } catch (err) {
-      console.error("Error refreshing claims:", err);
-      setError(err.message);
-
-      // More specific error messages
-      if (
-        err.message.includes("NetworkError") ||
-        err.message.includes("Failed to fetch")
-      ) {
-        showCustomPopup(
-          "Network Error",
-          "Please check your internet connection and try again.",
-          "error"
-        );
-      } else if (err.message.includes("HTTP error! status: 404")) {
-        showCustomPopup("Not Found", "No claims found for this policy.", "error");
-      } else if (err.message.includes("HTTP error! status: 500")) {
-        showCustomPopup(
-          "Server Error",
-          "The server is experiencing issues. Please try again later.",
-          "error"
-        );
-      } else if (err.message.includes("Invalid data format")) {
-        showCustomPopup(
-          "Data Error",
-          "Received unexpected data format from server.",
-          "error"
-        );
-      } else {
-        showCustomPopup(
-          "Error",
-          "Failed to refresh claims data. Please try again.",
-          "error"
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
+    console.log("Refreshing claims data...");
+    await fetchClaims(false); // Don't show loading spinner for refresh
   };
 
+  // Modified handleEdit function to clear any refresh flags
   const handleEdit = async (claim) => {
     try {
       await SecureStore.setItemAsync("edit_referenceNo", claim.referenceNo);
       await SecureStore.setItemAsync("referenNo", claim.referenceNo);
-      await SecureStore.setItemAsync("edit_enteredBy", claim.enteredBy); //patient name
-      await SecureStore.setItemAsync("edit_relationship", claim.relationship); // relationship
+      await SecureStore.setItemAsync("edit_enteredBy", claim.enteredBy);
+      await SecureStore.setItemAsync("edit_relationship", claim.relationship);
       await SecureStore.setItemAsync("edit_claimType", claim.claimType);
       await SecureStore.setItemAsync("edit_createdOn", claim.createdOn);
       await SecureStore.setItemAsync("edit_claimId", claim.id);
@@ -405,6 +378,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
 
       // Navigate to edit screen
       navigation.navigate("EditClaimIntimation1", {
+        claim: claim, // Pass the claim data
         claimData: claim,
         onUpdate: (updatedClaim) => {
           setPendingClaims((prev) =>
@@ -441,23 +415,20 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
     );
   };
 
-  // Delete claim from server
+  // Update deleteClaimFromServer to refresh the list after deletion
   const deleteClaimFromServer = async (claimId) => {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            claimNo: claimId,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/DeleteClaim/DeleteClaim`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          claimNo: claimId,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -469,13 +440,32 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       setPendingClaims((prev) => prev.filter((item) => item.id !== claimId));
 
       showCustomPopup("Success", "Claim deleted successfully", "success");
+
+      // Refresh the data to ensure consistency
+      setTimeout(() => {
+        refreshData();
+      }, 1000);
     } catch (error) {
       console.error("Error deleting claim:", error);
-      showCustomPopup("Error", "Failed to delete claim. Please try again.", "error");
+      showCustomPopup(
+        "Error",
+        "Failed to delete claim. Please try again.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  // Add a manual refresh button to the header (optional)
+  const renderRefreshButton = () => (
+    <TouchableOpacity
+      style={styles.refreshButton}
+      onPress={refreshData}
+      disabled={loading}
+    >
+    </TouchableOpacity>
+  );
 
   // Show loading while fetching stored values or claims
   if (loading || !userId || !policyNo) {
@@ -493,10 +483,11 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
             />
           </TouchableOpacity>
         </View>
-        <LoadingScreen 
-          message={!userId || !policyNo
-            ? "Loading Policy Information..."
-            : "Loading Pending Claims..."
+        <LoadingScreen
+          message={
+            !userId || !policyNo
+              ? "Loading Policy Information..."
+              : "Loading Pending Claims..."
           }
         />
         <CustomPopup />
@@ -538,6 +529,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         <View style={{ width: 26 }} />
         <Text style={styles.headerTitle}>Pending Intimations</Text>
         <View style={styles.headerRight}>
+          {renderRefreshButton()}
           <TouchableOpacity onPress={onClose}>
             <Ionicons
               name="close"
@@ -640,12 +632,12 @@ const styles = StyleSheet.create({
   // Custom Loading Styles
   loadingOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 30,
     minWidth: 200,
     minHeight: 150,
@@ -657,32 +649,32 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#16858D',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#6DD3D3',
+    borderColor: "#6DD3D3",
   },
   loadingIconInner: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#17ABB7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '600',
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
     marginBottom: 5,
   },
   loadingSubText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   errorContainer: {
     flex: 1,
@@ -775,34 +767,34 @@ const styles = StyleSheet.create({
   // Custom Popup Styles
   popupOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   blurContainer: {
     flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
-    width: '85%',
+    width: "85%",
     maxWidth: 350,
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
   },
   popupContent: {
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   popupHeader: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 16,
   },
   popupIcon: {
@@ -810,39 +802,39 @@ const styles = StyleSheet.create({
   },
   popupTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
     marginBottom: 8,
   },
   popupMessage: {
     fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
+    color: "#555",
+    textAlign: "center",
     lineHeight: 22,
     marginBottom: 24,
   },
   popupButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   popupButton: {
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 25,
     minWidth: 100,
-    alignItems: 'center',
+    alignItems: "center",
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   popupButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 
