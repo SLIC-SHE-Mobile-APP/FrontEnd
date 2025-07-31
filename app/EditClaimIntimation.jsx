@@ -37,6 +37,7 @@ const EditClaimIntimation = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [imageLoadingStates, setImageLoadingStates] = useState(new Map());
 
 
   // Track all loading states
@@ -364,20 +365,18 @@ const EditClaimIntimation = ({ route }) => {
       const result = await response.json();
 
       if (result.success && result.data && Array.isArray(result.data)) {
-        // Transform API data to match component structure
+        // Transform API data to match component structure without image processing
         const transformedDocuments = result.data.map((doc, index) => {
           return {
             id: doc.clmMemSeqNo || `doc_${index}`,
-            clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API
+            clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API and image loading
             type: doc.docType || "Unknown",
             date: formatDate(doc.docDate),
             amount: doc.docAmount ? doc.docAmount.toString() : "0.00",
             imagePath: doc.imagePath || "0",
-            // Convert byte array to base64 string if imgContent exists
-            imgContent: doc.imgContent
-              ? arrayBufferToBase64(doc.imgContent)
-              : null,
-            originalImgContent: doc.imgContent, // Keep original for debugging
+            hasImage: doc.imgContent && doc.imgContent.length > 0, // Check if document has image content
+            imageLoaded: false, // Track if image has been loaded
+            imgContent: null, // Will be populated when user clicks to view
           };
         });
 
@@ -404,6 +403,68 @@ const EditClaimIntimation = ({ route }) => {
     } finally {
       setDocumentsLoading(false);
       updateLoadingState('documents', false);
+    }
+  };
+
+
+  // Load image on demand
+  const loadDocumentImage = async (document) => {
+    try {
+      // Set loading state for this specific document
+      setImageLoadingStates((prev) => new Map(prev.set(document.id, true)));
+
+      console.log("Loading image for document:", document.clmMemSeqNo);
+
+      const response = await fetch(
+        `${API_BASE_URL}/ClaimDocuments/view/${document.clmMemSeqNo}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Get the response as blob
+      const blob = await response.blob();
+
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = reader.result;
+        setSelectedImageUri(base64String);
+        setImageModalVisible(true);
+        // Clear loading state for this document
+        setImageLoadingStates((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(document.id);
+          return newMap;
+        });
+      };
+      reader.onerror = () => {
+        console.error("Error reading image blob");
+        Alert.alert("Error", "Failed to load image");
+        // Clear loading state for this document
+        setImageLoadingStates((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(document.id);
+          return newMap;
+        });
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error("Error loading document image:", error);
+      Alert.alert("Error", "Failed to load image");
+      // Clear loading state for this document
+      setImageLoadingStates((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(document.id);
+        return newMap;
+      });
     }
   };
 
@@ -956,43 +1017,50 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   const renderDocumentImage = (document) => {
-    if (document.imgContent) {
-      // Test if it's valid base64
-      try {
-        const testDecode = atob(document.imgContent.substring(0, 100));
-      } catch (error) {
-        console.error("Base64 decode test failed:", error);
-      }
+    const isLoadingThisImage = imageLoadingStates.get(document.id) || false;
 
-      const imageUri = `data:image/jpeg;base64,${document.imgContent}`;
-
-      return (
-        <TouchableOpacity
-          style={styles.documentImageContainer}
-          onPress={() => {
-            setSelectedImageUri(imageUri);
-            setImageModalVisible(true);
-          }}
+    return (
+      <TouchableOpacity
+        style={styles.documentImageIconContainer}
+        onPress={() => {
+          if (document.hasImage) {
+            loadDocumentImage(document);
+          } else {
+            Alert.alert(
+              "No Image",
+              "This document doesn't have an associated image."
+            );
+          }
+        }}
+        disabled={isLoadingThisImage}
+      >
+        <View
+          style={[
+            styles.imageIconWrapper,
+            { backgroundColor: document.hasImage ? "#4DD0E1" : "#E0E0E0" },
+          ]}
         >
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.documentImage}
-            resizeMode="cover"
-            onError={(error) => { }}
-            onLoad={() => { }}
-            onLoadStart={() => { }}
-            onLoadEnd={() => { }}
-          />
-        </TouchableOpacity>
-      );
-    } else {
-      return (
-        <View style={styles.documentImagePlaceholder}>
-          <Ionicons name="document-outline" size={24} color="#4DD0E1" />
-          <Text style={styles.noImageText}>No Image</Text>
+          {isLoadingThisImage ? (
+            <Animated.View style={{ transform: [{ rotate: "45deg" }] }}>
+              <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            </Animated.View>
+          ) : (
+            <Ionicons
+              name={document.hasImage ? "image" : "document-outline"}
+              size={20}
+              color={document.hasImage ? "#FFFFFF" : "#999"}
+            />
+          )}
         </View>
-      );
-    }
+        <Text style={styles.imageIconText}>
+          {isLoadingThisImage
+            ? "Loading..."
+            : document.hasImage
+            ? "View"
+            : "No Image"}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   // Show loading screen while initializing
@@ -1110,7 +1178,7 @@ const EditClaimIntimation = ({ route }) => {
 
 
         {/* Documents Section */}
-        {/* <View style={styles.documentsSection}>
+        <View style={styles.documentsSection}>
           {documentsLoading && !initialLoading ? (
             <View style={styles.loadingOverlay}>
               <View style={styles.loadingContainer}>
@@ -1161,7 +1229,7 @@ const EditClaimIntimation = ({ route }) => {
               <Text style={styles.noDocumentsText}>No documents found.</Text>
             </View>
           )}
-        </View> */}
+        </View>
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
@@ -1679,11 +1747,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   documentLabel: {
-    fontSize: 13,
-    color: "#4DD0E1",
-    fontWeight: "500",
-    width: 120,
-    flexShrink: 0,
+     fontSize: 13,
+  color: "#4DD0E1",
+  fontWeight: "500",
+  width: 100,
+  flexShrink: 0,
   },
   documentColon: {
     fontSize: 13,
@@ -1700,7 +1768,7 @@ const styles = StyleSheet.create({
   },
   documentActionIcons: {
     position: "absolute",
-    top: 50,
+    top: 70,
     bottom: 10,
     right: 10,
     flexDirection: "row",
@@ -1893,6 +1961,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  documentImageIconContainer: {
+    width: 50,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    marginRight: 10,
+  },
+  imageIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  imageIconText: {
+    fontSize: 10,
+    color: "#666",
+    textAlign: "center",
+    fontWeight: "500",
   },
 });
 
