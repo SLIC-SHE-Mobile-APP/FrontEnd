@@ -37,7 +37,6 @@ const EditClaimIntimation = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [imageLoadingStates, setImageLoadingStates] = useState(new Map());
 
 
   // Track all loading states
@@ -70,6 +69,7 @@ const EditClaimIntimation = ({ route }) => {
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [claimTypes, setClaimType] = useState("");
   const [referenceNo2, setReferenceNo] = useState("");
+  const [imageLoadingStates, setImageLoadingStates] = useState(new Map());
 
   // New beneficiary form
   const [newBeneficiary, setNewBeneficiary] = useState({
@@ -173,7 +173,7 @@ const EditClaimIntimation = ({ route }) => {
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContainer}>
         <LoadingIcon />
-        <Text style={styles.loadingText}>Loading Saved Claim Details...</Text>
+        <Text style={styles.loadingText}>Loading....</Text>
         <Text style={styles.loadingSubText}>Please wait a moment</Text>
       </View>
     </View>
@@ -406,8 +406,6 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-
-  // Load image on demand
   const loadDocumentImage = async (document) => {
     try {
       // Set loading state for this specific document
@@ -467,6 +465,7 @@ const EditClaimIntimation = ({ route }) => {
       });
     }
   };
+
 
   // Fetch claim amount from API
   const fetchClaimAmount = async (referenceNo) => {
@@ -628,7 +627,7 @@ const EditClaimIntimation = ({ route }) => {
       const [storedPatientName, storedIllness, storedRelationship] = await Promise.all([
         SecureStore.getItemAsync('stored_patient_name'),
         SecureStore.getItemAsync('stored_illness_description'),
-        SecureStore.getItemAsync('stored_relationship')
+        SecureStore.getItemAsync('stored_relationship')  // This might be null
       ]);
 
       // Fallback to edit-specific stored data
@@ -653,7 +652,7 @@ const EditClaimIntimation = ({ route }) => {
           name: finalPatientName,
           relationship: finalRelationship,
           illness: finalIllness || "",
-          amount: claimAmount, // Set amount from API
+          amount: claimAmount,
         };
 
         // Store beneficiary amount in SecureStore
@@ -1056,8 +1055,8 @@ const EditClaimIntimation = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -1747,11 +1746,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   documentLabel: {
-     fontSize: 13,
-  color: "#4DD0E1",
-  fontWeight: "500",
-  width: 100,
-  flexShrink: 0,
+    fontSize: 13,
+    color: "#4DD0E1",
+    fontWeight: "500",
+    width: 100,
+    flexShrink: 0,
   },
   documentColon: {
     fontSize: 13,
@@ -1961,8 +1960,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-  },
-  documentImageIconContainer: {
+  }, documentImageIconContainer: {
     width: 50,
     height: 60,
     alignItems: "center",

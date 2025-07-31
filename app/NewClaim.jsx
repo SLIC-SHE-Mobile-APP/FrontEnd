@@ -7,6 +7,8 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,9 +16,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Animated,
-  FlatList
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';
@@ -204,13 +204,14 @@ const NewClaim = ({ onClose, onEditClaim }) => {
   }, [initialising, policyNo, memberNo, selectedMember, members]);
 
   // Function to store patient details in SecureStore
+  // Function to store patient details in SecureStore
   const storePatientDetails = async (claimType, name, illnessDesc, clmSeqNo = null) => {
     try {
       const storePromises = [
         SecureStore.setItemAsync('stored_claim_type', claimType),
         SecureStore.setItemAsync('stored_patient_name', name),
         SecureStore.setItemAsync('stored_illness_description', illnessDesc),
-        // ADD THIS LINE TO RESET BENEFICIARY AMOUNT
+        SecureStore.setItemAsync('stored_relationship', relationship),
         SecureStore.setItemAsync('stored_beneficiary_amount', '0'),
       ];
 
