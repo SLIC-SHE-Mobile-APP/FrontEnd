@@ -2119,14 +2119,14 @@ const EditClaimIntimation1 = ({ route }) => {
   // Show loading screen while initializing
   if (initialLoading) {
     return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <LoadingScreen />
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -2701,7 +2701,7 @@ const EditClaimIntimation1 = ({ route }) => {
         message={popup.message}
         type={popup.type}
         showConfirmButton={popup.showConfirmButton}
-        onClose={popup.onConfirm || hidePopup}
+        onClose={hidePopup}
         onConfirm={popup.onConfirm}
       />
     </LinearGradient>

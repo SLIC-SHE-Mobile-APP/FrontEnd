@@ -30,7 +30,7 @@ export default function RootLayout() {
         <StatusBar
           translucent
           backgroundColor='transparent'
-          // barStyle='light-content'
+          barStyle='light-content'
         />
 
 

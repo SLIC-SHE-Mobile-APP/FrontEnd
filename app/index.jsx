@@ -9,7 +9,7 @@ import ForgotPassword from './ForgotPassword.jsx';
 
 export default function HomeScreen() {
   return (
-    <ForgotPassword/>
+    <Home/>
   );
 }
 const styles = StyleSheet.create({
