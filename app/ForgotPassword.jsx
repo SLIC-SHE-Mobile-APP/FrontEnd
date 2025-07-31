@@ -23,7 +23,7 @@ import {
 } from "react-native-safe-area-context";
 
 function ForgotPasswordContent() {
-  const [contactMethod, setContactMethod] = useState('email'); 
+  const [contactMethod, setContactMethod] = useState('email');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -110,11 +110,11 @@ function ForgotPasswordContent() {
     }
 
     setLoading(true);
-    
+
     // Simulate API call
     setTimeout(() => {
       setLoading(false);
-      
+
       if (contactMethod === 'email') {
         Alert.alert('Success', `OTP sent to ${email}`);
         router.push({
@@ -160,7 +160,7 @@ function ForgotPasswordContent() {
           styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
-            marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0,
+            // marginBottom: isKeyboardVisible ? keyboardHeight - 100 : 0,
           },
         ]}
       >
@@ -179,7 +179,7 @@ function ForgotPasswordContent() {
           <View style={styles.formSection}>
             {/* Toggle Buttons */}
             <View style={styles.toggleContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.toggleButton, contactMethod === 'email' && styles.activeToggle]}
                 onPress={() => setContactMethod('email')}
                 disabled={loading}
@@ -194,8 +194,8 @@ function ForgotPasswordContent() {
                   </Text>
                 </View>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.toggleButton, contactMethod === 'phone' && styles.activeToggle]}
                 onPress={() => setContactMethod('phone')}
                 disabled={loading}
@@ -268,7 +268,7 @@ function ForgotPasswordContent() {
             {/* Info Text */}
             <View style={styles.infoContainer}>
               <Text style={styles.infoText}>
-                {contactMethod === 'email' 
+                {contactMethod === 'email'
                   ? "We'll send you an OTP to reset your password via email"
                   : "We'll send you an OTP to reset your password via SMS"
                 }
@@ -294,8 +294,14 @@ function ForgotPasswordContent() {
             </TouchableOpacity>
 
             {/* Back to Login */}
-            <TouchableOpacity 
-              onPress={() => navigation.goBack()}
+            <TouchableOpacity
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/login'); 
+                }
+              }}
               disabled={loading}
               style={styles.backContainer}
             >

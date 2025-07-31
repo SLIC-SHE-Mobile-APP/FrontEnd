@@ -529,7 +529,7 @@ function OTPVerificationContent() {
           styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
-            marginBottom: isKeyboardVisible ? keyboardHeight - 80 : 0,
+            // marginBottom: isKeyboardVisible ? keyboardHeight - 500 : 0,
           },
         ]}
       >
