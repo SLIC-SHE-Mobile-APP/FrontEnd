@@ -3,9 +3,10 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   Image,
   Modal,
   Platform,
@@ -15,7 +16,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -87,28 +87,18 @@ const CustomPopup = ({
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
-        <TouchableOpacity 
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
-          onPress={!showConfirmButton ? onClose : undefined}
+          onPress={() => {
+            if (!showConfirmButton && onClose) {
+              onClose();
+            }
+          }}
         />
-        <Animated.View
-          style={[
-            styles.popupContainer,
-            {
-              transform: [{ scale: scaleAnim }],
-            },
-          ]}
-        >
-          <View
-            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
-          >
+        <Animated.View style={[styles.popupContainer, { transform: [{ scale: scaleAnim }] }]}>
+          <View style={[styles.popupIconContainer, { backgroundColor: bgColor }]}>
             <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
           </View>
 
@@ -127,17 +117,13 @@ const CustomPopup = ({
             <TouchableOpacity
               style={[
                 styles.popupButton,
-                showConfirmButton
-                  ? styles.popupCancelButton
-                  : styles.popupOkButton,
+                showConfirmButton ? styles.popupCancelButton : styles.popupOkButton,
               ]}
               onPress={onClose}
             >
               <Text
                 style={[
-                  showConfirmButton
-                    ? styles.popupCancelButtonText
-                    : styles.popupOkButtonText,
+                  showConfirmButton ? styles.popupCancelButtonText : styles.popupOkButtonText,
                 ]}
               >
                 {showConfirmButton ? "Cancel" : "OK"}
@@ -149,6 +135,7 @@ const CustomPopup = ({
     </Modal>
   );
 };
+
 
 const EditClaimIntimation1 = ({ route }) => {
   const navigation = useNavigation();
@@ -1144,9 +1131,9 @@ const EditClaimIntimation1 = ({ route }) => {
       patientData:
         beneficiaries.length > 0
           ? {
-              patientName: beneficiaries[0].name,
-              illness: beneficiaries[0].illness,
-            }
+            patientName: beneficiaries[0].name,
+            illness: beneficiaries[0].illness,
+          }
           : {},
     });
   };
@@ -1887,11 +1874,13 @@ const EditClaimIntimation1 = ({ route }) => {
       "Submit Claim",
       "Are you sure you want to submit this claim?",
       "confirm",
+
       true,
       async () => {
         hidePopup();
         try {
           console.log("Submitting claim...");
+          navigation?.goBack();
 
           // Validate that we have a reference number
           if (!claimDetails.referenceNo) {
@@ -1943,11 +1932,14 @@ const EditClaimIntimation1 = ({ route }) => {
 
   // Handle submit later
   const handleSubmitLater = () => {
-    showPopup("Saved", "Claim saved for later submission.", "success", false, () => {
-      hidePopup();
-      navigation?.goBack();
-    });
+    showPopup("Saved", "Claim saved for later submission.", "success");
+  
+    // Delay navigation to give user time to see the popup
+    setTimeout(() => {
+      navigation.goBack();
+    }, 1500); // Adjust delay as needed
   };
+  
 
   // Document icon with image loading on click
   const renderDocumentImage = (document) => {
@@ -1991,8 +1983,8 @@ const EditClaimIntimation1 = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -2405,8 +2397,8 @@ const EditClaimIntimation1 = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : "Select Member"}
+                    ? selectedMember.name
+                    : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2424,7 +2416,7 @@ const EditClaimIntimation1 = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2432,7 +2424,7 @@ const EditClaimIntimation1 = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -2510,10 +2502,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -2542,7 +2534,7 @@ const EditClaimIntimation1 = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -2552,7 +2544,7 @@ const EditClaimIntimation1 = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -2601,10 +2593,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   editDocumentType === "O01" &&
-                    (!newDocument.amount ||
-                      newDocument.amount.trim() === "" ||
-                      parseFloat(newDocument.amount) <= 0) &&
-                    styles.textInputError,
+                  (!newDocument.amount ||
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0) &&
+                  styles.textInputError,
                 ]}
                 placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
                 placeholderTextColor="#B0B0B0"
@@ -2631,12 +2623,12 @@ const EditClaimIntimation1 = ({ route }) => {
                     (!newDocument.amount ||
                       newDocument.amount.trim() === "" ||
                       parseFloat(newDocument.amount) <= 0) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!newDocument.amount ||
-                  newDocument.amount.trim() === "" ||
-                  parseFloat(newDocument.amount) <= 0
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0
                     ? "Amount is required and must be greater than 0 for Bill type"
                     : "Amount is required for Bill type"}
                 </Text>

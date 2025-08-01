@@ -14,17 +14,15 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
+  View
 } from "react-native";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome";
-import ClaimTypeSelection from "./NewClaim.jsx";
+import { API_BASE_URL } from "../constants/index.js";
 import ClaimHistory from "./ClaimHistory";
+import ClaimTypeSelection from "./NewClaim.jsx";
 import PendingIntimations from "./PendingIntimations";
 import PendingRequirement from "./PendingRequirement";
-import { API_BASE_URL } from "../constants/index.js";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
