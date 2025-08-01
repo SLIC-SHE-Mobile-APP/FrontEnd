@@ -219,33 +219,35 @@ const PendingRequirement = ({ onClose }) => {
 
   const renderRequirementCard = (requirement) => (
     <View key={requirement.id} style={styles.requirementCard}>
+      {/* Main Content Area */}
       <View style={styles.cardContent}>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Claim Number</Text>
-          <Text style={styles.colon}>:</Text>
-          <Text style={styles.value}>{requirement.claimNumber}</Text>
+        {/* First View - Claim Number */}
+        <View style={styles.sectionView}>
+          <Text style={styles.sectionHeader}>Claim Number</Text>
+          <Text style={styles.sectionValue}>{requirement.claimNumber}</Text>
         </View>
-        
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Required Documents</Text>
-          <Text style={styles.colon}>:</Text>
-          <Text style={styles.value}>{requirement.requiredDocuments.join(', ')}</Text>
+
+        {/* Second View - Required Documents */}
+        <View style={styles.sectionView}>
+          <Text style={styles.sectionHeader}>Required Document</Text>
+          <Text style={styles.sectionValue}>{requirement.requiredDocuments.join(', ')}</Text>
         </View>
-        
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Required Date</Text>
-          <Text style={styles.colon}>:</Text>
-          <Text style={styles.value}>{requirement.requiredDate}</Text>
+
+        {/* Third View - Required Date with Send Button */}
+        <View style={styles.sectionView}>
+          <Text style={styles.sectionHeader}>Required Date</Text>
+          <View style={styles.dateRowWithButton}>
+            <Text style={styles.sectionValue}>{requirement.requiredDate}</Text>
+            <TouchableOpacity 
+              style={styles.sendButton}
+              onPress={() => handleSendPress(requirement)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="send" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-      
-      <TouchableOpacity 
-        style={styles.sendButton}
-        onPress={() => handleSendPress(requirement)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="send" size={20} color="#FFFFFF" />
-      </TouchableOpacity>
     </View>
   );
 
@@ -259,7 +261,6 @@ const PendingRequirement = ({ onClose }) => {
         <View style={styles.emptyContainer}>
           <Ionicons name="document-outline" size={60} color="#00ADBB" />
           <Text style={styles.emptyText}>No pending requirements found</Text>
-          
         </View>
       );
     }
@@ -314,6 +315,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#13646D',
     textAlign: 'left',
+    marginBottom:15,
     flex: 1,
   },
   // Custom Loading Styles
@@ -374,8 +376,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderWidth: 1,
     borderColor: '#00ADBB',
-    flexDirection: 'row',
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -385,31 +385,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  cardContent: {
-    flex: 1,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 14,
-    color: '#00ADBB',
-    fontWeight: '500',
-    width: 120,
-  },
-  colon: {
-    marginHorizontal: 5,
-    fontSize: 14,
-    color: '#13646D',
-  },
-  value: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#13646D',
-    flex: 1,
-  },
   sendButton: {
     backgroundColor: '#00ADBB',
     borderRadius: 25,
@@ -417,7 +392,6 @@ const styles = StyleSheet.create({
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -426,6 +400,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  sectionView: {
+    marginBottom: 15,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sectionHeader: {
+    fontSize: 14,
+    color: '#00ADBB',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  sectionValue: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#13646D',
+    lineHeight: 20,
+    flex: 1,
+  },
+  dateRowWithButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   emptyContainer: {
     flex: 1,

@@ -106,7 +106,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContainer}>
         <LoadingIcon />
-        <Text style={styles.loadingText}>Loading Claim History...</Text>
+        <Text style={styles.loadingText}>Loading Online Claim History...</Text>
         <Text style={styles.loadingSubText}>Please wait a moment</Text>
       </View>
     </View>
@@ -386,7 +386,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
       {/* Fixed Header */}
       <View style={styles.header}>
         <View style={{ width: 26 }} />
-        <Text style={styles.headerTitle}>Claim History</Text>
+        <Text style={styles.headerTitle}>Online Claim History</Text>
         <TouchableOpacity onPress={onClose}>
           <Ionicons
             name="close"

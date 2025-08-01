@@ -32,7 +32,7 @@ export default function PolicyHome({ route }) {
   const [policyDetails, setPolicyDetails] = useState(null);
   const [slideAnim] = useState(new Animated.Value(screenHeight));
   const [showPolicySelection, setShowPolicySelection] = useState(false);
-  const [policySelectSlideAnim] = useState(new Animated.Value(1000)); 
+  const [policySelectSlideAnim] = useState(new Animated.Value(1000));
   const [selectedPolicyNumber, setSelectedPolicyNumber] = useState(null);
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [dependents, setDependents] = useState([]);
@@ -966,8 +966,9 @@ export default function PolicyHome({ route }) {
   }, []);
 
   const handleMemberSelect = async (member) => {
-    setSelectedMember(member);
-    setShowMemberDropdown(false);
+    // Remove these lines that set the selected member:
+    // setSelectedMember(member);
+    setShowMemberDropdown(false); // Only close the dropdown
 
     try {
       // Get existing policy data
@@ -1210,13 +1211,9 @@ export default function PolicyHome({ route }) {
           >
             <View style={styles.memberInfo}>
               <Text style={styles.memberName}>
-                {selectedMember ? selectedMember.name : "View Your Members"}
+                View Your Members {/* Always show this text */}
               </Text>
-              {selectedMember && (
-                <Text style={styles.memberRelationship}>
-                  {selectedMember.relationship}
-                </Text>
-              )}
+              {/* Remove the conditional rendering of relationship */}
             </View>
             <View style={styles.memberActions}>
               <View style={styles.totalBadge}>
@@ -1225,12 +1222,6 @@ export default function PolicyHome({ route }) {
                   {membersCount.toString().padStart(2, "0")}
                 </Text>
               </View>
-              <Icon
-                name={showMemberDropdown ? "chevron-up" : "chevron-down"}
-                size={16}
-                color="#666"
-                style={styles.dropdownIcon}
-              />
             </View>
           </TouchableOpacity>
 
@@ -1248,11 +1239,7 @@ export default function PolicyHome({ route }) {
                 members.map((member) => (
                   <TouchableOpacity
                     key={member.id}
-                    style={[
-                      styles.dropdownItem,
-                      selectedMember?.id === member.id &&
-                        styles.selectedDropdownItem,
-                    ]}
+                    style={styles.dropdownItem} // Remove selected styling
                     onPress={() => handleMemberSelect(member)}
                   >
                     <View style={styles.dropdownMemberInfo}>
@@ -1263,9 +1250,7 @@ export default function PolicyHome({ route }) {
                         {member.relationship}
                       </Text>
                     </View>
-                    {selectedMember?.id === member.id && (
-                      <Icon name="check" size={16} color="#16858D" />
-                    )}
+                    {/* Remove the check icon */}
                   </TouchableOpacity>
                 ))
               )}
@@ -1389,7 +1374,7 @@ export default function PolicyHome({ route }) {
                       style={[
                         styles.policyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                          styles.selectedPolicyItem,
+                        styles.selectedPolicyItem,
                       ]}
                       onPress={() => handlePolicySelection(policy)}
                     >
@@ -1579,19 +1564,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   headerContent: {
+
     paddingHorizontal: 20,
     paddingTop: 30,
     paddingBottom: 20,
   },
   logoContainer: {
-    marginLeft: 10,
-    marginTop: 10,
+    display: 'flex',
+    alignItems: 'left'
   },
   logoRow: {
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 15, marginTop: 15,
     display: "flex",
-    justifyContent: "center",
+    justifyContent: "left",
   },
   logo: {
     width: 150,
@@ -1621,22 +1607,31 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   userSection: {
+    backgroundColor: 'white',
+    width: '100%',
+    height: 50,
+    borderRadius: 20,
     display: "flex",
     alignItems: "center",
     justifyContent: "right",
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "center", shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 3,
   },
   userAvatar: {
     width: 30,
+    marginLeft: 10,
     height: 30,
     borderRadius: 15,
-    marginRight: 10,
+    marginRight: 20,
   },
   userName: {
     fontSize: 16,
     color: "#333",
-    marginRight: 120,
+    marginRight: 130,
   },
   body: {
     padding: 15,

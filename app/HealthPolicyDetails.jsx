@@ -564,7 +564,7 @@ const HealthPolicyDetails = () => {
           return <DownloadClaimForms {...commonProps} />;
         case "Online Claim Intimations":
           return <OnlineClaimIntimations {...commonProps} />;
-        case "Claim History":
+        case "Online Claim History":
           return <ClaimHistory {...commonProps} />;
         case "Payment History":
           return <PaymentHistory {...commonProps} />;
@@ -655,7 +655,7 @@ const HealthPolicyDetails = () => {
       "Hospitals List",
       "Download Claim Forms",
       "Online Claim Intimations",
-      "Claim History",
+      "Online Claim History",
       "Pending Requirements",
       "Payment History",
     ],
@@ -742,7 +742,7 @@ const HealthPolicyDetails = () => {
       </View>
 
       {/* Bottom Navigation Bar */}
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { paddingBottom: insets.bottom }]}>
         {renderNavItem("home", "Home", handleNavigation)}
         {renderNavItem("bell", "Notification", handleNavigation)}
         {renderNavItem("file-text", "Policy Details", handleNavigation)}
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     marginTop: 20,
-    paddingHorizontal: 15,
+    paddingHorizontal: 15,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
   },
   headerRow: {
     flexDirection: "row",
@@ -854,7 +854,7 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     flex: 1,
     marginTop: 20,
-    marginBottom: 65,
+    marginBottom: 35,
   },
   buttonsWrapper: {
     borderRadius: 30,
