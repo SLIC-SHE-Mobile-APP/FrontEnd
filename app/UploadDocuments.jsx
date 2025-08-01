@@ -1,13 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Alert,
   Dimensions,
@@ -21,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -31,11 +31,14 @@ const UploadDocuments = ({ route }) => {
     memberNo = "",
     policyNo = "",
     patientData: initialPatientData = {},
-    // ADD THESE NEW PARAMETERS
     claimId = "",
     patientName = "",
     illness = "",
     claimType = "",
+    // ADD THESE NEW PARAMETERS FOR CLAIM AMOUNT HANDLING
+    currentClaimAmount = "0.00",
+    fromEditClaim = false,
+    referenceNo = "",
   } = route?.params || {};
 
   const patientData = route?.params?.patientData || {};
@@ -58,8 +61,10 @@ const UploadDocuments = ({ route }) => {
   const [storedPatientName, setStoredPatientName] = useState("");
   const [storedClaimType, setStoredClaimType] = useState("");
   const [storedIllness, setStoredIllness] = useState("");
-  const [storedBeneficiaryAmount, setStoredBeneficiaryAmount] = useState("0");
-
+  
+  // ADD NEW STATE FOR TRACKING ACTUAL CLAIM AMOUNT FROM API
+  const [actualClaimAmount, setActualClaimAmount] = useState("0.00");
+  const [claimAmountLoading, setClaimAmountLoading] = useState(false);
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -80,12 +85,80 @@ const UploadDocuments = ({ route }) => {
     },
   ]);
 
+  // FETCH CLAIM AMOUNT FROM API
+  const fetchClaimAmountFromAPI = async (referenceNo) => {
+    try {
+      setClaimAmountLoading(true);
+      console.log("Fetching claim amount from API for referenceNo:", referenceNo);
+
+      if (!referenceNo || referenceNo.trim() === "") {
+        console.warn("Invalid referenceNo provided:", referenceNo);
+        setActualClaimAmount("0.00");
+        return "0.00";
+      }
+
+      const requestBody = {
+        seqNo: referenceNo.trim(),
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("No claim amount found for referenceNo:", referenceNo);
+          setActualClaimAmount("0.00");
+          return "0.00";
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Claim Amount API Response:", data);
+
+      let claimAmount = "0.00";
+
+      if (data && typeof data === "object") {
+        if (data.claimAmount !== undefined && data.claimAmount !== null) {
+          claimAmount = data.claimAmount.toString();
+        } else if (data.amount !== undefined && data.amount !== null) {
+          claimAmount = data.amount.toString();
+        } else if (data.totalAmount !== undefined && data.totalAmount !== null) {
+          claimAmount = data.totalAmount.toString();
+        }
+      } else if (typeof data === "number" || typeof data === "string") {
+        claimAmount = data.toString();
+      }
+
+      const formattedAmount = claimAmount.includes(".")
+        ? claimAmount
+        : `${claimAmount}.00`;
+
+      console.log("Formatted claim amount:", formattedAmount);
+      setActualClaimAmount(formattedAmount);
+      return formattedAmount;
+    } catch (error) {
+      console.error("Error fetching claim amount:", error);
+      setActualClaimAmount("0.00");
+      return "0.00";
+    } finally {
+      setClaimAmountLoading(false);
+    }
+  };
+
   // Fetch document types from API
   useEffect(() => {
     const fetchDocumentTypes = async () => {
       try {
         setLoading(true);
-        // You can make this dynamic based on request type if needed
         const response = await fetch(
           `${API_BASE_URL}/RequiredDocumentsCon/Outdoor`
         );
@@ -95,8 +168,6 @@ const UploadDocuments = ({ route }) => {
         }
 
         const data = await response.json();
-
-        // Transform API response to match the expected format
         const transformedDocumentTypes = data.map((doc) => ({
           id: doc.docId,
           label: doc.docDesc,
@@ -111,7 +182,6 @@ const UploadDocuments = ({ route }) => {
           "Failed to load document types. Please try again."
         );
 
-        // Fallback to hardcoded types if API fails
         setDocumentTypes([
           { id: "O01", label: "BILL", icon: "receipt-outline" },
           { id: "O02", label: "PRESCRIPTION", icon: "medical-outline" },
@@ -126,56 +196,85 @@ const UploadDocuments = ({ route }) => {
     fetchDocumentTypes();
   }, []);
 
+  // LOAD STORED VALUES AND FETCH CLAIM AMOUNT
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
-        const referenceNo = await SecureStore.getItemAsync("stored_claim_seq_no");
+        const referenceNoFromStore = await SecureStore.getItemAsync(
+          "stored_claim_seq_no"
+        );
         const nic = await SecureStore.getItemAsync("user_nic");
-        // LOAD ADDITIONAL STORED VALUES
-        const storedPatientNameFromStore = await SecureStore.getItemAsync("stored_patient_name");
-        const storedClaimTypeFromStore = await SecureStore.getItemAsync("stored_claim_type");
-        const storedIllnessFromStore = await SecureStore.getItemAsync("stored_illness_description");
-        // ADD THIS LINE
-        const storedBeneficiaryAmountFromStore = await SecureStore.getItemAsync("stored_beneficiary_amount");
+        const storedPatientNameFromStore = await SecureStore.getItemAsync(
+          "stored_patient_name"
+        );
+        const storedClaimTypeFromStore = await SecureStore.getItemAsync(
+          "stored_claim_type"
+        );
+        const storedIllnessFromStore = await SecureStore.getItemAsync(
+          "stored_illness_description"
+        );
 
-        setStoredReferenceNo(referenceNo || "");
+        // Determine the reference number to use
+        const finalReferenceNo = referenceNo || referenceNoFromStore || "";
+        
+        setStoredReferenceNo(finalReferenceNo);
         setStoredNic(nic || "");
-
-        // SET VALUES FROM ROUTE PARAMS OR STORED VALUES
         setStoredPatientName(patientName || storedPatientNameFromStore || "");
         setStoredClaimType(claimType || storedClaimTypeFromStore || "");
         setStoredIllness(illness || storedIllnessFromStore || "");
-        // ADD THIS LINE
-        setStoredBeneficiaryAmount(storedBeneficiaryAmountFromStore || "0");
 
         console.log("Loaded stored values:", {
-          referenceNo,
+          referenceNo: finalReferenceNo,
           nic,
           patientName: patientName || storedPatientNameFromStore,
           claimType: claimType || storedClaimTypeFromStore,
           illness: illness || storedIllnessFromStore,
-          // ADD THIS LINE
-          beneficiaryAmount: storedBeneficiaryAmountFromStore || "0"
+          fromEditClaim: fromEditClaim,
+          passedCurrentClaimAmount: currentClaimAmount,
         });
+
+        // FETCH ACTUAL CLAIM AMOUNT FROM API
+        if (finalReferenceNo) {
+          await fetchClaimAmountFromAPI(finalReferenceNo);
+        } else {
+          setActualClaimAmount("0.00");
+        }
       } catch (error) {
         console.error("Error loading stored values:", error);
+        setActualClaimAmount("0.00");
       }
     };
 
     loadStoredValues();
-  }, [patientName, claimType, illness]);
+  }, [patientName, claimType, illness, referenceNo]);
+
+  // USE FOCUS EFFECT TO REFRESH CLAIM AMOUNT WHEN SCREEN IS FOCUSED
+  useFocusEffect(
+    useCallback(() => {
+      const refreshClaimAmount = async () => {
+        if (fromEditClaim) {
+          console.log("Screen focused from EditClaim, refreshing claim amount...");
+          const refNo = referenceNo || storedReferenceNo;
+          if (refNo) {
+            await fetchClaimAmountFromAPI(refNo);
+          }
+        }
+      };
+
+      refreshClaimAmount();
+    }, [fromEditClaim, referenceNo, storedReferenceNo])
+  );
 
   const formatDateForAPI = (date) => {
     const day = date.getDate().toString().padStart(2, "0");
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits
+    const year = date.getFullYear().toString().slice(-2);
     return `${day}-${month}-${year}`;
   };
 
   const createFormDataForDocument = async (document) => {
     const formData = new FormData();
 
-    // Add the image file
     const fileUri = document.uri;
     const fileName = document.name;
     const fileType = document.type || "image/jpeg";
@@ -186,7 +285,6 @@ const UploadDocuments = ({ route }) => {
       name: fileName,
     });
 
-    // Add other required fields
     formData.append("ClmSeqNo", storedReferenceNo);
     formData.append("DocType", document.documentType);
     formData.append("ImgName", fileName);
@@ -200,7 +298,6 @@ const UploadDocuments = ({ route }) => {
     return formData;
   };
 
-  // Helper function to get appropriate icon for document type
   const getIconForDocType = (docDesc) => {
     switch (docDesc.toUpperCase()) {
       case "BILL":
@@ -216,45 +313,44 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
+  // UPDATED: Use actualClaimAmount from API
   const isDocumentTypeDisabled = (docTypeId) => {
-    // Disable BILL (O01) if beneficiary amount is greater than 0
     if (docTypeId === "O01") {
-      const beneficiaryAmount = parseFloat(storedBeneficiaryAmount || "0");
+      const beneficiaryAmount = parseFloat(actualClaimAmount || "0");
+      console.log("Checking BILL disable condition:", {
+        docTypeId,
+        actualClaimAmount,
+        beneficiaryAmount,
+        isDisabled: beneficiaryAmount > 0,
+      });
       return beneficiaryAmount > 0;
     }
     return false;
   };
 
-  // 4. Update the handleDocumentTypeSelect function
   const handleDocumentTypeSelect = (type) => {
-    // Check if document type is disabled
     if (isDocumentTypeDisabled(type)) {
+      const currentAmount = parseFloat(actualClaimAmount || "0");
       Alert.alert(
         "Document Type Not Available",
-        "Bill document type is not available when beneficiary amount is greater than 0."
+        `Bill document type is not available when the current claim amount is Rs ${currentAmount.toFixed(
+          2
+        )}. Only non-bill documents can be added to existing claims with amounts.`
       );
       return;
     }
 
     setSelectedDocumentType(type);
-
-    // Store the selected docId temporarily
     setSelectedDocId(type);
     console.log("Selected document type ID:", type);
 
-    // Set amount based on document type
     if (type === "O02" || type === "O03") {
-      // PRESCRIPTION or DIAGNOSIS CARD
       setAmount("0.00");
     } else if (type === "O01") {
-      // BILL
-      setAmount(""); // Clear amount for bill type so user can enter
+      setAmount("");
     } else {
-      setAmount(""); // Clear for other types
+      setAmount("");
     }
-
-    // Don't clear uploaded documents when switching document types
-    // setUploadedDocuments([]);
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -275,24 +371,17 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleAmountChange = (text) => {
-    // If document type is prescription or diagnosis, don't allow editing
     if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return;
     }
 
-    // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
 
-    // Format the amount
     let formattedAmount = cleanedText;
-
-    // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
@@ -302,22 +391,18 @@ const UploadDocuments = ({ route }) => {
     setAmount(formattedAmount);
   };
 
-  // Add image compression function
   const compressImage = async (imageUri) => {
     try {
-      // Get file info to check size
       const fileInfo = await FileSystem.getInfoAsync(imageUri);
       const fileSizeInMB = fileInfo.size / (1024 * 1024);
 
       console.log(`Original image size: ${fileSizeInMB.toFixed(2)} MB`);
 
-      // If image is already less than 1MB, return as is
       if (fileSizeInMB < 1) {
         console.log("Image is already under 1MB, no compression needed");
         return imageUri;
       }
 
-      // If image is larger than 5MB, show error
       if (fileSizeInMB > 5) {
         Alert.alert(
           "File Too Large",
@@ -326,10 +411,7 @@ const UploadDocuments = ({ route }) => {
         return null;
       }
 
-      // Compress image to target 1MB
-      let compress = 0.8; // Start with 80% quality
-
-      // Calculate compression based on file size
+      let compress = 0.8;
       if (fileSizeInMB > 3) {
         compress = 0.3;
       } else if (fileSizeInMB > 2) {
@@ -340,10 +422,7 @@ const UploadDocuments = ({ route }) => {
 
       const compressedImage = await ImageManipulator.manipulateAsync(
         imageUri,
-        [
-          // Resize if image is too large
-          { resize: { width: 1200 } }, // Resize to max width of 1200px
-        ],
+        [{ resize: { width: 1200 } }],
         {
           compress: compress,
           format: ImageManipulator.SaveFormat.JPEG,
@@ -351,7 +430,6 @@ const UploadDocuments = ({ route }) => {
         }
       );
 
-      // Check compressed file size
       const compressedFileInfo = await FileSystem.getInfoAsync(
         compressedImage.uri
       );
@@ -368,24 +446,17 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleEditAmountChange = (text) => {
-    // If document type is prescription or diagnosis, don't allow editing
     if (editDocumentType === "O02" || editDocumentType === "O03") {
       return;
     }
 
-    // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
 
-    // Format the amount
     let formattedAmount = cleanedText;
-
-    // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
@@ -396,12 +467,10 @@ const UploadDocuments = ({ route }) => {
   };
 
   const validateAmount = (amountString) => {
-    // For prescription and diagnosis, 0.00 is valid
     if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return true;
     }
 
-    // For bill type, amount must be greater than 0
     if (selectedDocumentType === "O01") {
       if (!amountString || amountString.trim() === "") {
         return false;
@@ -415,7 +484,6 @@ const UploadDocuments = ({ route }) => {
       return true;
     }
 
-    // For other types, any valid number is acceptable
     if (!amountString || amountString.trim() === "") {
       return false;
     }
@@ -437,27 +505,22 @@ const UploadDocuments = ({ route }) => {
     return amount.toFixed(2);
   };
 
-  // FIXED: Check if maximum documents reached based on document type
   const canAddMoreDocuments = () => {
     if (selectedDocumentType === "O01") {
-      // BILL
-      // Count only bill-type documents
       const billDocuments = uploadedDocuments.filter(
         (doc) => doc.documentType === "O01"
       );
-      return billDocuments.length < 1; // Only 1 bill document allowed
+      return billDocuments.length < 1;
     }
-    return true; // No limit for other document types
+    return true;
   };
 
   const handleBrowseFiles = async () => {
-    // Add validation for document type
     if (!selectedDocumentType) {
       Alert.alert("Validation Error", "Please select a document type first");
       return;
     }
 
-    // Add validation for bill amount
     if (
       selectedDocumentType === "O01" &&
       (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
@@ -488,21 +551,18 @@ const UploadDocuments = ({ route }) => {
 
         let finalUri = file.uri;
 
-        // If it's an image, compress it
         if (file.mimeType && file.mimeType.startsWith("image/")) {
           const compressedUri = await compressImage(file.uri);
           if (!compressedUri) {
-            return; // Compression failed or file too large
+            return;
           }
           finalUri = compressedUri;
         }
 
-        // Get document type label for custom name
         const docTypeLabel =
           documentTypes.find((type) => type.id === selectedDocumentType)
             ?.label || selectedDocumentType;
 
-        // Generate custom name based on document type
         const fileExtension = file.name.split(".").pop();
         const customName = `${docTypeLabel}.${fileExtension}`;
 
@@ -518,7 +578,6 @@ const UploadDocuments = ({ route }) => {
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
 
-        // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
@@ -532,13 +591,11 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleTakePhoto = async () => {
-    // Add validation for document type
     if (!selectedDocumentType) {
       Alert.alert("Validation Error", "Please select a document type first");
       return;
     }
 
-    // Add validation for bill amount
     if (
       selectedDocumentType === "O01" &&
       (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
@@ -582,18 +639,15 @@ const UploadDocuments = ({ route }) => {
           "Please wait while we optimize your image..."
         );
 
-        // Compress the captured photo
         const compressedUri = await compressImage(photo.uri);
         if (!compressedUri) {
-          return; // Compression failed or file too large
+          return;
         }
 
-        // Get document type label for custom name
         const docTypeLabel =
           documentTypes.find((type) => type.id === selectedDocumentType)
             ?.label || selectedDocumentType;
 
-        // Generate custom name based on document type
         const customName = `${docTypeLabel}.jpg`;
 
         const newDocument = {
@@ -608,7 +662,6 @@ const UploadDocuments = ({ route }) => {
         };
         setUploadedDocuments((prev) => [...prev, newDocument]);
 
-        // Reset form after successful upload
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
@@ -670,12 +723,10 @@ const UploadDocuments = ({ route }) => {
   };
 
   const validateEditAmount = (amountString) => {
-    // For prescription and diagnosis, 0.00 is valid
     if (editDocumentType === "O02" || editDocumentType === "O03") {
       return true;
     }
 
-    // For bill type, amount must be greater than 0
     if (editDocumentType === "O01") {
       if (!amountString || amountString.trim() === "") {
         return false;
@@ -689,7 +740,6 @@ const UploadDocuments = ({ route }) => {
       return true;
     }
 
-    // For other types, any valid number is acceptable
     if (!amountString || amountString.trim() === "") {
       return false;
     }
@@ -737,7 +787,6 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    // Validate stored values
     if (!storedReferenceNo || !storedNic) {
       Alert.alert(
         "Error",
@@ -769,7 +818,6 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    // Show loading alert
     Alert.alert("Uploading", "Please wait while we upload your documents...");
 
     try {
@@ -778,7 +826,6 @@ const UploadDocuments = ({ route }) => {
       );
       const results = await Promise.all(uploadPromises);
 
-      // Check if all uploads were successful
       const failedUploads = results.filter((result) => !result.success);
 
       if (failedUploads.length > 0) {
@@ -797,75 +844,80 @@ const UploadDocuments = ({ route }) => {
         return;
       }
 
-      // All uploads successful - UPDATED TO PASS COMPREHENSIVE DATA
       const claimData = {
         referenceNo: storedReferenceNo,
         enteredBy: storedPatientName || patientData.patientName || "Unknown",
         status: "Submission for Approval Pending",
         claimType: storedClaimType || patientData.claimType || "Unknown",
-        createdOn: new Date().toLocaleDateString('en-GB'),
-        // Add beneficiary data
-        beneficiaries: [{
-          id: "1",
-          name: storedPatientName || patientData.patientName || "Unknown",
-          relationship: "Self",
-          illness: storedIllness || patientData.illness || "",
-          amount: "0.00"
-        }],
-        // Add document data
-        documents: uploadedDocuments.map(doc => ({
+        createdOn: new Date().toLocaleDateString("en-GB"),
+        beneficiaries: [
+          {
+            id: "1",
+            name: storedPatientName || patientData.patientName || "Unknown",
+            relationship: "Self",
+            illness: storedIllness || patientData.illness || "",
+            amount: "0.00",
+          },
+        ],
+        documents: uploadedDocuments.map((doc) => ({
           id: doc.id,
           type: getDocumentTypeLabel(doc.documentType),
           date: doc.date,
           amount: doc.amount,
           documentType: doc.documentType,
           uri: doc.uri,
-          imgContent: null
+          imgContent: null,
         })),
-        // Metadata
         metadata: {
           userNic: storedNic,
           totalDocuments: uploadedDocuments.length,
           uploadTimestamp: new Date().toISOString(),
-        }
+        },
       };
 
-      console.log("All documents uploaded successfully. Passing data:", claimData);
+      console.log(
+        "All documents uploaded successfully. Passing data:",
+        claimData
+      );
 
-      // Show success alert and navigate with comprehensive data
       Alert.alert("Success", "All documents uploaded successfully!", [
         {
           text: "OK",
           onPress: () => {
-            // Add a slight delay to ensure API calls are completed
             setTimeout(() => {
-              navigation.navigate("EditClaimIntimation", {
-                claim: claimData,
-                // ENSURE THESE KEY PARAMETERS ARE PASSED EXPLICITLY
-                referenceNo: storedReferenceNo,
-                claimType: storedClaimType || patientData.claimType,
-                patientName: storedPatientName || patientData.patientName,
-                illness: storedIllness || patientData.illness,
-                claimId: claimId,
-                userNic: storedNic,
-                // Add this flag to indicate documents were just uploaded
-                documentsUploaded: true,
-                // Keep backward compatibility
-                submittedData: {
-                  patientData: {
-                    ...patientData,
-                    patientName: storedPatientName || patientData.patientName,
-                    illness: storedIllness || patientData.illness,
-                    claimType: storedClaimType || patientData.claimType,
-                    referenceNo: storedReferenceNo,
-                    claimId: claimId,
+              if (fromEditClaim) {
+                navigation.navigate("EditClaimIntimation", {
+                  ...route.params,
+                  fromUploadDocuments: true,
+                  documentsUploaded: true,
+                  refreshClaimAmount: true,
+                });
+              } else {
+                navigation.navigate("EditClaimIntimation", {
+                  claim: claimData,
+                  referenceNo: storedReferenceNo,
+                  claimType: storedClaimType || patientData.claimType,
+                  patientName: storedPatientName || patientData.patientName,
+                  illness: storedIllness || patientData.illness,
+                  claimId: claimId,
+                  userNic: storedNic,
+                  documentsUploaded: true,
+                  submittedData: {
+                    patientData: {
+                      ...patientData,
+                      patientName: storedPatientName || patientData.patientName,
+                      illness: storedIllness || patientData.illness,
+                      claimType: storedClaimType || patientData.claimType,
+                      referenceNo: storedReferenceNo,
+                      claimId: claimId,
+                    },
+                    documents: uploadedDocuments,
+                    uploadResults: results,
+                    metadata: claimData.metadata,
                   },
-                  documents: uploadedDocuments,
-                  uploadResults: results,
-                  metadata: claimData.metadata
-                },
-              });
-            }, 500); // 500ms delay
+                });
+              }
+            }, 500);
           },
         },
       ]);
@@ -878,10 +930,7 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
-
-
   const handleAddDocumentButton = async () => {
-    // Log all the details that will be passed
     console.log("Reference Number:", storedReferenceNo);
     console.log("Patient Name:", storedPatientName || patientData.patientName);
     console.log("Claim Type:", storedClaimType);
@@ -889,28 +938,35 @@ const UploadDocuments = ({ route }) => {
     console.log("User NIC:", storedNic);
     console.log("Claim ID:", claimId);
     console.log("Total Documents:", uploadedDocuments.length);
+    console.log("Current Claim Amount:", actualClaimAmount);
     console.log("=====================================");
 
-    // Call the main function
     await handleAddDocument();
   };
 
   const handleBackPress = () => {
     console.log("Back button pressed");
     try {
-      navigation.goBack();
+      if (fromEditClaim) {
+        navigation.navigate("EditClaimIntimation", {
+          ...route.params,
+          fromUploadDocuments: true,
+          refreshClaimAmount: true,
+        });
+      } else {
+        navigation.goBack();
+      }
     } catch (error) {
       console.error("Navigation error:", error);
+      navigation.goBack();
     }
   };
 
-  // Handle image popup
   const handleImagePress = (image) => {
     setSelectedImage(image);
     setShowImagePopup(true);
   };
 
-  // Handle document image popup
   const handleDocumentImagePress = (document) => {
     if (document.type?.startsWith("image/")) {
       setSelectedImage({
@@ -926,7 +982,6 @@ const UploadDocuments = ({ route }) => {
     setSelectedImage(null);
   };
 
-  // FIXED: Get upload instruction text based on document type
   const getUploadInstructionText = () => {
     if (selectedDocumentType === "O01") {
       const billDocuments = uploadedDocuments.filter(
@@ -940,7 +995,6 @@ const UploadDocuments = ({ route }) => {
     return `You can upload multiple documents for this type (${currentTypeDocuments.length} uploaded)`;
   };
 
-  // Check if amount field should be editable
   const isAmountEditable = () => {
     return selectedDocumentType !== "O02" && selectedDocumentType !== "O03";
   };
@@ -949,7 +1003,6 @@ const UploadDocuments = ({ route }) => {
     return editDocumentType !== "O02" && editDocumentType !== "O03";
   };
 
-  // Get document type label by ID
   const getDocumentTypeLabel = (docId) => {
     const docType = documentTypes.find((type) => type.id === docId);
     return docType ? docType.label : docId;
@@ -992,6 +1045,21 @@ const UploadDocuments = ({ route }) => {
           </View>
         )}
 
+        {/* CLAIM AMOUNT DISPLAY */}
+        {fromEditClaim && (
+          <View style={styles.claimAmountCard}>
+            <Text style={styles.claimAmountTitle}>Current Claim Amount</Text>
+            <Text style={styles.claimAmountValue}>
+              Rs {claimAmountLoading ? "Loading..." : actualClaimAmount}
+            </Text>
+            {parseFloat(actualClaimAmount) > 0 && (
+              <Text style={styles.claimAmountNote}>
+                Note: BILL document type is disabled because claim amount is greater than 0
+              </Text>
+            )}
+          </View>
+        )}
+
         {/* Document Type Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Document Type</Text>
@@ -1003,18 +1071,20 @@ const UploadDocuments = ({ route }) => {
                   key={type.id}
                   style={[
                     styles.documentTypeOption,
-                    selectedDocumentType === type.id && styles.documentTypeSelected,
-                    isDisabled && styles.documentTypeDisabled, // Add disabled style
+                    selectedDocumentType === type.id &&
+                      styles.documentTypeSelected,
+                    isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
-                  disabled={isDisabled} // Disable touch
+                  disabled={isDisabled}
                 >
                   <View style={styles.radioContainer}>
                     <View
                       style={[
                         styles.radioButton,
-                        selectedDocumentType === type.id && styles.radioButtonSelected,
-                        isDisabled && styles.radioButtonDisabled, // Add disabled style
+                        selectedDocumentType === type.id &&
+                          styles.radioButtonSelected,
+                        isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
                       {selectedDocumentType === type.id && (
@@ -1024,8 +1094,9 @@ const UploadDocuments = ({ route }) => {
                     <Text
                       style={[
                         styles.documentTypeText,
-                        selectedDocumentType === type.id && styles.documentTypeTextSelected,
-                        isDisabled && styles.documentTypeTextDisabled, // Add disabled style
+                        selectedDocumentType === type.id &&
+                          styles.documentTypeTextSelected,
+                        isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
                       {type.label}
@@ -1035,7 +1106,6 @@ const UploadDocuments = ({ route }) => {
                 </TouchableOpacity>
               );
             })}
-
           </View>
         </View>
 
@@ -1052,8 +1122,8 @@ const UploadDocuments = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
             placeholderTextColor="#B0B0B0"
@@ -1072,7 +1142,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                  styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1103,7 +1173,7 @@ const UploadDocuments = ({ route }) => {
               is24Hour={true}
               display="default"
               onChange={handleDateChange}
-              maximumDate={new Date()} // Prevent future dates
+              maximumDate={new Date()}
             />
           )}
         </View>
@@ -1152,7 +1222,6 @@ const UploadDocuments = ({ route }) => {
                 Allowed formats: JPG, JPEG, TIFF, PNG
               </Text>
 
-              {/* Upload instruction based on document type */}
               <Text
                 style={[
                   styles.sectionSubtitle,
@@ -1184,7 +1253,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1203,7 +1272,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1218,7 +1287,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1237,7 +1306,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1250,14 +1319,13 @@ const UploadDocuments = ({ route }) => {
           )}
         </View>
 
-        {/* Uploaded Documents List - Show after document type selection */}
+        {/* Uploaded Documents List */}
         {uploadedDocuments.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Uploaded Documents</Text>
             <View style={styles.uploadedDocuments}>
               {uploadedDocuments.map((doc) => (
                 <View key={doc.id} style={styles.documentItem}>
-                  {/* Show image thumbnail if it's an image */}
                   {doc.type?.startsWith("image/") && (
                     <TouchableOpacity
                       onPress={() => handleDocumentImagePress(doc)}
@@ -1361,7 +1429,7 @@ const UploadDocuments = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                    editDocumentType.slice(1)
+                      editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1386,7 +1454,7 @@ const UploadDocuments = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
+                editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
@@ -1423,6 +1491,16 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
     backgroundColor: "#6DD3D3",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
   },
   container: {
     flex: 1,
@@ -1483,6 +1561,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
+  // NEW STYLES FOR CLAIM AMOUNT DISPLAY
+  claimAmountCard: {
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+    marginVertical: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF6B6B",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  claimAmountTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#13646D",
+    marginBottom: 10,
+  },
+  claimAmountValue: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FF6B6B",
+    marginBottom: 10,
+  },
+  claimAmountNote: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+  },
   section: {
     marginVertical: 15,
   },
@@ -1513,9 +1622,7 @@ const styles = StyleSheet.create({
   documentTypeOption: {
     marginBottom: 15,
   },
-  documentTypeSelected: {
-    // Additional styling for selected state if needed
-  },
+  documentTypeSelected: {},
   radioContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1636,12 +1743,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  sampleImageName: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#fff",
-    marginBottom: 2,
-  },
   sampleImageDescription: {
     fontSize: 8,
     color: "#fff",
@@ -1649,15 +1750,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   documentTypeDisabled: {
-  opacity: 0.5,
-},
-radioButtonDisabled: {
-  borderColor: "#CCC",
-  backgroundColor: "#F5F5F5",
-},
-documentTypeTextDisabled: {
-  color: "#999",
-},
+    opacity: 0.5,
+  },
+  radioButtonDisabled: {
+    borderColor: "#CCC",
+    backgroundColor: "#F5F5F5",
+  },
+  documentTypeTextDisabled: {
+    color: "#999",
+  },
   expandIcon: {
     marginLeft: 5,
   },
@@ -1704,12 +1805,6 @@ documentTypeTextDisabled: {
   uploadedDocuments: {
     marginTop: 0,
   },
-  uploadedDocumentsTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#13646D",
-    marginBottom: 10,
-  },
   documentItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -1732,17 +1827,23 @@ documentTypeTextDisabled: {
   documentInfo: {
     flex: 1,
   },
-  documentName: {
+  documentType: {
     fontSize: 14,
     fontWeight: "500",
     color: "#333",
     marginBottom: 2,
   },
-  documentSize: {
+  documentAmount: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 2,
+  },
+  documentDate: {
     fontSize: 12,
     color: "#888",
   },
-  removeButton: {
+  deleteButton: {
     padding: 5,
   },
   addDocumentButton: {
@@ -1762,7 +1863,6 @@ documentTypeTextDisabled: {
     fontWeight: "600",
     textAlign: "center",
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
@@ -1779,15 +1879,6 @@ documentTypeTextDisabled: {
     width: screenWidth * 0.9,
     maxHeight: screenHeight * 0.8,
     position: "relative",
-  },
-  modalCloseButton: {
-    position: "absolute",
-    top: -10,
-    right: -10,
-    zIndex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 8,
   },
   modalImage: {
     width: "100%",
@@ -1809,6 +1900,100 @@ documentTypeTextDisabled: {
     fontSize: 14,
     color: "#ccc",
     textAlign: "center",
+  },
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editModalContent: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  editModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  editModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#13646D",
+    flex: 1,
+  },
+  editModalCloseButton: {
+    padding: 5,
+  },
+  editModalBody: {
+    marginBottom: 20,
+  },
+  editSection: {
+    marginBottom: 15,
+  },
+  editLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#13646D",
+    marginBottom: 8,
+  },
+  editValue: {
+    fontSize: 16,
+    color: "#333",
+    backgroundColor: "#F5F5F5",
+    padding: 12,
+    borderRadius: 8,
+  },
+  editInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#333",
+  },
+  editInputDisabled: {
+    backgroundColor: "#F5F5F5",
+    color: "#888",
+  },
+  editHelpText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 5,
+    marginLeft: 5,
+  },
+  editModalFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  editCancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#F5F5F5",
+  },
+  editCancelButtonText: {
+    color: "#666",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  editSaveButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#00C4CC",
+  },
+  editSaveButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 
