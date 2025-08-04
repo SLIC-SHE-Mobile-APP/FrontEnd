@@ -7,9 +7,9 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Alert,
+  Animated,
   Dimensions,
   Image,
   Modal,
@@ -21,9 +21,216 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
+
 import { API_BASE_URL } from "../constants/index.js";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
+// Custom Loading Animation Component
+const LoadingIcon = () => {
+  const [rotateAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(1));
+
+  useEffect(() => {
+    const createRotateAnimation = () => {
+      return Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      );
+    };
+
+    const createPulseAnimation = () => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1.2,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const rotateAnimation = createRotateAnimation();
+    const pulseAnimation = createPulseAnimation();
+
+    rotateAnimation.start();
+    pulseAnimation.start();
+
+    return () => {
+      rotateAnimation.stop();
+      pulseAnimation.stop();
+    };
+  }, []);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.customLoadingIcon,
+        {
+          transform: [{ rotate: spin }, { scale: scaleAnim }],
+        },
+      ]}
+    >
+      <View style={styles.loadingIconOuter}>
+        <View style={styles.loadingIconInner}>
+          <Icon name="heartbeat" size={20} color="#FFFFFF" />
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+// Loading Screen Component
+const LoadingScreen = () => (
+  <View style={styles.loadingOverlay}>
+    <View style={styles.loadingContainer}>
+      <LoadingIcon />
+      <Text style={styles.loadingText}>Loading Document Types...</Text>
+      <Text style={styles.loadingSubText}>Please wait a moment</Text>
+    </View>
+  </View>
+);
+
+// Custom Popup Component
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={showConfirmButton ? undefined : onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const UploadDocuments = ({ route }) => {
   const navigation = useNavigation();
@@ -35,7 +242,6 @@ const UploadDocuments = ({ route }) => {
     patientName = "",
     illness = "",
     claimType = "",
-    // ADD THESE NEW PARAMETERS FOR CLAIM AMOUNT HANDLING
     currentClaimAmount = "0.00",
     fromEditClaim = false,
     referenceNo = "",
@@ -62,9 +268,18 @@ const UploadDocuments = ({ route }) => {
   const [storedClaimType, setStoredClaimType] = useState("");
   const [storedIllness, setStoredIllness] = useState("");
   
-  // ADD NEW STATE FOR TRACKING ACTUAL CLAIM AMOUNT FROM API
   const [actualClaimAmount, setActualClaimAmount] = useState("0.00");
   const [claimAmountLoading, setClaimAmountLoading] = useState(false);
+
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
 
   // Sample images with local image sources
   const [sampleImages] = useState([
@@ -84,6 +299,29 @@ const UploadDocuments = ({ route }) => {
       description: "Diagnosis Report Sample",
     },
   ]);
+
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
 
   // FETCH CLAIM AMOUNT FROM API
   const fetchClaimAmountFromAPI = async (referenceNo) => {
@@ -177,11 +415,13 @@ const UploadDocuments = ({ route }) => {
         setDocumentTypes(transformedDocumentTypes);
       } catch (error) {
         console.error("Error fetching document types:", error);
-        Alert.alert(
+        showPopup(
           "Error",
-          "Failed to load document types. Please try again."
+          "Failed to load document types. Please try again.",
+          "error"
         );
 
+        // Fallback to hardcoded types if API fails
         setDocumentTypes([
           { id: "O01", label: "BILL", icon: "receipt-outline" },
           { id: "O02", label: "PRESCRIPTION", icon: "medical-outline" },
@@ -331,11 +571,12 @@ const UploadDocuments = ({ route }) => {
   const handleDocumentTypeSelect = (type) => {
     if (isDocumentTypeDisabled(type)) {
       const currentAmount = parseFloat(actualClaimAmount || "0");
-      Alert.alert(
+      showPopup(
         "Document Type Not Available",
         `Bill document type is not available when the current claim amount is Rs ${currentAmount.toFixed(
           2
-        )}. Only non-bill documents can be added to existing claims with amounts.`
+        )}. Only non-bill documents can be added to existing claims with amounts.`,
+        "warning"
       );
       return;
     }
@@ -344,10 +585,9 @@ const UploadDocuments = ({ route }) => {
     setSelectedDocId(type);
     console.log("Selected document type ID:", type);
 
+    // Set amount based on document type
     if (type === "O02" || type === "O03") {
       setAmount("0.00");
-    } else if (type === "O01") {
-      setAmount("");
     } else {
       setAmount("");
     }
@@ -371,6 +611,7 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleAmountChange = (text) => {
+    // Disable amount input for PRESCRIPTION and DIAGNOSIS CARD
     if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return;
     }
@@ -404,9 +645,10 @@ const UploadDocuments = ({ route }) => {
       }
 
       if (fileSizeInMB > 5) {
-        Alert.alert(
+        showPopup(
           "File Too Large",
-          "Image size cannot exceed 5MB. Please select a smaller image."
+          "Image size cannot exceed 5MB. Please select a smaller image.",
+          "error"
         );
         return null;
       }
@@ -440,7 +682,11 @@ const UploadDocuments = ({ route }) => {
       return compressedImage.uri;
     } catch (error) {
       console.error("Error compressing image:", error);
-      Alert.alert("Error", "Failed to compress image. Please try again.");
+      showPopup(
+        "Error",
+        "Failed to compress image. Please try again.",
+        "error"
+      );
       return null;
     }
   };
@@ -515,9 +761,27 @@ const UploadDocuments = ({ route }) => {
     return true;
   };
 
+  // Check if file type is allowed (only jpg, jpeg, png)
+  const isAllowedFileType = (mimeType, name) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+    
+    if (allowedTypes.includes(mimeType)) {
+      return true;
+    }
+    
+    // Fallback check using file extension
+    const extension = name.toLowerCase().split('.').pop();
+    return ['jpg', 'jpeg', 'png'].includes(extension);
+  };
+
   const handleBrowseFiles = async () => {
     if (!selectedDocumentType) {
-      Alert.alert("Validation Error", "Please select a document type first");
+      showPopup(
+        "Validation Error",
+        "Please select a document type first",
+        "warning"
+      );
       return;
     }
 
@@ -525,29 +789,41 @@ const UploadDocuments = ({ route }) => {
       selectedDocumentType === "O01" &&
       (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
     ) {
-      Alert.alert(
+      showPopup(
         "Validation Error",
-        "Please enter a valid amount greater than 0 for Bill type"
+        "Please enter a valid amount greater than 0 for Bill type",
+        "warning"
       );
       return;
     }
 
     if (!canAddMoreDocuments()) {
-      Alert.alert(
+      showPopup(
         "Document Limit",
-        "You can only upload 1 document for Bill type."
+        "You can only upload 1 document for Bill type.",
+        "warning"
       );
       return;
     }
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["image/*", "application/pdf", "image/jpeg", "image/png"],
+        type: ["image/jpeg", "image/jpg", "image/png"], // Restrict to only JPG, JPEG, PNG
         copyToCacheDirectory: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
+        
+        // Check if file type is allowed
+        if (!isAllowedFileType(file.mimeType, file.name)) {
+          showPopup(
+            "Invalid File Type",
+            "Only JPG, JPEG, and PNG files are allowed.",
+            "error"
+          );
+          return;
+        }
 
         let finalUri = file.uri;
 
@@ -582,17 +858,29 @@ const UploadDocuments = ({ route }) => {
         setAmount("");
         setDocumentDate(new Date());
 
-        Alert.alert("Success", "Document uploaded successfully!");
+        showPopup(
+          "Success",
+          "Document uploaded successfully!",
+          "success"
+        );
       }
     } catch (error) {
       console.error("Error picking document:", error);
-      Alert.alert("Error", "Failed to pick document");
+      showPopup(
+        "Error",
+        "Failed to pick document",
+        "error"
+      );
     }
   };
 
   const handleTakePhoto = async () => {
     if (!selectedDocumentType) {
-      Alert.alert("Validation Error", "Please select a document type first");
+      showPopup(
+        "Validation Error",
+        "Please select a document type first",
+        "warning"
+      );
       return;
     }
 
@@ -600,17 +888,19 @@ const UploadDocuments = ({ route }) => {
       selectedDocumentType === "O01" &&
       (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
     ) {
-      Alert.alert(
+      showPopup(
         "Validation Error",
-        "Please enter a valid amount greater than 0 for Bill type"
+        "Please enter a valid amount greater than 0 for Bill type",
+        "warning"
       );
       return;
     }
 
     if (!canAddMoreDocuments()) {
-      Alert.alert(
+      showPopup(
         "Document Limit",
-        "You can only upload 1 document for Bill type."
+        "You can only upload 1 document for Bill type.",
+        "warning"
       );
       return;
     }
@@ -618,9 +908,10 @@ const UploadDocuments = ({ route }) => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
+        showPopup(
           "Permission Required",
-          "Camera permission is required to take photos"
+          "Camera permission is required to take photos",
+          "warning"
         );
         return;
       }
@@ -634,15 +925,18 @@ const UploadDocuments = ({ route }) => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const photo = result.assets[0];
 
-        Alert.alert(
+        showPopup(
           "Processing Image",
-          "Please wait while we optimize your image..."
+          "Please wait while we optimize your image...",
+          "info"
         );
 
         const compressedUri = await compressImage(photo.uri);
         if (!compressedUri) {
           return;
         }
+
+        hidePopup(); // Hide the processing message
 
         const docTypeLabel =
           documentTypes.find((type) => type.id === selectedDocumentType)
@@ -666,43 +960,56 @@ const UploadDocuments = ({ route }) => {
         setAmount("");
         setDocumentDate(new Date());
 
-        Alert.alert("Success", "Photo captured and uploaded successfully!");
+        showPopup(
+          "Success",
+          "Photo captured and uploaded successfully!",
+          "success"
+        );
       }
     } catch (error) {
       console.error("Error taking photo:", error);
-      Alert.alert("Error", "Failed to take photo");
+      showPopup(
+        "Error",
+        "Failed to take photo",
+        "error"
+      );
     }
   };
 
   const handleRemoveDocument = (documentId) => {
-    Alert.alert(
+    showPopup(
       "Delete Document",
       "Are you sure you want to delete this document? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setUploadedDocuments((prev) =>
-              prev.filter((doc) => doc.id !== documentId)
-            );
-            Alert.alert("Success", "Document deleted successfully.");
-          },
-        },
-      ]
+      "warning",
+      true,
+      () => {
+        setUploadedDocuments((prev) =>
+          prev.filter((doc) => doc.id !== documentId)
+        );
+        hidePopup();
+        showPopup(
+          "Success",
+          "Document deleted successfully.",
+          "success"
+        );
+      }
     );
   };
 
   const handleSaveEdit = () => {
     if (!validateEditAmount(editAmount)) {
       if (editDocumentType === "O01") {
-        Alert.alert(
+        showPopup(
           "Validation Error",
-          "Please enter a valid amount greater than 0 for Bill type"
+          "Please enter a valid amount greater than 0 for Bill type",
+          "warning"
         );
       } else {
-        Alert.alert("Validation Error", "Please enter a valid amount");
+        showPopup(
+          "Validation Error",
+          "Please enter a valid amount",
+          "warning"
+        );
       }
       return;
     }
@@ -719,7 +1026,11 @@ const UploadDocuments = ({ route }) => {
     setEditingDocument(null);
     setEditAmount("");
     setEditDocumentType("");
-    Alert.alert("Success", "Document details updated successfully.");
+    showPopup(
+      "Success",
+      "Document details updated successfully.",
+      "success"
+    );
   };
 
   const validateEditAmount = (amountString) => {
@@ -783,14 +1094,19 @@ const UploadDocuments = ({ route }) => {
 
   const handleAddDocument = async () => {
     if (uploadedDocuments.length === 0) {
-      Alert.alert("Validation Error", "Please upload at least one document");
+      showPopup(
+        "Validation Error",
+        "Please upload at least one document",
+        "warning"
+      );
       return;
     }
 
     if (!storedReferenceNo || !storedNic) {
-      Alert.alert(
+      showPopup(
         "Error",
-        "Missing required information. Please ensure you have a valid reference number and user identification."
+        "Missing required information. Please ensure you have a valid reference number and user identification.",
+        "error"
       );
       return;
     }
@@ -811,14 +1127,13 @@ const UploadDocuments = ({ route }) => {
     });
 
     if (invalidDocuments.length > 0) {
-      Alert.alert(
+      showPopup(
         "Validation Error",
-        "Some uploaded documents have invalid information. Please check and re-upload if necessary."
+        "Some uploaded documents have invalid information. Please check and re-upload if necessary.",
+        "warning"
       );
       return;
     }
-
-    Alert.alert("Uploading", "Please wait while we upload your documents...");
 
     try {
       const uploadPromises = uploadedDocuments.map((doc) =>
@@ -829,17 +1144,11 @@ const UploadDocuments = ({ route }) => {
       const failedUploads = results.filter((result) => !result.success);
 
       if (failedUploads.length > 0) {
-        Alert.alert(
+        hidePopup();
+        showPopup(
           "Upload Error",
           `Failed to upload ${failedUploads.length} document(s). Please try again.`,
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                console.error("Failed uploads:", failedUploads);
-              },
-            },
-          ]
+          "error"
         );
         return;
       }
@@ -880,52 +1189,57 @@ const UploadDocuments = ({ route }) => {
         claimData
       );
 
-      Alert.alert("Success", "All documents uploaded successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            setTimeout(() => {
-              if (fromEditClaim) {
-                navigation.navigate("EditClaimIntimation", {
-                  ...route.params,
-                  fromUploadDocuments: true,
-                  documentsUploaded: true,
-                  refreshClaimAmount: true,
-                });
-              } else {
-                navigation.navigate("EditClaimIntimation", {
-                  claim: claimData,
-                  referenceNo: storedReferenceNo,
-                  claimType: storedClaimType || patientData.claimType,
-                  patientName: storedPatientName || patientData.patientName,
-                  illness: storedIllness || patientData.illness,
-                  claimId: claimId,
-                  userNic: storedNic,
-                  documentsUploaded: true,
-                  submittedData: {
-                    patientData: {
-                      ...patientData,
-                      patientName: storedPatientName || patientData.patientName,
-                      illness: storedIllness || patientData.illness,
-                      claimType: storedClaimType || patientData.claimType,
-                      referenceNo: storedReferenceNo,
-                      claimId: claimId,
-                    },
-                    documents: uploadedDocuments,
-                    uploadResults: results,
-                    metadata: claimData.metadata,
+      hidePopup();
+      showPopup(
+        "Success",
+        "All documents uploaded successfully!",
+        "success",
+        false,
+        () => {
+          hidePopup();
+          setTimeout(() => {
+            if (fromEditClaim) {
+              navigation.navigate("EditClaimIntimation", {
+                ...route.params,
+                fromUploadDocuments: true,
+                documentsUploaded: true,
+                refreshClaimAmount: true,
+              });
+            } else {
+              navigation.navigate("EditClaimIntimation", {
+                claim: claimData,
+                referenceNo: storedReferenceNo,
+                claimType: storedClaimType || patientData.claimType,
+                patientName: storedPatientName || patientData.patientName,
+                illness: storedIllness || patientData.illness,
+                claimId: claimId,
+                userNic: storedNic,
+                documentsUploaded: true,
+                submittedData: {
+                  patientData: {
+                    ...patientData,
+                    patientName: storedPatientName || patientData.patientName,
+                    illness: storedIllness || patientData.illness,
+                    claimType: storedClaimType || patientData.claimType,
+                    referenceNo: storedReferenceNo,
+                    claimId: claimId,
                   },
-                });
-              }
-            }, 500);
-          },
-        },
-      ]);
+                  documents: uploadedDocuments,
+                  uploadResults: results,
+                  metadata: claimData.metadata,
+                },
+              });
+            }
+          }, 500);
+        }
+      );
     } catch (error) {
       console.error("Error during document upload:", error);
-      Alert.alert(
+      hidePopup();
+      showPopup(
         "Error",
-        "An unexpected error occurred while uploading documents. Please try again."
+        "An unexpected error occurred while uploading documents. Please try again.",
+        "error"
       );
     }
   };
@@ -996,6 +1310,11 @@ const UploadDocuments = ({ route }) => {
   };
 
   const isAmountEditable = () => {
+    // First check if any document type is selected
+    if (!selectedDocumentType) {
+      return false;
+    }
+    // Then check if it's not PRESCRIPTION or DIAGNOSIS CARD
     return selectedDocumentType !== "O02" && selectedDocumentType !== "O03";
   };
 
@@ -1011,9 +1330,14 @@ const UploadDocuments = ({ route }) => {
   if (loading) {
     return (
       <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={[styles.gradient]}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading document types...</Text>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#13646D" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Upload Documents</Text>
+          <View style={styles.placeholder} />
         </View>
+        <LoadingScreen />
       </LinearGradient>
     );
   }
@@ -1125,14 +1449,24 @@ const UploadDocuments = ({ route }) => {
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
                 styles.textInputError,
             ]}
-            placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
+            placeholder={
+              !selectedDocumentType 
+                ? "Select document type first" 
+                : isAmountEditable() 
+                  ? "Enter amount" 
+                  : "0.00"
+            }
             placeholderTextColor="#B0B0B0"
             value={amount}
             onChangeText={handleAmountChange}
             keyboardType="decimal-pad"
             editable={isAmountEditable()}
           />
-          {selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
+          {!selectedDocumentType ? (
+            <Text style={styles.helpText}>
+              Please select a document type first to enable amount input
+            </Text>
+          ) : selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
             <Text style={styles.helpText}>
               Amount is automatically set to 0.00 for{" "}
               {getDocumentTypeLabel(selectedDocumentType)}
@@ -1219,7 +1553,7 @@ const UploadDocuments = ({ route }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Document</Text>
               <Text style={styles.sectionSubtitle}>
-                Allowed formats: JPG, JPEG, TIFF, PNG
+                Allowed formats: JPG, JPEG, PNG only
               </Text>
 
               <Text
@@ -1483,6 +1817,17 @@ const UploadDocuments = ({ route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={popup.onConfirm || hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </LinearGradient>
   );
 };
@@ -1491,16 +1836,6 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
     backgroundColor: "#6DD3D3",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "center",
   },
   container: {
     flex: 1,
@@ -1534,6 +1869,53 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  // Loading Screen Styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   patientInfoCard: {
     backgroundColor: "#fff",
@@ -1622,7 +2004,12 @@ const styles = StyleSheet.create({
   documentTypeOption: {
     marginBottom: 15,
   },
-  documentTypeSelected: {},
+  documentTypeSelected: {
+    // Additional styling for selected state if needed
+  },
+  documentTypeDisabled: {
+    opacity: 0.5,
+  },
   radioContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1640,6 +2027,9 @@ const styles = StyleSheet.create({
   radioButtonSelected: {
     borderColor: "#00C4CC",
   },
+  radioButtonDisabled: {
+    borderColor: "#ccc",
+  },
   radioButtonInner: {
     width: 10,
     height: 10,
@@ -1653,6 +2043,9 @@ const styles = StyleSheet.create({
   documentTypeTextSelected: {
     color: "#00C4CC",
     fontWeight: "500",
+  },
+  documentTypeTextDisabled: {
+    color: "#ccc",
   },
   inputLabel: {
     fontSize: 15,
@@ -1749,16 +2142,6 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     flex: 1,
   },
-  documentTypeDisabled: {
-    opacity: 0.5,
-  },
-  radioButtonDisabled: {
-    borderColor: "#CCC",
-    backgroundColor: "#F5F5F5",
-  },
-  documentTypeTextDisabled: {
-    color: "#999",
-  },
   expandIcon: {
     marginLeft: 5,
   },
@@ -1836,7 +2219,7 @@ const styles = StyleSheet.create({
   documentAmount: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#333",
+    color: "#00C4CC",
     marginBottom: 2,
   },
   documentDate: {
@@ -1863,6 +2246,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
@@ -1901,6 +2285,7 @@ const styles = StyleSheet.create({
     color: "#ccc",
     textAlign: "center",
   },
+  // Edit Modal styles
   editModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1908,11 +2293,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   editModalContent: {
-    width: "90%",
-    backgroundColor: "white",
-    borderRadius: 15,
+    backgroundColor: "#fff",
+    borderRadius: 20,
     padding: 20,
-    maxHeight: "80%",
+    width: screenWidth * 0.9,
+    maxHeight: screenHeight * 0.8,
   },
   editModalHeader: {
     flexDirection: "row",
@@ -1924,7 +2309,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#13646D",
-    flex: 1,
   },
   editModalCloseButton: {
     padding: 5,
@@ -1936,25 +2320,25 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   editLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "500",
     color: "#13646D",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   editValue: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#333",
     backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 8,
+    padding: 15,
+    borderRadius: 10,
   },
   editInput: {
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#E8E8E8",
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 15,
-    paddingVertical: 12,
+    paddingVertical: 15,
     fontSize: 15,
     color: "#333",
   },
@@ -1963,37 +2347,135 @@ const styles = StyleSheet.create({
     color: "#888",
   },
   editHelpText: {
-    fontSize: 12,
     color: "#666",
+    fontSize: 12,
     marginTop: 5,
     marginLeft: 5,
   },
   editModalFooter: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     gap: 10,
   },
   editCancelButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flex: 1,
     backgroundColor: "#F5F5F5",
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: "center",
   },
   editCancelButtonText: {
     color: "#666",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
   },
   editSaveButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flex: 1,
     backgroundColor: "#00C4CC",
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: "center",
   },
   editSaveButtonText: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  // Popup Styles
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: screenWidth * 0.85,
+    minWidth: screenWidth * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#00C4CC",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#00C4CC",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

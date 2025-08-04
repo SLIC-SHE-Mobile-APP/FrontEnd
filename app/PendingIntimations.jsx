@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -12,9 +12,140 @@ import {
   View,
   Animated,
   Modal,
+  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
+
+const { width } = Dimensions.get('window');
+
+// Enhanced Custom Popup Component with blur background and animations
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      case "confirm":
+        return { icon: "?", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const PendingIntimations = ({ onClose, onEditClaim }) => {
   const navigation = useNavigation();
@@ -25,131 +156,37 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   const [userId, setUserId] = useState(null);
   const [policyNo, setPolicyNo] = useState(null);
 
-  // Custom Popup states
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupMessage, setPopupMessage] = useState("");
-  const [popupTitle, setPopupTitle] = useState("");
-  const [popupType, setPopupType] = useState("info"); // "success", "error", "info", "confirm"
-  const [popupActions, setPopupActions] = useState(null);
-
-  // Custom Popup Component
-  const CustomPopup = () => {
-    const getIconName = () => {
-      switch (popupType) {
-        case "success":
-          return "checkmark-circle";
-        case "error":
-          return "alert-circle";
-        case "confirm":
-          return "help-circle";
-        default:
-          return "information-circle";
-      }
-    };
-
-    const getIconColor = () => {
-      switch (popupType) {
-        case "success":
-          return "#4CAF50";
-        case "error":
-          return "#FF6B6B";
-        case "confirm":
-          return "#FF9800";
-        default:
-          return "#2196F3";
-      }
-    };
-
-    const closePopup = () => {
-      setShowPopup(false);
-      setPopupActions(null);
-    };
-
-    if (!showPopup) return null;
-
-    return (
-      <Modal
-        visible={showPopup}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closePopup}
-        statusBarTranslucent={true}
-      >
-        <View style={styles.popupOverlay}>
-          <View style={styles.blurContainer}>
-            <View style={styles.popupContainer}>
-              <LinearGradient
-                colors={["#FFFFFF", "#F8F9FA"]}
-                style={styles.popupContent}
-              >
-                <View style={styles.popupHeader}>
-                  <Ionicons
-                    name={getIconName()}
-                    size={32}
-                    color={getIconColor()}
-                    style={styles.popupIcon}
-                  />
-                  {popupTitle && (
-                    <Text style={styles.popupTitle}>{popupTitle}</Text>
-                  )}
-                </View>
-
-                <Text style={styles.popupMessage}>{popupMessage}</Text>
-
-                {popupActions ? (
-                  <View style={styles.popupButtonContainer}>
-                    {popupActions.map((action, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.popupButton,
-                          {
-                            backgroundColor:
-                              action.style === "destructive"
-                                ? "#FF6B6B"
-                                : action.style === "cancel"
-                                ? "#9E9E9E"
-                                : getIconColor(),
-                            marginHorizontal: 5,
-                          },
-                        ]}
-                        onPress={() => {
-                          closePopup();
-                          if (action.onPress) action.onPress();
-                        }}
-                      >
-                        <Text style={styles.popupButtonText}>
-                          {action.text}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.popupButton,
-                      { backgroundColor: getIconColor() },
-                    ]}
-                    onPress={closePopup}
-                  >
-                    <Text style={styles.popupButtonText}>OK</Text>
-                  </TouchableOpacity>
-                )}
-              </LinearGradient>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
+  // Enhanced popup states
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
 
   // Show popup function
-  const showCustomPopup = (title, message, type = "info", actions = null) => {
-    setPopupTitle(title);
-    setPopupMessage(message);
-    setPopupType(type);
-    setPopupActions(actions);
-    setShowPopup(true);
+  const showCustomPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
   };
 
   // Custom Loading Animation Component
@@ -205,9 +242,6 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       </View>
     </View>
   );
-
-  // Remove the route params useEffect since we're not using navigate
-  // useEffect for route params removed - using useFocusEffect instead
 
   // Add useFocusEffect to refresh when screen comes into focus
   useFocusEffect(
@@ -288,7 +322,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       console.error("Error fetching claims:", err);
       setError(err.message);
 
-      // More specific error messages
+      // More specific error messages with enhanced popup
       if (
         err.message.includes("NetworkError") ||
         err.message.includes("Failed to fetch")
@@ -398,20 +432,17 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
     }
   };
 
-  // Handle Delete
+  // Handle Delete with enhanced confirmation popup
   const handleDelete = (id) => {
     showCustomPopup(
       "Confirm Delete",
-      "Are you sure you want to delete this claim?",
+      "Are you sure you want to delete this claim? This action cannot be undone.",
       "confirm",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteClaimFromServer(id),
-        },
-      ]
+      true,
+      () => {
+        hidePopup();
+        deleteClaimFromServer(id);
+      }
     );
   };
 
@@ -490,7 +521,15 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
               : "Loading Pending Claims..."
           }
         />
-        <CustomPopup />
+        <CustomPopup
+          visible={popup.visible}
+          title={popup.title}
+          message={popup.message}
+          type={popup.type}
+          showConfirmButton={popup.showConfirmButton}
+          onClose={hidePopup}
+          onConfirm={popup.onConfirm}
+        />
       </LinearGradient>
     );
   }
@@ -517,7 +556,15 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-        <CustomPopup />
+        <CustomPopup
+          visible={popup.visible}
+          title={popup.title}
+          message={popup.message}
+          type={popup.type}
+          showConfirmButton={popup.showConfirmButton}
+          onClose={hidePopup}
+          onConfirm={popup.onConfirm}
+        />
       </LinearGradient>
     );
   }
@@ -593,8 +640,16 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         )}
       </ScrollView>
 
-      {/* Custom Popup */}
-      <CustomPopup />
+      {/* Enhanced Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </LinearGradient>
   );
 };
@@ -764,77 +819,101 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
-  // Custom Popup Styles
+  // Enhanced Popup Styles with Blur Background
   popupOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
-  blurContainer: {
-    flex: 1,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   popupContainer: {
-    width: "85%",
-    maxWidth: 350,
+    backgroundColor: "white",
     borderRadius: 20,
-    overflow: "hidden",
-    elevation: 10,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
     shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
   },
-  popupContent: {
-    padding: 24,
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
     alignItems: "center",
-  },
-  popupHeader: {
-    alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 15,
   },
   popupIcon: {
-    marginBottom: 12,
+    fontSize: 28,
+    fontWeight: "bold",
   },
   popupTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#333",
+    marginBottom: 10,
     textAlign: "center",
-    marginBottom: 8,
   },
   popupMessage: {
-    fontSize: 16,
-    color: "#555",
+    fontSize: 15,
+    color: "#666",
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: 25,
   },
   popupButtonContainer: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
   },
   popupButton: {
-    paddingHorizontal: 32,
+    flex: 1,
     paddingVertical: 12,
-    borderRadius: 25,
-    minWidth: 100,
+    borderRadius: 10,
     alignItems: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  popupButtonText: {
-    color: "#FFFFFF",
+  popupOkButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupOkButtonText: {
+    color: "white",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
