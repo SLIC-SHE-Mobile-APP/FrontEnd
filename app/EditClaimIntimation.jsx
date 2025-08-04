@@ -3,11 +3,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   BackHandler,
+  Dimensions,
   Image,
   Modal,
   Platform,
@@ -20,6 +20,135 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
+
+const { width } = Dimensions.get("window");
+
+// Custom Popup Component
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      case "confirm":
+        return { icon: "?", color: "#2196F3", bgColor: "#E3F2FD" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={() => {
+            if (!showConfirmButton && onClose) {
+              onClose();
+            }
+          }}
+        />
+        <Animated.View
+          style={[styles.popupContainer, { transform: [{ scale: scaleAnim }] }]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const EditClaimIntimation = ({ route }) => {
   const navigation = useNavigation();
@@ -43,6 +172,16 @@ const EditClaimIntimation = ({ route }) => {
   const [isEditDocTypeDropdownVisible, setEditDocTypeDropdownVisible] =
     useState(false);
 
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
+
   // State for claim details
   const [claimDetails, setClaimDetails] = useState({
     referenceNo: referenceNo || claimNumber || claim?.referenceNo || "",
@@ -54,7 +193,7 @@ const EditClaimIntimation = ({ route }) => {
     claimAmount: claimAmount || claim?.claimAmount || "0.00",
   });
 
-  // Employee info state
+  // Other state variables
   const [employeeInfo, setEmployeeInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [documentsLoading, setDocumentsLoading] = useState(true);
@@ -62,7 +201,6 @@ const EditClaimIntimation = ({ route }) => {
   const [claimTypes, setClaimType] = useState("");
   const [referenceNo2, setReferenceNo] = useState("");
 
-  // Track all loading states
   const [loadingStates, setLoadingStates] = useState({
     claimDetails: true,
     beneficiaryData: true,
@@ -70,30 +208,47 @@ const EditClaimIntimation = ({ route }) => {
     documents: true,
   });
 
-  // Beneficiaries state - Initialize as empty array
   const [beneficiaries, setBeneficiaries] = useState([]);
-
-  // Documents state - Initialize as empty array (will be populated from API)
   const [documents, setDocuments] = useState([]);
 
-  // Modal states
   const [isAddDocumentModalVisible, setAddDocumentModalVisible] =
     useState(false);
   const [isEditDocumentModalVisible, setEditDocumentModalVisible] =
     useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
 
-  // Image modal states
   const [isImageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imageLoadingStates, setImageLoadingStates] = useState(new Map());
 
-  // New document form
   const [newDocument, setNewDocument] = useState({
     type: "",
     date: "",
     amount: "",
   });
+
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
 
   // Helper function to format amount to 2 decimal places
   const formatAmount = (amount) => {
@@ -107,49 +262,33 @@ const EditClaimIntimation = ({ route }) => {
   const updateLoadingState = (key, value) => {
     setLoadingStates((prev) => {
       const newStates = { ...prev, [key]: value };
-
-      // Check if all loading states are false
       const allLoaded = Object.values(newStates).every((state) => !state);
       if (allLoaded) {
         setInitialLoading(false);
       }
-
       return newStates;
     });
   };
 
   const handleBackPress = () => {
-    Alert.alert(
+    showPopup(
       "Exit Claim",
       "Do you want to exit? Your claim will be saved in saved claims.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Yes",
-          onPress: () => {
-            console.log("User confirmed exit, navigating to home");
-
-            // Show confirmation message
-            Alert.alert(
-              "Claim Saved",
-              "Your claim has been saved in saved claims.",
-              [
-                {
-                  text: "OK",
-                  onPress: () => {
-                    // Change "Home" to "home" (lowercase)
-                    navigation.navigate("home");
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ],
-      { cancelable: false }
+      "confirm",
+      true,
+      () => {
+        hidePopup();
+        showPopup(
+          "Claim Saved",
+          "Your claim has been saved in saved claims.",
+          "success",
+          false,
+          () => {
+            hidePopup();
+            navigation.navigate("home");
+          }
+        );
+      }
     );
   };
 
@@ -220,7 +359,6 @@ const EditClaimIntimation = ({ route }) => {
     );
   };
 
-  // Loading Screen Component with Custom Icon
   const LoadingScreen = () => (
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContainer}>
@@ -231,7 +369,6 @@ const EditClaimIntimation = ({ route }) => {
     </View>
   );
 
-  // Format date from API response (e.g., "2025-03-04T00:00:00" to "04/03/2025")
   const formatDate = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -245,12 +382,9 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Fetch document types
   const fetchDocumentTypes = async () => {
     try {
       setLoadingDocumentTypes(true);
-      console.log("Fetching document types...");
-
       const response = await fetch(
         `${API_BASE_URL}/RequiredDocumentsCon/Outdoor`,
         {
@@ -267,14 +401,14 @@ const EditClaimIntimation = ({ route }) => {
       }
 
       const docTypesData = await response.json();
-      console.log("Document types API response:", docTypesData);
-
       setDocumentTypes(docTypesData);
     } catch (error) {
       console.error("Error fetching document types:", error);
-      Alert.alert("Error", "Failed to load document types. Please try again.");
-
-      // Set fallback data in case of error
+      showPopup(
+        "Error",
+        "Failed to load document types. Please try again.",
+        "error"
+      );
       setDocumentTypes([
         { docId: "O01", docDesc: "BILL" },
         { docId: "O02", docDesc: "PRESCRIPTION" },
@@ -286,17 +420,14 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Helper function to parse clmMemSeqNo
   const parseClmMemSeqNo = (clmMemSeqNo) => {
     try {
       if (!clmMemSeqNo || typeof clmMemSeqNo !== "string") {
-        console.warn("Invalid clmMemSeqNo:", clmMemSeqNo);
         return { memId: 0, seqNo: 0 };
       }
 
       const parts = clmMemSeqNo.split("-");
       if (parts.length !== 2) {
-        console.warn("Invalid clmMemSeqNo format:", clmMemSeqNo);
         return { memId: 0, seqNo: 0 };
       }
 
@@ -304,7 +435,6 @@ const EditClaimIntimation = ({ route }) => {
       const seqNo = parseInt(parts[1], 10);
 
       if (isNaN(memId) || isNaN(seqNo)) {
-        console.warn("Invalid numeric values in clmMemSeqNo:", clmMemSeqNo);
         return { memId: 0, seqNo: 0 };
       }
 
@@ -315,18 +445,9 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Delete document from API
   const deleteDocumentFromAPI = async (document) => {
     try {
       const { memId, seqNo } = parseClmMemSeqNo(document.clmMemSeqNo);
-
-      console.log("Deleting document with:", {
-        claimNo: claimDetails.referenceNo,
-        memId,
-        seqNo,
-        originalClmMemSeqNo: document.clmMemSeqNo,
-      });
-
       const requestBody = {
         claimNo: claimDetails.referenceNo,
         memId: memId,
@@ -343,15 +464,12 @@ const EditClaimIntimation = ({ route }) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Delete Document API Error Response:", errorText);
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
 
       const result = await response.json();
-      console.log("Delete document API response:", result);
-
       return result;
     } catch (error) {
       console.error("Error deleting document from API:", error);
@@ -359,11 +477,8 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Fetch documents from API
   const fetchDocuments = async (referenceNo) => {
     try {
-      console.log("Fetching documents for referenceNo:", referenceNo);
-
       const response = await fetch(
         `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
         {
@@ -375,30 +490,23 @@ const EditClaimIntimation = ({ route }) => {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Documents API Error Response:", errorText);
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
 
       if (result.success && result.data && Array.isArray(result.data)) {
-        // Transform API data to match component structure without image processing
-        const transformedDocuments = result.data.map((doc, index) => {
-          return {
-            id: doc.clmMemSeqNo || `doc_${index}`,
-            clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API and image loading
-            type: doc.docType || "Unknown",
-            date: formatDate(doc.docDate),
-            amount: formatAmount(doc.docAmount), // Format amount with 2 decimal places
-            imagePath: doc.imagePath || "0",
-            hasImage: doc.imgContent && doc.imgContent.length > 0, // Check if document has image content
-            imageLoaded: false, // Track if image has been loaded
-            imgContent: doc.imgContent || null, // Store original image content for API calls
-          };
-        });
+        const transformedDocuments = result.data.map((doc, index) => ({
+          id: doc.clmMemSeqNo || `doc_${index}`,
+          clmMemSeqNo: doc.clmMemSeqNo,
+          type: doc.docType || "Unknown",
+          date: formatDate(doc.docDate),
+          amount: formatAmount(doc.docAmount),
+          imagePath: doc.imagePath || "0",
+          hasImage: doc.imgContent && doc.imgContent.length > 0,
+          imageLoaded: false,
+          imgContent: doc.imgContent || null,
+        }));
 
         setDocuments(transformedDocuments);
       } else {
@@ -406,19 +514,11 @@ const EditClaimIntimation = ({ route }) => {
       }
     } catch (error) {
       console.error("Error fetching documents:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        referenceNo: referenceNo,
-      });
-
-      // Show user-friendly error message
-      Alert.alert(
+      showPopup(
         "Documents Loading Error",
-        `Unable to fetch documents. Error: ${error.message}`
+        `Unable to fetch documents. Error: ${error.message}`,
+        "error"
       );
-
-      // Set empty documents array as fallback
       setDocuments([]);
     } finally {
       setDocumentsLoading(false);
@@ -428,10 +528,7 @@ const EditClaimIntimation = ({ route }) => {
 
   const loadDocumentImage = async (document) => {
     try {
-      // Set loading state for this specific document
       setImageLoadingStates((prev) => new Map(prev.set(document.id, true)));
-
-      console.log("Loading image for document:", document.clmMemSeqNo);
 
       const response = await fetch(
         `${API_BASE_URL}/ClaimDocuments/view/${document.clmMemSeqNo}`,
@@ -447,37 +544,33 @@ const EditClaimIntimation = ({ route }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Get the response as blob
       const blob = await response.blob();
-
-      // Convert blob to base64
       const reader = new FileReader();
+
       reader.onload = () => {
         const base64String = reader.result;
         setSelectedImageUri(base64String);
         setImageModalVisible(true);
-        // Clear loading state for this document
         setImageLoadingStates((prev) => {
           const newMap = new Map(prev);
           newMap.delete(document.id);
           return newMap;
         });
       };
+
       reader.onerror = () => {
-        console.error("Error reading image blob");
-        Alert.alert("Error", "Failed to load image");
-        // Clear loading state for this document
+        showPopup("Error", "Failed to load image", "error");
         setImageLoadingStates((prev) => {
           const newMap = new Map(prev);
           newMap.delete(document.id);
           return newMap;
         });
       };
+
       reader.readAsDataURL(blob);
     } catch (error) {
       console.error("Error loading document image:", error);
-      Alert.alert("Error", "Failed to load image");
-      // Clear loading state for this document
+      showPopup("Error", "Failed to load image", "error");
       setImageLoadingStates((prev) => {
         const newMap = new Map(prev);
         newMap.delete(document.id);
@@ -486,37 +579,21 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Fetch claim amount from API
   const fetchClaimAmount = async (referenceNo) => {
     try {
-      // Validate referenceNo before making API call
       if (!referenceNo || referenceNo.trim() === "") {
-        console.warn(
-          "Invalid referenceNo provided to fetchClaimAmount:",
-          referenceNo
-        );
-
-        // Try to get referenceNo from different sources
         const fallbackReferenceNo =
           (await SecureStore.getItemAsync("stored_claim_seq_no")) ||
           (await SecureStore.getItemAsync("edit_referenceNo")) ||
           claimDetails.referenceNo;
 
         if (!fallbackReferenceNo || fallbackReferenceNo.trim() === "") {
-          console.warn(
-            "No valid referenceNo found, skipping claim amount fetch"
-          );
           return "0.00";
         }
-
         referenceNo = fallbackReferenceNo;
       }
 
-      console.log("Fetching claim amount for referenceNo:", referenceNo);
-
-      const requestBody = {
-        seqNo: referenceNo.trim(), // Ensure no whitespace
-      };
+      const requestBody = { seqNo: referenceNo.trim() };
 
       const response = await fetch(
         `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
@@ -530,51 +607,34 @@ const EditClaimIntimation = ({ route }) => {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error Response:", errorText);
-
-        // Handle 404 specifically for "No claim amount found"
         if (response.status === 404) {
-          console.warn("No claim amount found for referenceNo:", referenceNo);
-          return "0.00"; // Return default without showing error alert
+          return "0.00";
         }
-
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Claim Amount API Response:", data);
-
-      // Handle different response formats
       let claimAmount = "0.00";
 
       if (data && typeof data === "object") {
-        // If response has claimAmount property
         if (data.claimAmount !== undefined && data.claimAmount !== null) {
           claimAmount = data.claimAmount.toString();
-        }
-        // If response has amount property
-        else if (data.amount !== undefined && data.amount !== null) {
+        } else if (data.amount !== undefined && data.amount !== null) {
           claimAmount = data.amount.toString();
-        }
-        // If response has totalAmount property
-        else if (data.totalAmount !== undefined && data.totalAmount !== null) {
+        } else if (
+          data.totalAmount !== undefined &&
+          data.totalAmount !== null
+        ) {
           claimAmount = data.totalAmount.toString();
         }
-      }
-      // If response is a direct number/string
-      else if (typeof data === "number" || typeof data === "string") {
+      } else if (typeof data === "number" || typeof data === "string") {
         claimAmount = data.toString();
       }
 
-      // Format the amount (ensure it has .00 if it's a whole number)
       const formattedAmount = claimAmount.includes(".")
         ? claimAmount
         : `${claimAmount}.00`;
 
-      // Update claimDetails state with the fetched amount
       setClaimDetails((prev) => ({
         ...prev,
         claimAmount: formattedAmount,
@@ -583,56 +643,37 @@ const EditClaimIntimation = ({ route }) => {
       return formattedAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        referenceNo: referenceNo,
-      });
-
-      // Only show alert for non-404 errors
       if (!error.message.includes("404")) {
-        Alert.alert(
+        showPopup(
           "Network Error",
-          `Unable to fetch claim amount. Using default amount. Error: ${error.message}`
+          `Unable to fetch claim amount. Using default amount. Error: ${error.message}`,
+          "error"
         );
       }
-
-      return "0.00"; // Default fallback amount
+      return "0.00";
     }
   };
 
-  // NEW FUNCTION: Refresh claim amount and update beneficiaries
   const refreshClaimAmount = async () => {
     try {
-      console.log("Refreshing claim amount for beneficiaries...");
-
       if (!claimDetails.referenceNo) {
-        console.warn(
-          "No reference number available for refreshing claim amount"
-        );
         return;
       }
 
-      // Fetch updated claim amount
       const updatedAmount = await fetchClaimAmount(claimDetails.referenceNo);
 
-      // Update all beneficiaries with the new amount
       if (beneficiaries.length > 0) {
         const updatedBeneficiaries = beneficiaries.map((beneficiary) => ({
           ...beneficiary,
           amount: updatedAmount,
         }));
-
         setBeneficiaries(updatedBeneficiaries);
-
-        console.log("Claim amount refreshed successfully:", updatedAmount);
       }
     } catch (error) {
       console.error("Error refreshing claim amount:", error);
     }
   };
 
-  // Retrieve claim details from SecureStore
   const retrieveClaimDetails = async () => {
     try {
       const storedReferenceNo = await SecureStore.getItemAsync(
@@ -640,13 +681,10 @@ const EditClaimIntimation = ({ route }) => {
       );
       const storedClaimType = await SecureStore.getItemAsync("edit_claimType");
       const storedCreatedOn = await SecureStore.getItemAsync("edit_createdOn");
-
-      // Also check stored_claim_seq_no which seems to contain the correct reference number
       const storedClaimSeqNo = await SecureStore.getItemAsync(
         "stored_claim_seq_no"
       );
 
-      // Prioritize route params, then stored values, then defaults
       const finalReferenceNo =
         referenceNo ||
         claimNumber ||
@@ -662,15 +700,6 @@ const EditClaimIntimation = ({ route }) => {
         storedCreatedOn ||
         new Date().toLocaleDateString("en-GB");
 
-      console.log("Debug - Reference number sources:", {
-        routeReferenceNo: referenceNo,
-        routeClaimNumber: claimNumber,
-        claimReferenceNo: claim?.referenceNo,
-        storedClaimSeqNo: storedClaimSeqNo,
-        storedReferenceNo: storedReferenceNo,
-        finalReferenceNo: finalReferenceNo,
-      });
-
       setClaimDetails((prev) => ({
         ...prev,
         referenceNo: finalReferenceNo,
@@ -678,15 +707,7 @@ const EditClaimIntimation = ({ route }) => {
         createdOn: finalCreatedOn,
       }));
 
-      // Update the display reference number
       setReferenceNo(finalReferenceNo);
-
-      console.log("Retrieved claim details:", {
-        referenceNo: finalReferenceNo,
-        claimType: finalClaimType,
-        createdOn: finalCreatedOn,
-      });
-
       return finalReferenceNo;
     } catch (error) {
       console.error("Error retrieving claim details:", error);
@@ -707,18 +728,15 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Retrieve beneficiary data from SecureStore
   const retrieveBeneficiaryData = async (referenceNo) => {
     try {
-      // First try to get from stored patient details (from NewClaim page)
       const [storedPatientName, storedIllness, storedRelationship] =
         await Promise.all([
           SecureStore.getItemAsync("stored_patient_name"),
           SecureStore.getItemAsync("stored_illness_description"),
-          SecureStore.getItemAsync("stored_relationship"), // This might be null
+          SecureStore.getItemAsync("stored_relationship"),
         ]);
 
-      // Fallback to edit-specific stored data
       const [storedEnteredBy, storedEditRelationship, storedEditIllness] =
         await Promise.all([
           SecureStore.getItemAsync("edit_enteredBy"),
@@ -726,14 +744,11 @@ const EditClaimIntimation = ({ route }) => {
           SecureStore.getItemAsync("edit_illness"),
         ]);
 
-      // Use stored patient details first, then fallback to edit data
       const finalPatientName = storedPatientName || storedEnteredBy;
       const finalIllness = storedIllness || storedEditIllness;
       const finalRelationship = storedRelationship || storedEditRelationship;
 
-      // If we have patient data, create a beneficiary object
       if (finalPatientName && finalRelationship) {
-        // Fetch claim amount for this beneficiary
         const claimAmount = await fetchClaimAmount(referenceNo);
 
         const beneficiary = {
@@ -746,7 +761,6 @@ const EditClaimIntimation = ({ route }) => {
 
         setBeneficiaries([beneficiary]);
       } else {
-        // If no stored data, initialize with empty array
         setBeneficiaries([]);
       }
     } catch (error) {
@@ -757,12 +771,10 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Fetch employee information
   const fetchEmployeeInfo = async () => {
     try {
       setLoading(true);
 
-      // Get stored employee info
       const policyNumber = await SecureStore.getItemAsync(
         "selected_policy_number"
       );
@@ -784,17 +796,15 @@ const EditClaimIntimation = ({ route }) => {
       }
 
       const data = await response.json();
-
       setEmployeeInfo(data);
 
-      // Update claim details with member name
       setClaimDetails((prev) => ({
         ...prev,
         enteredBy: data.memberName || "Unknown Member",
       }));
     } catch (error) {
       console.error("Error fetching employee info:", error);
-      Alert.alert("Error", "Failed to fetch employee information");
+      showPopup("Error", "Failed to fetch employee information", "error");
       setClaimDetails((prev) => ({ ...prev, enteredBy: "Unknown Member" }));
     } finally {
       setLoading(false);
@@ -802,10 +812,8 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Store claim details in SecureStore
   const storeClaimDetails = async () => {
     try {
-      // Get the actual reference number from multiple sources
       const actualReferenceNo =
         (await SecureStore.getItemAsync("stored_claim_seq_no")) ||
         claimDetails.referenceNo ||
@@ -819,13 +827,6 @@ const EditClaimIntimation = ({ route }) => {
         claimType ||
         claim?.claimType;
 
-      console.log("Storing claim details with actual values:", {
-        actualReferenceNo,
-        actualClaimType,
-        createdOn: claimDetails.createdOn,
-      });
-
-      // Store claim details with actual values
       await SecureStore.setItemAsync(
         "edit_referenceNo",
         String(actualReferenceNo || "")
@@ -839,33 +840,22 @@ const EditClaimIntimation = ({ route }) => {
         String(claimDetails.createdOn || "")
       );
 
-      // Update state with the correct values
       setClaimDetails((prev) => ({
         ...prev,
         referenceNo: actualReferenceNo || prev.referenceNo,
         claimType: actualClaimType || prev.claimType,
       }));
 
-      // Update display values
       setClaimType(actualClaimType || "");
       setReferenceNo(actualReferenceNo || "");
-
-      console.log("Claim details stored and state updated successfully");
     } catch (error) {
       console.error("Error storing claim details:", error);
     }
   };
 
-  // Submit final claim API function
   const submitFinalClaim = async (referenceNo) => {
     try {
-      console.log("Submitting final claim:", referenceNo);
-
-      const requestBody = {
-        claimSeqNo: referenceNo,
-      };
-
-      console.log("Submit final claim request data:", requestBody);
+      const requestBody = { claimSeqNo: referenceNo };
 
       const response = await fetch(
         `${API_BASE_URL}/FinalClaimSub/submitfinalclaim`,
@@ -880,14 +870,12 @@ const EditClaimIntimation = ({ route }) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Submit Final Claim API Error Response:", errorText);
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
 
       const result = await response.json();
-      console.log("Submit final claim API response:", result);
       return result;
     } catch (error) {
       console.error("Error submitting final claim:", error);
@@ -895,34 +883,28 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // useEffect to fetch employee info and retrieve claim details on component mount
+  // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
       try {
-        // First retrieve stored claim details
         const referenceNo = await retrieveClaimDetails();
 
-        // Start all loading operations in parallel
         const loadingPromises = [
-          retrieveBeneficiaryData(referenceNo), // This will call fetchClaimAmount internally
+          retrieveBeneficiaryData(referenceNo),
           fetchEmployeeInfo(),
           storeClaimDetails(),
           fetchDocumentTypes(),
         ];
 
-        // Add document fetching if referenceNo is available
         if (referenceNo) {
           loadingPromises.push(fetchDocuments(referenceNo));
         } else {
-          // If no referenceNo, mark documents as loaded
           updateLoadingState("documents", false);
         }
 
-        // Wait for all operations to complete
         await Promise.all(loadingPromises);
       } catch (error) {
         console.error("Error initializing component:", error);
-        // Ensure loading screen disappears even on error
         setInitialLoading(false);
       }
     };
@@ -934,28 +916,22 @@ const EditClaimIntimation = ({ route }) => {
   useEffect(() => {
     const backAction = () => {
       handleBackPress();
-      return true; // Prevent default back action
+      return true;
     };
 
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
       backAction
     );
-
     return () => backHandler.remove();
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
       const fetchDocumentsOnFocus = async () => {
-        // Only fetch documents on focus if not in initial loading state
         if (!initialLoading) {
-          console.log("Fetching documents on focus");
-
-          // Get reference number from multiple sources
           let referenceNo = claimDetails.referenceNo || claim?.referenceNo;
 
-          // If still no reference number, try to get from SecureStore
           if (!referenceNo) {
             try {
               referenceNo =
@@ -969,26 +945,16 @@ const EditClaimIntimation = ({ route }) => {
             }
           }
 
-          console.log("Reference number for document fetch:", referenceNo);
-
-          // Check if reference number exists and is not empty
           if (referenceNo && referenceNo !== "") {
             setDocumentsLoading(true);
 
             try {
               await fetchDocuments(referenceNo);
-
-              // Only refresh claim amount if documents fetch was successful
-              console.log("Refreshing claim amount after navigation...");
               await refreshClaimAmount();
             } catch (error) {
               console.error("Error fetching documents on focus:", error);
               setDocumentsLoading(false);
             }
-          } else {
-            console.log(
-              "No valid reference number found, skipping document fetch"
-            );
           }
         }
       };
@@ -999,17 +965,11 @@ const EditClaimIntimation = ({ route }) => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", async () => {
-      // Check if we're returning from UploadDocuments
       const routes = navigation.getState()?.routes;
       const currentRoute = routes[routes.length - 1];
 
       if (currentRoute?.params?.fromUploadDocuments) {
-        console.log(
-          "Returned from UploadDocuments, refreshing claim amount..."
-        );
         await refreshClaimAmount();
-
-        // Clear the flag to prevent multiple refreshes
         navigation.setParams({ fromUploadDocuments: undefined });
       }
     });
@@ -1017,49 +977,25 @@ const EditClaimIntimation = ({ route }) => {
     return unsubscribe;
   }, [navigation]);
 
-  // Navigate to UploadDocuments page
   const handleNavigateToUploadDocuments = () => {
-    // Get the current claim amount from multiple sources
     const currentClaimAmount =
       claimDetails.claimAmount ||
       (beneficiaries.length > 0 ? beneficiaries[0].amount : "0.00");
 
-    console.log("Navigating to UploadDocuments with data:", {
-      claimDetailsAmount: claimDetails.claimAmount,
-      beneficiaryAmount:
-        beneficiaries.length > 0 ? beneficiaries[0].amount : "none",
-      finalAmount: currentClaimAmount,
-      referenceNo: claimDetails.referenceNo,
-      patientName: claimDetails.enteredBy,
-      claimType: claimDetails.claimType,
-      illness: beneficiaries.length > 0 ? beneficiaries[0].illness : "",
-      fromEditClaim: true,
-    });
-
     navigation.navigate("UploadDocuments", {
-      // Pass existing data
       claim: claim,
       beneficiaries: beneficiaries,
       documents: documents,
-
-      // Navigation flags
       fromEditClaim: true,
-
-      // Current claim amount - this is crucial for BILL disable logic
       currentClaimAmount: currentClaimAmount,
-
-      // Reference and patient data
       referenceNo: claimDetails.referenceNo,
       patientName: claimDetails.enteredBy,
       claimType: claimDetails.claimType,
       illness: beneficiaries.length > 0 ? beneficiaries[0].illness : "",
-
-      // Additional metadata
-      claimId: claimDetails.referenceNo, // Use referenceNo as claimId
+      claimId: claimDetails.referenceNo,
     });
   };
 
-  // Add document
   const handleAddDocument = () => {
     if (newDocument.type && newDocument.date) {
       setDocuments((prev) => [
@@ -1067,8 +1003,8 @@ const EditClaimIntimation = ({ route }) => {
         {
           id: Date.now().toString(),
           ...newDocument,
-          amount: formatAmount(newDocument.amount), // Format amount
-          hasImage: false, // New documents don't have images initially
+          amount: formatAmount(newDocument.amount),
+          hasImage: false,
         },
       ]);
       setNewDocument({ type: "", date: "", amount: "" });
@@ -1076,20 +1012,15 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Edit document
   const handleEditDocument = (document) => {
     setSelectedDocument(document);
 
-    // Set the document type ID based on the document type string
     const docType = documentTypes.find(
       (type) => type.docDesc === document.type
     );
     setEditDocumentType(docType ? docType.docId : "");
-
-    // Set to today's date instead of parsing existing date
     setEditDocumentDate(new Date());
 
-    // Set the amount and keep existing date for display
     setNewDocument({
       type: document.type,
       date: document.date,
@@ -1099,19 +1030,17 @@ const EditClaimIntimation = ({ route }) => {
     setEditDocumentModalVisible(true);
   };
 
-  // Helper functions for document modal
   const handleEditDocTypeSelect = (docType) => {
-    // Check if BILL type already exists and prevent selection
     if (docType.docId === "O01") {
       const billExists = documents.some(
         (doc) => doc.type === "BILL" && doc.id !== selectedDocument?.id
       );
 
       if (billExists) {
-        Alert.alert(
+        showPopup(
           "Document Type Restriction",
           "A BILL document already exists. Only one BILL document is allowed per claim.",
-          [{ text: "OK", style: "default" }]
+          "warning"
         );
         return;
       }
@@ -1119,13 +1048,11 @@ const EditClaimIntimation = ({ route }) => {
 
     setEditDocumentType(docType.docId);
 
-    // Update newDocument type with the description
     setNewDocument((prev) => ({
       ...prev,
       type: docType.docDesc,
     }));
 
-    // Set amount to 0.00 for non-bill types
     if (docType.docId !== "O01") {
       setNewDocument((prev) => ({
         ...prev,
@@ -1141,7 +1068,6 @@ const EditClaimIntimation = ({ route }) => {
     setShowEditDatePicker(Platform.OS === "ios");
     setEditDocumentDate(currentDate);
 
-    // Update newDocument date
     const formattedDate = formatDate(currentDate);
     setNewDocument((prev) => ({
       ...prev,
@@ -1154,24 +1080,18 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   const handleEditAmountChange = (text) => {
-    // Only allow editing if document type is BILL (O01)
     if (editDocumentType !== "O01") {
       return;
     }
 
-    // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
 
-    // Format the amount
     let formattedAmount = cleanedText;
 
-    // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
@@ -1190,12 +1110,8 @@ const EditClaimIntimation = ({ route }) => {
 
   const updateDocumentAPI = async (documentData) => {
     try {
-      console.log("Updating document via API:", documentData);
-
-      // Create FormData for multipart/form-data request
       const formData = new FormData();
 
-      // Add all fields to FormData
       formData.append("ClmSeqNo", documentData.ClmSeqNo);
       formData.append("ClmMemSeqNo", documentData.ClmMemSeqNo.toString());
       formData.append("DocSeq", documentData.DocSeq.toString());
@@ -1205,16 +1121,13 @@ const EditClaimIntimation = ({ route }) => {
       formData.append("CreatedBy", documentData.CreatedBy);
       formData.append("ImgName", documentData.ImgName);
 
-      // Handle image content if available - React Native compatible approach
       if (documentData.ImgContent && documentData.ImgContent !== "") {
         try {
-          // For React Native, create file object directly from base64
           const base64Data = documentData.ImgContent.replace(
             /^data:image\/[a-z]+;base64,/,
             ""
           );
 
-          // Create file object compatible with React Native FormData
           const imageFile = {
             uri: `data:image/jpeg;base64,${base64Data}`,
             type: "image/jpeg",
@@ -1222,10 +1135,8 @@ const EditClaimIntimation = ({ route }) => {
           };
 
           formData.append("ImgContent", imageFile);
-          console.log("Image file prepared for upload");
         } catch (imageError) {
           console.error("Error processing image:", imageError);
-          // Continue without image if there's an error
         }
       }
 
@@ -1242,14 +1153,12 @@ const EditClaimIntimation = ({ route }) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Update Document API Error Response:", errorText);
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
 
       const result = await response.json();
-      console.log("Update document API response:", result);
       return result;
     } catch (error) {
       console.error("Error updating document via API:", error);
@@ -1262,7 +1171,7 @@ const EditClaimIntimation = ({ route }) => {
       const day = date.getDate().toString().padStart(2, "0");
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const year = date.getFullYear();
-      return `${day}/${month}/${year}`; // DD/MM/YYYY format for Oracle
+      return `${day}/${month}/${year}`;
     } catch (error) {
       console.error("Error formatting date for API:", error);
       const today = new Date();
@@ -1273,12 +1182,14 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Save document edit with claim amount refresh
   const handleSaveDocumentEdit = async () => {
     try {
-      // Validate required fields
       if (!editDocumentType) {
-        Alert.alert("Validation Error", "Please select a document type.");
+        showPopup(
+          "Validation Error",
+          "Please select a document type.",
+          "warning"
+        );
         return;
       }
 
@@ -1286,57 +1197,49 @@ const EditClaimIntimation = ({ route }) => {
         editDocumentType === "O01" &&
         (!newDocument.amount || parseFloat(newDocument.amount) <= 0)
       ) {
-        Alert.alert(
+        showPopup(
           "Validation Error",
-          "Amount is required and must be greater than 0 for Bill type."
+          "Amount is required and must be greater than 0 for Bill type.",
+          "warning"
         );
         return;
       }
 
-      // Get stored user NIC
       const storedNic = await SecureStore.getItemAsync("user_nic");
       if (!storedNic) {
-        Alert.alert("Error", "User information not found. Please login again.");
+        showPopup(
+          "Error",
+          "User information not found. Please login again.",
+          "error"
+        );
         return;
       }
 
-      // Parse clmMemSeqNo to get ClmMemSeqNo and DocSeq
       const { memId: clmMemSeqNo, seqNo: docSeq } = parseClmMemSeqNo(
         selectedDocument.clmMemSeqNo
       );
 
-      // Find the original document data to get imgContent
       const originalDocData = documents.find(
         (doc) => doc.id === selectedDocument.id
       );
 
-      // Prepare API request data with correct data types
       const updateDocumentData = {
-        ClmSeqNo: claimDetails.referenceNo, // string
-        ClmMemSeqNo: parseInt(clmMemSeqNo), // int
-        DocSeq: parseInt(docSeq), // int
-        NewDocRef: editDocumentType, // string - This is the docId (O01, O02, etc.)
-        DocDate: formatDateForAPI(editDocumentDate), // string - Format: YYYY-MM-DD
-        ImgContent: originalDocData?.imgContent || "", // Will be converted to IFormFile
-        DocAmount: parseFloat(newDocument.amount || "0"), // decimal
-        CreatedBy: storedNic, // string
-        ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`, // string - Generate image name
+        ClmSeqNo: claimDetails.referenceNo,
+        ClmMemSeqNo: parseInt(clmMemSeqNo),
+        DocSeq: parseInt(docSeq),
+        NewDocRef: editDocumentType,
+        DocDate: formatDateForAPI(editDocumentDate),
+        ImgContent: originalDocData?.imgContent || "",
+        DocAmount: parseFloat(newDocument.amount || "0"),
+        CreatedBy: storedNic,
+        ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
       };
 
-      console.log("Prepared update document data:", {
-        ...updateDocumentData,
-        ImgContent: updateDocumentData.ImgContent
-          ? "Base64 data present"
-          : "No image data",
-      });
-
-      // Call the update API
       await updateDocumentAPI(updateDocumentData);
 
-      // Update local state with formatted amount
       const updatedDocument = {
         ...newDocument,
-        amount: formatAmount(newDocument.amount), // Format amount
+        amount: formatAmount(newDocument.amount),
       };
 
       setDocuments((prev) =>
@@ -1347,235 +1250,197 @@ const EditClaimIntimation = ({ route }) => {
         )
       );
 
-      // Close modal and reset form
       setEditDocumentModalVisible(false);
       setNewDocument({ type: "", date: "", amount: "" });
       setEditDocumentType("");
       setEditDocumentDate(new Date());
 
-      // Show success message
-      Alert.alert("Success", "Document updated successfully!");
+      showPopup("Success", "Document updated successfully!", "success");
 
-      // Refresh documents from API to get latest data
       const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
       if (referenceNo) {
         await fetchDocuments(referenceNo);
       }
 
-      // Refresh claim amount after editing document
-      console.log("Document updated, refreshing claim amount...");
       await refreshClaimAmount();
     } catch (error) {
       console.error("Error in handleSaveDocumentEdit:", error);
 
-      // Check if it's a 404 error (document not found)
       if (error.message.includes("404")) {
-        Alert.alert(
+        showPopup(
           "Document Not Found",
           "The document could not be found in the system. It may have been deleted or moved.\n\nWould you like to refresh the document list?",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Refresh Documents",
-              onPress: async () => {
-                const referenceNo =
-                  claimDetails.referenceNo || claim?.referenceNo;
-                if (referenceNo) {
-                  await fetchDocuments(referenceNo);
-                }
-                setEditDocumentModalVisible(false);
-                setNewDocument({ type: "", date: "", amount: "" });
-                setEditDocumentType("");
-                setEditDocumentDate(new Date());
-              },
-            },
-          ]
+          "error",
+          true,
+          async () => {
+            hidePopup();
+            const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+            if (referenceNo) {
+              await fetchDocuments(referenceNo);
+            }
+            setEditDocumentModalVisible(false);
+            setNewDocument({ type: "", date: "", amount: "" });
+            setEditDocumentType("");
+            setEditDocumentDate(new Date());
+          }
         );
       } else {
-        Alert.alert(
+        showPopup(
           "Update Error",
           `Failed to update document: ${error.message}\n\nWould you like to save the changes locally?`,
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Save Locally",
-              onPress: () => {
-                // Save locally without API call
-                const updatedDocument = {
-                  ...newDocument,
-                  amount: formatAmount(newDocument.amount), // Format amount
-                };
-                setDocuments((prev) =>
-                  prev.map((item) =>
-                    item.id === selectedDocument.id
-                      ? { ...item, ...updatedDocument }
-                      : item
-                  )
-                );
-                setEditDocumentModalVisible(false);
-                setNewDocument({ type: "", date: "", amount: "" });
-                setEditDocumentType("");
-                setEditDocumentDate(new Date());
-              },
-            },
-          ]
+          "error",
+          true,
+          () => {
+            hidePopup();
+            const updatedDocument = {
+              ...newDocument,
+              amount: formatAmount(newDocument.amount),
+            };
+            setDocuments((prev) =>
+              prev.map((item) =>
+                item.id === selectedDocument.id
+                  ? { ...item, ...updatedDocument }
+                  : item
+              )
+            );
+            setEditDocumentModalVisible(false);
+            setNewDocument({ type: "", date: "", amount: "" });
+            setEditDocumentType("");
+            setEditDocumentDate(new Date());
+          }
         );
       }
     }
   };
 
-  // Updated Delete document function with API integration
   const handleDeleteDocument = (documentId) => {
-    // Find the document to get its details
     const documentToDelete = documents.find((doc) => doc.id === documentId);
 
     if (!documentToDelete) {
-      Alert.alert("Error", "Document not found.");
+      showPopup("Error", "Document not found.", "error");
       return;
     }
 
-    Alert.alert(
+    showPopup(
       "Confirm Delete",
       "Are you sure you want to delete this document?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Show loading indicator (optional)
-              setDocumentsLoading(true);
+      "confirm",
+      true,
+      async () => {
+        hidePopup();
+        try {
+          setDocumentsLoading(true);
 
-              // Only call API if document has clmMemSeqNo (exists in backend)
-              if (documentToDelete.clmMemSeqNo) {
-                console.log("Deleting document from API:", documentToDelete);
-                await deleteDocumentFromAPI(documentToDelete);
+          if (documentToDelete.clmMemSeqNo) {
+            await deleteDocumentFromAPI(documentToDelete);
+            showPopup(
+              "Success",
+              "Document deleted successfully from server.",
+              "success"
+            );
+          }
 
-                // Show success message
-                Alert.alert(
-                  "Success",
-                  "Document deleted successfully from server."
-                );
-              }
+          setDocuments((prev) => prev.filter((item) => item.id !== documentId));
 
-              // Remove from local state regardless of API call success
+          const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+          if (referenceNo) {
+            await fetchDocuments(referenceNo);
+          }
+
+          await refreshClaimAmount();
+        } catch (error) {
+          console.error("Error deleting document:", error);
+
+          showPopup(
+            "Delete Error",
+            `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
+            "error",
+            true,
+            async () => {
+              hidePopup();
               setDocuments((prev) =>
                 prev.filter((item) => item.id !== documentId)
               );
-
-              // Optionally refresh documents from API
-              const referenceNo =
-                claimDetails.referenceNo || claim?.referenceNo;
-              if (referenceNo) {
-                await fetchDocuments(referenceNo);
-              }
-
-              // Refresh claim amount after deleting document
-              console.log("Document deleted, refreshing claim amount...");
               await refreshClaimAmount();
-            } catch (error) {
-              console.error("Error deleting document:", error);
-
-              // Show error but still ask if user wants to remove locally
-              Alert.alert(
-                "Delete Error",
-                `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Remove Locally",
-                    style: "destructive",
-                    onPress: async () => {
-                      setDocuments((prev) =>
-                        prev.filter((item) => item.id !== documentId)
-                      );
-                      // Still refresh claim amount even for local deletion
-                      await refreshClaimAmount();
-                    },
-                  },
-                ]
-              );
-            } finally {
-              setDocumentsLoading(false);
             }
-          },
-        },
-      ]
+          );
+        } finally {
+          setDocumentsLoading(false);
+        }
+      }
     );
   };
 
-  // Handle submit - Updated with API integration
-  // Handle submit - Updated with API integration and home navigation
   const handleSubmitClaim = () => {
-    Alert.alert("Submit Claim", "Are you sure you want to submit this claim?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Submit",
-        onPress: async () => {
-          try {
-            console.log("Submitting claim...");
-
-            // Validate that we have a reference number
-            if (!claimDetails.referenceNo) {
-              Alert.alert("Error", "Claim reference number not found.");
-              return;
-            }
-
-            // Call the submit final claim API
-            await submitFinalClaim(claimDetails.referenceNo);
-
-            // Show success message and navigate to home
-            Alert.alert("Success", "Claim submitted successfully!", [
-              {
-                text: "OK",
-                onPress: () => {
-                  // Navigate to home page instead of going back
-                  navigation.navigate("home");
-                },
-              },
-            ]);
-          } catch (error) {
-            console.error("Error submitting claim:", error);
-
-            // Handle different types of errors
-            if (error.message.includes("404")) {
-              Alert.alert(
-                "Claim Not Found",
-                "The claim could not be found in the system. Please refresh and try again."
-              );
-            } else if (error.message.includes("400")) {
-              Alert.alert(
-                "Invalid Request",
-                "The claim cannot be submitted. Please check all required fields and try again."
-              );
-            } else if (error.message.includes("500")) {
-              Alert.alert(
-                "Server Error",
-                "Server is currently unavailable. Please try again later."
-              );
-            } else {
-              Alert.alert(
-                "Submit Error",
-                `Failed to submit claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`
-              );
-            }
+    showPopup(
+      "Submit Claim",
+      "Are you sure you want to submit this claim?",
+      "confirm",
+      true,
+      async () => {
+        hidePopup();
+        try {
+          if (!claimDetails.referenceNo) {
+            showPopup("Error", "Claim reference number not found.", "error");
+            return;
           }
-        },
-      },
-    ]);
+
+          await submitFinalClaim(claimDetails.referenceNo);
+
+          showPopup(
+            "Success",
+            "Claim submitted successfully!",
+            "success",
+            false,
+            () => {
+              hidePopup();
+              navigation.navigate("home");
+            }
+          );
+        } catch (error) {
+          console.error("Error submitting claim:", error);
+
+          if (error.message.includes("404")) {
+            showPopup(
+              "Claim Not Found",
+              "The claim could not be found in the system. Please refresh and try again.",
+              "error"
+            );
+          } else if (error.message.includes("400")) {
+            showPopup(
+              "Invalid Request",
+              "The claim cannot be submitted. Please check all required fields and try again.",
+              "error"
+            );
+          } else if (error.message.includes("500")) {
+            showPopup(
+              "Server Error",
+              "Server is currently unavailable. Please try again later.",
+              "error"
+            );
+          } else {
+            showPopup(
+              "Submit Error",
+              `Failed to submit claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+              "error"
+            );
+          }
+        }
+      }
+    );
   };
 
-  // Handle submit later
   const handleSubmitLater = () => {
-    Alert.alert("Saved", "Claim saved for later submission.", [
-      {
-        text: "OK",
-        onPress: () => {
-          navigation?.goBack();
-        },
-      },
-    ]);
+    showPopup(
+      "Saved",
+      "Claim saved for later submission.",
+      "success",
+      false,
+      () => {
+        hidePopup();
+        navigation?.goBack();
+      }
+    );
   };
 
   const renderDocumentImage = (document) => {
@@ -1588,9 +1453,10 @@ const EditClaimIntimation = ({ route }) => {
           if (document.hasImage) {
             loadDocumentImage(document);
           } else {
-            Alert.alert(
+            showPopup(
               "No Image",
-              "This document doesn't have an associated image."
+              "This document doesn't have an associated image.",
+              "info"
             );
           }
         }}
@@ -1625,7 +1491,6 @@ const EditClaimIntimation = ({ route }) => {
     );
   };
 
-  // Show loading screen while initializing
   if (initialLoading) {
     return (
       <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
@@ -1641,12 +1506,12 @@ const EditClaimIntimation = ({ route }) => {
         <TouchableOpacity onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
+        <Text style={styles.headerTitle}>SHE Claim Intimation </Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Claim Details Section - Read Only */}
+        {/* Claim Details Section */}
         <View style={styles.claimDetailsSection}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Reference No</Text>
@@ -1677,7 +1542,7 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </View>
 
-        {/* Beneficiaries Title - Full Width */}
+        {/* Beneficiaries Title */}
         <View style={styles.beneficiariesTitleContainer}>
           <Text style={styles.beneficiariesTitle}>Beneficiaries for Claim</Text>
         </View>
@@ -1911,7 +1776,6 @@ const EditClaimIntimation = ({ route }) => {
               {isEditDocTypeDropdownVisible && !loadingDocumentTypes && (
                 <View style={styles.documentDropdownOptions}>
                   {documentTypes.map((docType) => {
-                    // Check if BILL type already exists (excluding current document being edited)
                     const isBillDisabled =
                       docType.docId === "O01" &&
                       documents.some(
@@ -1968,7 +1832,7 @@ const EditClaimIntimation = ({ route }) => {
                   is24Hour={true}
                   display="default"
                   onChange={handleEditDateChange}
-                  maximumDate={new Date()} // Prevent future dates
+                  maximumDate={new Date()}
                 />
               )}
 
@@ -2076,6 +1940,17 @@ const EditClaimIntimation = ({ route }) => {
           )}
         </View>
       </Modal>
+
+      {/* Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </LinearGradient>
   );
 };
@@ -2106,7 +1981,7 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
 
-  // Custom Loading Styles
+  // Loading Styles
   loadingOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -2154,7 +2029,7 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  // Claim Details Section - Fixed alignment
+  // Claim Details Section
   claimDetailsSection: {
     backgroundColor: "rgba(77, 208, 225, 0.1)",
     borderRadius: 15,
@@ -2190,7 +2065,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Beneficiaries Title - Full Width Background
+  // Beneficiaries Section
   beneficiariesTitleContainer: {
     backgroundColor: "#6DD3D3",
     width: "100%",
@@ -2205,8 +2080,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
   },
-
-  // Beneficiaries Section - Fixed alignment
   beneficiariesSection: {
     backgroundColor: "white",
     borderRadius: 15,
@@ -2266,7 +2139,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Documents Section - Fixed alignment
+  // Documents Section
   documentsSection: {
     marginBottom: 20,
     marginHorizontal: 20,
@@ -2283,7 +2156,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
   },
-
   documentContent: {
     flex: 1,
     paddingRight: 60,
@@ -2335,19 +2207,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  addDocumentButton: {
-    backgroundColor: "#2E7D7D",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    alignSelf: "flex-end",
-    marginTop: 10,
-  },
-  addDocumentText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "500",
-  },
 
   // Action Buttons
   buttonContainer: {
@@ -2388,7 +2247,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Modal styles
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -2443,7 +2302,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Edit Document Modal Styles
+  // Document Modal Styles
   documentModalContent: {
     width: "90%",
     backgroundColor: "white",
@@ -2476,8 +2335,6 @@ const styles = StyleSheet.create({
     borderTopColor: "#f0f0f0",
     backgroundColor: "white",
   },
-
-  // Document-specific field styles
   documentFieldLabel: {
     fontSize: 14,
     fontWeight: "500",
@@ -2572,6 +2429,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+  // Document Image Styles
   documentImageIconContainer: {
     width: 50,
     height: 60,
@@ -2600,7 +2458,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Image Modal styles
+  // Image Modal Styles
   imageModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.9)",
@@ -2621,6 +2479,8 @@ const styles = StyleSheet.create({
     height: "80%",
     borderRadius: 10,
   },
+
+  // Empty State Styles
   noBeneficiariesContainer: {
     padding: 20,
     alignItems: "center",
@@ -2638,6 +2498,103 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textAlign: "center",
+  },
+
+  // Popup Styles
+  popupOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  backdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

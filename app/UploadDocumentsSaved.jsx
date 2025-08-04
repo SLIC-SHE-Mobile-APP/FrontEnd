@@ -888,12 +888,6 @@ const UploadDocumentsSaved = ({ route }) => {
       return;
     }
 
-    showPopup(
-      "Uploading",
-      "Please wait while we upload your documents...",
-      "info"
-    );
-
     try {
       const uploadPromises = uploadedDocuments.map((doc) =>
         uploadDocumentToAPI(doc)
