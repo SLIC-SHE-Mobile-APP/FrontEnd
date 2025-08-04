@@ -467,7 +467,7 @@ function LoginRequestOTPContent() {
                   />
                 </View>
                 <TextInput
-                  placeholder="NIC"
+                  placeholder="Registered NIC"
                   style={styles.input}
                   value={nic}
                   onChangeText={handleNICChange}
@@ -490,7 +490,7 @@ function LoginRequestOTPContent() {
                   <Text style={styles.countryCodeText}>+94</Text>
                 </View>
                 <TextInput
-                  placeholder="700 000 000"
+                  placeholder="Registered Phone Number"
                   keyboardType="numeric"
                   style={styles.phoneInput}
                   value={mobile}
