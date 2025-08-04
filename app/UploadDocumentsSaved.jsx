@@ -21,9 +21,89 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
 
 import { API_BASE_URL } from "../constants/index.js";
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
+// Custom Loading Animation Component
+const LoadingIcon = () => {
+  const [rotateAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(1));
+
+  useEffect(() => {
+    const createRotateAnimation = () => {
+      return Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      );
+    };
+
+    const createPulseAnimation = () => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1.2,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const rotateAnimation = createRotateAnimation();
+    const pulseAnimation = createPulseAnimation();
+
+    rotateAnimation.start();
+    pulseAnimation.start();
+
+    return () => {
+      rotateAnimation.stop();
+      pulseAnimation.stop();
+    };
+  }, []);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.customLoadingIcon,
+        {
+          transform: [{ rotate: spin }, { scale: scaleAnim }],
+        },
+      ]}
+    >
+      <View style={styles.loadingIconOuter}>
+        <View style={styles.loadingIconInner}>
+          <Icon name="heartbeat" size={20} color="#FFFFFF" />
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+// Loading Screen Component
+const LoadingScreen = () => (
+  <View style={styles.loadingOverlay}>
+    <View style={styles.loadingContainer}>
+      <LoadingIcon />
+      <Text style={styles.loadingText}>Loading Document Types...</Text>
+      <Text style={styles.loadingSubText}>Please wait a moment</Text>
+    </View>
+  </View>
+);
 
 // Custom Popup Component
 const CustomPopup = ({
@@ -363,10 +443,9 @@ const UploadDocumentsSaved = ({ route }) => {
     setSelectedDocId(type);
     console.log("Selected document type ID:", type);
 
+    // Set amount based on document type
     if (type === "O02" || type === "O03") {
       setAmount("0.00");
-    } else if (type === "O01") {
-      setAmount("");
     } else {
       setAmount("");
     }
@@ -390,6 +469,7 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const handleAmountChange = (text) => {
+    // Disable amount input for PRESCRIPTION and DIAGNOSIS CARD
     if (selectedDocumentType === "O02" || selectedDocumentType === "O03") {
       return;
     }
@@ -539,6 +619,20 @@ const UploadDocumentsSaved = ({ route }) => {
     return true;
   };
 
+  // Check if file type is allowed (only jpg, jpeg, png)
+  const isAllowedFileType = (mimeType, name) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+    
+    if (allowedTypes.includes(mimeType)) {
+      return true;
+    }
+    
+    // Fallback check using file extension
+    const extension = name.toLowerCase().split('.').pop();
+    return ['jpg', 'jpeg', 'png'].includes(extension);
+  };
+
   const handleBrowseFiles = async () => {
     if (!selectedDocumentType) {
       showPopup(
@@ -572,12 +666,23 @@ const UploadDocumentsSaved = ({ route }) => {
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["image/*", "application/pdf", "image/jpeg", "image/png"],
+        type: ["image/jpeg", "image/jpg", "image/png"], // Restrict to only JPG, JPEG, PNG
         copyToCacheDirectory: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
+        
+        // Check if file type is allowed
+        if (!isAllowedFileType(file.mimeType, file.name)) {
+          showPopup(
+            "Invalid File Type",
+            "Only JPG, JPEG, and PNG files are allowed.",
+            "error"
+          );
+          return;
+        }
+
         let finalUri = file.uri;
 
         if (file.mimeType && file.mimeType.startsWith("image/")) {
@@ -980,6 +1085,11 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const isAmountEditable = () => {
+    // First check if any document type is selected
+    if (!selectedDocumentType) {
+      return false;
+    }
+    // Then check if it's not PRESCRIPTION or DIAGNOSIS CARD
     return selectedDocumentType !== "O02" && selectedDocumentType !== "O03";
   };
 
@@ -994,10 +1104,15 @@ const UploadDocumentsSaved = ({ route }) => {
 
   if (loading) {
     return (
-      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={[styles.gradient]}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading document types...</Text>
+      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={[styles.gradient]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#13646D" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Upload Documents Saved</Text>
+          <View style={styles.placeholder} />
         </View>
+        <LoadingScreen />
       </LinearGradient>
     );
   }
@@ -1094,14 +1209,24 @@ const UploadDocumentsSaved = ({ route }) => {
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
                 styles.textInputError,
             ]}
-            placeholder={isAmountEditable() ? "Enter amount" : "0.00"}
+            placeholder={
+              !selectedDocumentType 
+                ? "Select document type first" 
+                : isAmountEditable() 
+                  ? "Enter amount" 
+                  : "0.00"
+            }
             placeholderTextColor="#B0B0B0"
             value={amount}
             onChangeText={handleAmountChange}
             keyboardType="decimal-pad"
             editable={isAmountEditable()}
           />
-          {selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
+          {!selectedDocumentType ? (
+            <Text style={styles.helpText}>
+              Please select a document type first to enable amount input
+            </Text>
+          ) : selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
             <Text style={styles.helpText}>
               Amount is automatically set to 0.00 for{" "}
               {getDocumentTypeLabel(selectedDocumentType)}
@@ -1188,7 +1313,7 @@ const UploadDocumentsSaved = ({ route }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Document</Text>
               <Text style={styles.sectionSubtitle}>
-                Allowed formats: JPG, JPEG, TIFF, PNG
+                Allowed formats: JPG, JPEG, PNG only
               </Text>
 
               <Text
@@ -1505,14 +1630,52 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  loadingContainer: {
+  // Loading Screen Styles
+  loadingOverlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    minWidth: 200,
+    minHeight: 150,
+  },
+  customLoadingIcon: {
+    marginBottom: 15,
+  },
+  loadingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#16858D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#6DD3D3',
+  },
+  loadingIconInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17ABB7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
     fontSize: 16,
-    color: "#13646D",
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   patientInfoCard: {
     backgroundColor: "#fff",
