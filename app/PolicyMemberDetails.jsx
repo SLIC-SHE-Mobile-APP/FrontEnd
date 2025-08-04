@@ -545,7 +545,7 @@ export default function PolicyMemberDetails() {
 
   if (loading) {
     return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <LoadingScreen />
       </LinearGradient>
     );
@@ -553,7 +553,7 @@ export default function PolicyMemberDetails() {
 
   if (error && !memberDetails) {
     return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>Error: {error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
@@ -566,7 +566,7 @@ export default function PolicyMemberDetails() {
 
   if (!memberDetails) {
     return (
-      <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+      <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>No member details available</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
@@ -578,7 +578,7 @@ export default function PolicyMemberDetails() {
   }
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header1}>
         <TouchableOpacity onPress={handleBackPress}>
