@@ -3,9 +3,8 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
-  Alert,
   Animated,
   Image,
   Modal,
@@ -16,9 +15,138 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
+
+const { width } = Dimensions.get('window');
+
+// Custom Popup Component with Blur Background
+const CustomPopup = ({
+  visible,
+  title,
+  message,
+  type = "info",
+  onClose,
+  onConfirm,
+  showConfirmButton = false,
+}) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const getIconAndColor = () => {
+    switch (type) {
+      case "success":
+        return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+      case "error":
+        return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+      case "warning":
+        return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+      default:
+        return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View 
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.popupContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View
+            style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+          >
+            <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+          </View>
+
+          {title && <Text style={styles.popupTitle}>{title}</Text>}
+          <Text style={styles.popupMessage}>{message}</Text>
+
+          <View style={styles.popupButtonContainer}>
+            {showConfirmButton && (
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupConfirmButton]}
+                onPress={onConfirm}
+              >
+                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.popupButton,
+                showConfirmButton
+                  ? styles.popupCancelButton
+                  : styles.popupOkButton,
+              ]}
+              onPress={showConfirmButton ? onClose : (onConfirm || onClose)}
+            >
+              <Text
+                style={[
+                  showConfirmButton
+                    ? styles.popupCancelButtonText
+                    : styles.popupOkButtonText,
+                ]}
+              >
+                {showConfirmButton ? "Cancel" : "OK"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
 
 const EditClaimIntimation1 = ({ route }) => {
   const navigation = useNavigation();
@@ -37,6 +165,16 @@ const EditClaimIntimation1 = ({ route }) => {
   const [showEditDatePicker, setShowEditDatePicker] = useState(false);
   const [isEditDocTypeDropdownVisible, setEditDocTypeDropdownVisible] =
     useState(false);
+
+  // Popup state
+  const [popup, setPopup] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    showConfirmButton: false,
+    onConfirm: null,
+  });
 
   // State for claim details
   const [claimDetails, setClaimDetails] = useState({
@@ -98,6 +236,29 @@ const EditClaimIntimation1 = ({ route }) => {
     date: "",
     amount: "",
   });
+
+  // Show popup function
+  const showPopup = (
+    title,
+    message,
+    type = "info",
+    showConfirmButton = false,
+    onConfirm = null
+  ) => {
+    setPopup({
+      visible: true,
+      title,
+      message,
+      type,
+      showConfirmButton,
+      onConfirm,
+    });
+  };
+
+  // Hide popup function
+  const hidePopup = () => {
+    setPopup((prev) => ({ ...prev, visible: false }));
+  };
 
   // Helper function to format amount to 2 decimal places
   const formatAmount = (amount) => {
@@ -240,7 +401,7 @@ const EditClaimIntimation1 = ({ route }) => {
       setDocumentTypes(docTypesData);
     } catch (error) {
       console.error("Error fetching document types:", error);
-      Alert.alert("Error", "Failed to load document types. Please try again.");
+      showPopup("Error", "Failed to load document types. Please try again.", "error");
 
       // Set fallback data in case of error
       setDocumentTypes([
@@ -308,9 +469,10 @@ const EditClaimIntimation1 = ({ route }) => {
       console.log("Transformed member options:", transformedMembers);
     } catch (error) {
       console.error("Error fetching dependents:", error);
-      Alert.alert(
+      showPopup(
         "Error",
-        "Failed to load member information. Please try again."
+        "Failed to load member information. Please try again.",
+        "error"
       );
 
       // Set fallback data in case of error
@@ -448,9 +610,10 @@ const EditClaimIntimation1 = ({ route }) => {
         referenceNo: referenceNo,
       });
 
-      Alert.alert(
+      showPopup(
         "Documents Loading Error",
-        `Unable to fetch documents. Error: ${error.message}`
+        `Unable to fetch documents. Error: ${error.message}`,
+        "error"
       );
 
       setDocuments([]);
@@ -500,7 +663,7 @@ const EditClaimIntimation1 = ({ route }) => {
       };
       reader.onerror = () => {
         console.error("Error reading image blob");
-        Alert.alert("Error", "Failed to load image");
+        showPopup("Error", "Failed to load image", "error");
         // Clear loading state for this document
         setImageLoadingStates((prev) => {
           const newMap = new Map(prev);
@@ -511,7 +674,7 @@ const EditClaimIntimation1 = ({ route }) => {
       reader.readAsDataURL(blob);
     } catch (error) {
       console.error("Error loading document image:", error);
-      Alert.alert("Error", "Failed to load image");
+      showPopup("Error", "Failed to load image", "error");
       // Clear loading state for this document
       setImageLoadingStates((prev) => {
         const newMap = new Map(prev);
@@ -563,9 +726,10 @@ const EditClaimIntimation1 = ({ route }) => {
       });
 
       // Show user-friendly error message
-      Alert.alert(
+      showPopup(
         "Network Error",
-        `Unable to fetch claim amount. Using default amount. Error: ${error.message}`
+        `Unable to fetch claim amount. Using default amount. Error: ${error.message}`,
+        "error"
       );
 
       return "0.00"; // Default fallback amount
@@ -912,7 +1076,7 @@ const EditClaimIntimation1 = ({ route }) => {
       }));
     } catch (error) {
       console.error("Error fetching employee info:", error);
-      Alert.alert("Error", "Failed to fetch employee information");
+      showPopup("Error", "Failed to fetch employee information", "error");
       setClaimDetails((prev) => ({ ...prev, enteredBy: "Unknown Member" }));
     } finally {
       setLoading(false);
@@ -989,9 +1153,10 @@ const EditClaimIntimation1 = ({ route }) => {
         await Promise.all(loadingPromises);
       } catch (error) {
         console.error("Error initializing component:", error);
-        Alert.alert(
+        showPopup(
           "Initialization Error",
-          "Failed to load claim data. Please try again."
+          "Failed to load claim data. Please try again.",
+          "error"
         );
       } finally {
         // Ensure loading screen disappears even on error
@@ -1241,15 +1406,16 @@ const EditClaimIntimation1 = ({ route }) => {
     try {
       // Validate required fields
       if (!newBeneficiary.name || !newBeneficiary.relationship) {
-        Alert.alert(
+        showPopup(
           "Validation Error",
-          "Patient name and relationship are required."
+          "Patient name and relationship are required.",
+          "warning"
         );
         return;
       }
 
       if (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") {
-        Alert.alert("Validation Error", "Illness field is required.");
+        showPopup("Validation Error", "Illness field is required.", "warning");
         return;
       }
 
@@ -1292,7 +1458,7 @@ const EditClaimIntimation1 = ({ route }) => {
       });
 
       // Show success message
-      Alert.alert("Success", "Beneficiary information updated successfully!");
+      showPopup("Success", "Beneficiary information updated successfully!", "success");
 
       // Refresh patient details from API to ensure data consistency
       try {
@@ -1313,119 +1479,113 @@ const EditClaimIntimation1 = ({ route }) => {
 
       // Handle different types of errors
       if (error.message.includes("Required user information not found")) {
-        Alert.alert(
+        showPopup(
           "Authentication Error",
           "User information not found. Please logout and login again.",
-          [{ text: "OK", style: "default" }]
+          "error",
+          false,
+          () => {
+            hidePopup();
+          }
         );
       } else if (error.message.includes("404")) {
-        Alert.alert(
+        showPopup(
           "Not Found Error",
           "The claim could not be found in the system. Please refresh and try again.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Refresh",
-              onPress: async () => {
-                // Refresh patient details from API
-                try {
-                  const referenceNo = claimDetails.referenceNo;
-                  if (referenceNo) {
-                    await retrieveBeneficiaryData(referenceNo);
-                  }
-                } catch (refreshError) {
-                  console.error("Error refreshing data:", refreshError);
-                }
+          "error",
+          true,
+          async () => {
+            // Refresh patient details from API
+            try {
+              const referenceNo = claimDetails.referenceNo;
+              if (referenceNo) {
+                await retrieveBeneficiaryData(referenceNo);
+              }
+            } catch (refreshError) {
+              console.error("Error refreshing data:", refreshError);
+            }
 
-                setEditBeneficiaryModalVisible(false);
-                setDropdownVisible(false);
-                setSelectedMember(null);
-                setNewBeneficiary({
-                  name: "",
-                  relationship: "",
-                  illness: "",
-                  amount: "",
-                });
-              },
-            },
-          ]
+            setEditBeneficiaryModalVisible(false);
+            setDropdownVisible(false);
+            setSelectedMember(null);
+            setNewBeneficiary({
+              name: "",
+              relationship: "",
+              illness: "",
+              amount: "",
+            });
+            hidePopup();
+          }
         );
       } else if (error.message.includes("400")) {
-        Alert.alert(
+        showPopup(
           "Validation Error",
           "Please check your input data and try again.",
-          [{ text: "OK", style: "default" }]
+          "error"
         );
       } else if (error.message.includes("500")) {
-        Alert.alert(
+        showPopup(
           "Server Error",
           "Server is currently unavailable. Please try again later.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Save Locally",
-              onPress: async () => {
-                // Save locally without API call as fallback
-                const claimAmount = await fetchClaimAmount(
-                  claimDetails.referenceNo
-                );
-                const updatedBeneficiaries = beneficiaries.map((item) =>
-                  item.id === selectedBeneficiary.id
-                    ? { ...item, ...newBeneficiary, amount: claimAmount }
-                    : item
-                );
-                setBeneficiaries(updatedBeneficiaries);
-                await storeBeneficiaryData(updatedBeneficiaries);
-                setEditBeneficiaryModalVisible(false);
-                setDropdownVisible(false);
-                setSelectedMember(null);
-                setNewBeneficiary({
-                  name: "",
-                  relationship: "",
-                  illness: "",
-                  amount: "",
-                });
-                Alert.alert(
-                  "Saved",
-                  "Changes saved locally. Will sync when server is available."
-                );
-              },
-            },
-          ]
+          "error",
+          true,
+          async () => {
+            // Save locally without API call as fallback
+            const claimAmount = await fetchClaimAmount(
+              claimDetails.referenceNo
+            );
+            const updatedBeneficiaries = beneficiaries.map((item) =>
+              item.id === selectedBeneficiary.id
+                ? { ...item, ...newBeneficiary, amount: claimAmount }
+                : item
+            );
+            setBeneficiaries(updatedBeneficiaries);
+            await storeBeneficiaryData(updatedBeneficiaries);
+            setEditBeneficiaryModalVisible(false);
+            setDropdownVisible(false);
+            setSelectedMember(null);
+            setNewBeneficiary({
+              name: "",
+              relationship: "",
+              illness: "",
+              amount: "",
+            });
+            showPopup(
+              "Saved",
+              "Changes saved locally. Will sync when server is available.",
+              "success"
+            );
+          }
         );
       } else {
-        Alert.alert(
+        showPopup(
           "Update Error",
           `Failed to update beneficiary information: ${error.message}\n\nWould you like to save locally?`,
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Save Locally",
-              onPress: async () => {
-                // Save locally without API call as fallback
-                const claimAmount = await fetchClaimAmount(
-                  claimDetails.referenceNo
-                );
-                const updatedBeneficiaries = beneficiaries.map((item) =>
-                  item.id === selectedBeneficiary.id
-                    ? { ...item, ...newBeneficiary, amount: claimAmount }
-                    : item
-                );
-                setBeneficiaries(updatedBeneficiaries);
-                await storeBeneficiaryData(updatedBeneficiaries);
-                setEditBeneficiaryModalVisible(false);
-                setDropdownVisible(false);
-                setSelectedMember(null);
-                setNewBeneficiary({
-                  name: "",
-                  relationship: "",
-                  illness: "",
-                  amount: "",
-                });
-                Alert.alert("Saved", "Changes saved locally.");
-              },
-            },
-          ]
+          "error",
+          true,
+          async () => {
+            // Save locally without API call as fallback
+            const claimAmount = await fetchClaimAmount(
+              claimDetails.referenceNo
+            );
+            const updatedBeneficiaries = beneficiaries.map((item) =>
+              item.id === selectedBeneficiary.id
+                ? { ...item, ...newBeneficiary, amount: claimAmount }
+                : item
+            );
+            setBeneficiaries(updatedBeneficiaries);
+            await storeBeneficiaryData(updatedBeneficiaries);
+            setEditBeneficiaryModalVisible(false);
+            setDropdownVisible(false);
+            setSelectedMember(null);
+            setNewBeneficiary({
+              name: "",
+              relationship: "",
+              illness: "",
+              amount: "",
+            });
+            showPopup("Saved", "Changes saved locally.", "success");
+          }
         );
       }
     }
@@ -1433,25 +1593,22 @@ const EditClaimIntimation1 = ({ route }) => {
 
   // Delete beneficiary
   const handleDeleteBeneficiary = (id) => {
-    Alert.alert(
+    showPopup(
       "Confirm Delete",
       "Are you sure you want to delete this beneficiary?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const updatedBeneficiaries = beneficiaries.filter(
-              (item) => item.id !== id
-            );
-            setBeneficiaries(updatedBeneficiaries);
+      "warning",
+      true,
+      async () => {
+        const updatedBeneficiaries = beneficiaries.filter(
+          (item) => item.id !== id
+        );
+        setBeneficiaries(updatedBeneficiaries);
 
-            // Store the updated beneficiary data
-            await storeBeneficiaryData(updatedBeneficiaries);
-          },
-        },
-      ]
+        // Store the updated beneficiary data
+        await storeBeneficiaryData(updatedBeneficiaries);
+        
+        hidePopup();
+      }
     );
   };
 
@@ -1504,10 +1661,10 @@ const EditClaimIntimation1 = ({ route }) => {
       );
 
       if (billExists) {
-        Alert.alert(
+        showPopup(
           "Document Type Restriction",
           "A BILL document already exists. Only one BILL document is allowed per claim.",
-          [{ text: "OK", style: "default" }]
+          "warning"
         );
         return;
       }
@@ -1677,7 +1834,7 @@ const EditClaimIntimation1 = ({ route }) => {
 
       // Validate required fields
       if (!editDocumentType) {
-        Alert.alert("Validation Error", "Please select a document type.");
+        showPopup("Validation Error", "Please select a document type.", "warning");
         return;
       }
 
@@ -1685,9 +1842,10 @@ const EditClaimIntimation1 = ({ route }) => {
         editDocumentType === "O01" &&
         (!newDocument.amount || parseFloat(newDocument.amount) <= 0)
       ) {
-        Alert.alert(
+        showPopup(
           "Validation Error",
-          "Amount is required and must be greater than 0 for Bill type."
+          "Amount is required and must be greater than 0 for Bill type.",
+          "warning"
         );
         return;
       }
@@ -1695,7 +1853,7 @@ const EditClaimIntimation1 = ({ route }) => {
       // Get stored user NIC
       const storedNic = await SecureStore.getItemAsync("user_nic");
       if (!storedNic) {
-        Alert.alert("Error", "User information not found. Please login again.");
+        showPopup("Error", "User information not found. Please login again.", "error");
         return;
       }
 
@@ -1753,7 +1911,7 @@ const EditClaimIntimation1 = ({ route }) => {
       setEditDocumentDate(new Date());
 
       // Show success message
-      Alert.alert("Success", "Document updated successfully!");
+      showPopup("Success", "Document updated successfully!", "success");
 
       // Refresh documents from API to get latest data
       const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
@@ -1769,55 +1927,49 @@ const EditClaimIntimation1 = ({ route }) => {
 
       // Check if it's a 404 error (document not found)
       if (error.message.includes("404")) {
-        Alert.alert(
+        showPopup(
           "Document Not Found",
           "The document could not be found in the system. It may have been deleted or moved.\n\nWould you like to refresh the document list?",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Refresh Documents",
-              onPress: async () => {
-                const referenceNo =
-                  claimDetails.referenceNo || claim?.referenceNo;
-                if (referenceNo) {
-                  await fetchDocuments(referenceNo);
-                }
-                setEditDocumentModalVisible(false);
-                setNewDocument({ type: "", date: "", amount: "" });
-                setEditDocumentType("");
-                setEditDocumentDate(new Date());
-              },
-            },
-          ]
+          "error",
+          true,
+          async () => {
+            const referenceNo =
+              claimDetails.referenceNo || claim?.referenceNo;
+            if (referenceNo) {
+              await fetchDocuments(referenceNo);
+            }
+            setEditDocumentModalVisible(false);
+            setNewDocument({ type: "", date: "", amount: "" });
+            setEditDocumentType("");
+            setEditDocumentDate(new Date());
+            hidePopup();
+          }
         );
       } else {
-        Alert.alert(
+        showPopup(
           "Update Error",
           `Failed to update document: ${error.message}\n\nWould you like to save the changes locally?`,
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Save Locally",
-              onPress: () => {
-                // Save locally without API call
-                const updatedDocument = {
-                  ...newDocument,
-                  amount: formatAmount(newDocument.amount), // Format amount
-                };
-                setDocuments((prev) =>
-                  prev.map((item) =>
-                    item.id === selectedDocument.id
-                      ? { ...item, ...updatedDocument }
-                      : item
-                  )
-                );
-                setEditDocumentModalVisible(false);
-                setNewDocument({ type: "", date: "", amount: "" });
-                setEditDocumentType("");
-                setEditDocumentDate(new Date());
-              },
-            },
-          ]
+          "error",
+          true,
+          () => {
+            // Save locally without API call
+            const updatedDocument = {
+              ...newDocument,
+              amount: formatAmount(newDocument.amount), // Format amount
+            };
+            setDocuments((prev) =>
+              prev.map((item) =>
+                item.id === selectedDocument.id
+                  ? { ...item, ...updatedDocument }
+                  : item
+              )
+            );
+            setEditDocumentModalVisible(false);
+            setNewDocument({ type: "", date: "", amount: "" });
+            setEditDocumentType("");
+            setEditDocumentDate(new Date());
+            hidePopup();
+          }
         );
       }
     }
@@ -1829,150 +1981,155 @@ const EditClaimIntimation1 = ({ route }) => {
     const documentToDelete = documents.find((doc) => doc.id === documentId);
 
     if (!documentToDelete) {
-      Alert.alert("Error", "Document not found.");
+      showPopup("Error", "Document not found.", "error");
       return;
     }
 
-    Alert.alert(
+    showPopup(
       "Confirm Delete",
       "Are you sure you want to delete this document?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Show loading indicator (optional)
-              setDocumentsLoading(true);
+      "warning",
+      true,
+      async () => {
+        try {
+          // Show loading indicator (optional)
+          setDocumentsLoading(true);
 
-              // Only call API if document has clmMemSeqNo (exists in backend)
-              if (documentToDelete.clmMemSeqNo) {
-                console.log("Deleting document from API:", documentToDelete);
-                await deleteDocumentFromAPI(documentToDelete);
+          // Only call API if document has clmMemSeqNo (exists in backend)
+          if (documentToDelete.clmMemSeqNo) {
+            console.log("Deleting document from API:", documentToDelete);
+            await deleteDocumentFromAPI(documentToDelete);
 
-                // Show success message
-                Alert.alert(
-                  "Success",
-                  "Document deleted successfully from server."
-                );
-              }
+            // Show success message
+            showPopup(
+              "Success",
+              "Document deleted successfully from server.",
+              "success"
+            );
+          }
 
-              // Remove from local state regardless of API call success
+          // Remove from local state regardless of API call success
+          setDocuments((prev) =>
+            prev.filter((item) => item.id !== documentId)
+          );
+
+          // Optionally refresh documents from API
+          const referenceNo =
+            claimDetails.referenceNo || claim?.referenceNo;
+          if (referenceNo) {
+            await fetchDocuments(referenceNo);
+          }
+
+          // Refresh claim amount after deleting document
+          console.log("Document deleted, refreshing claim amount...");
+          await refreshClaimAmount();
+          
+          hidePopup();
+        } catch (error) {
+          console.error("Error deleting document:", error);
+
+          // Show error but still ask if user wants to remove locally
+          hidePopup();
+          showPopup(
+            "Delete Error",
+            `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
+            "error",
+            true,
+            async () => {
               setDocuments((prev) =>
                 prev.filter((item) => item.id !== documentId)
               );
-
-              // Optionally refresh documents from API
-              const referenceNo =
-                claimDetails.referenceNo || claim?.referenceNo;
-              if (referenceNo) {
-                await fetchDocuments(referenceNo);
-              }
-
-              // Refresh claim amount after deleting document
-              console.log("Document deleted, refreshing claim amount...");
+              // Still refresh claim amount even for local deletion
               await refreshClaimAmount();
-            } catch (error) {
-              console.error("Error deleting document:", error);
-
-              // Show error but still ask if user wants to remove locally
-              Alert.alert(
-                "Delete Error",
-                `Failed to delete from server: ${error.message}\n\nWould you like to remove it locally?`,
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Remove Locally",
-                    style: "destructive",
-                    onPress: async () => {
-                      setDocuments((prev) =>
-                        prev.filter((item) => item.id !== documentId)
-                      );
-                      // Still refresh claim amount even for local deletion
-                      await refreshClaimAmount();
-                    },
-                  },
-                ]
-              );
-            } finally {
-              setDocumentsLoading(false);
+              hidePopup();
             }
-          },
-        },
-      ]
+          );
+        } finally {
+          setDocumentsLoading(false);
+        }
+      }
     );
   };
 
   // Handle submit - Updated with API integration
   const handleSubmitClaim = () => {
-    Alert.alert("Submit Claim", "Are you sure you want to submit this claim?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Submit",
-        onPress: async () => {
-          try {
-            console.log("Submitting claim...");
+    showPopup(
+      "Submit Claim", 
+      "Are you sure you want to submit this claim?", 
+      "info",
+      true,
+      async () => {
+        try {
+          console.log("Submitting claim...");
 
-            // Validate that we have a reference number
-            if (!claimDetails.referenceNo) {
-              Alert.alert("Error", "Claim reference number not found.");
-              return;
-            }
-
-            // Call the submit final claim API
-            await submitFinalClaim(claimDetails.referenceNo);
-
-            // Show success message and navigate back
-            Alert.alert("Success", "Claim submitted successfully!", [
-              {
-                text: "OK",
-                onPress: () => {
-                  navigation?.goBack();
-                },
-              },
-            ]);
-          } catch (error) {
-            console.error("Error submitting claim:", error);
-
-            // Handle different types of errors
-            if (error.message.includes("404")) {
-              Alert.alert(
-                "Claim Not Found",
-                "The claim could not be found in the system. Please refresh and try again."
-              );
-            } else if (error.message.includes("400")) {
-              Alert.alert(
-                "Invalid Request",
-                "The claim cannot be submitted. Please check all required fields and try again."
-              );
-            } else if (error.message.includes("500")) {
-              Alert.alert(
-                "Server Error",
-                "Server is currently unavailable. Please try again later."
-              );
-            } else {
-              Alert.alert(
-                "Submit Error",
-                `Failed to submit claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`
-              );
-            }
+          // Validate that we have a reference number
+          if (!claimDetails.referenceNo) {
+            showPopup("Error", "Claim reference number not found.", "error");
+            return;
           }
-        },
-      },
-    ]);
+
+          // Call the submit final claim API
+          await submitFinalClaim(claimDetails.referenceNo);
+
+          // Show success message and navigate back
+          hidePopup();
+          showPopup(
+            "Success", 
+            "Claim submitted successfully!", 
+            "success",
+            false,
+            () => {
+              hidePopup();
+              navigation?.goBack();
+            }
+          );
+        } catch (error) {
+          console.error("Error submitting claim:", error);
+
+          hidePopup();
+          // Handle different types of errors
+          if (error.message.includes("404")) {
+            showPopup(
+              "Claim Not Found",
+              "The claim could not be found in the system. Please refresh and try again.",
+              "error"
+            );
+          } else if (error.message.includes("400")) {
+            showPopup(
+              "Invalid Request",
+              "The claim cannot be submitted. Please check all required fields and try again.",
+              "error"
+            );
+          } else if (error.message.includes("500")) {
+            showPopup(
+              "Server Error",
+              "Server is currently unavailable. Please try again later.",
+              "error"
+            );
+          } else {
+            showPopup(
+              "Submit Error",
+              `Failed to submit claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+              "error"
+            );
+          }
+        }
+      }
+    );
   };
 
   // Handle submit later
   const handleSubmitLater = () => {
-    Alert.alert("Saved", "Claim saved for later submission.", [
-      {
-        text: "OK",
-        onPress: () => {
-          navigation?.goBack();
-        },
-      },
-    ]);
+    showPopup(
+      "Saved", 
+      "Claim saved for later submission.", 
+      "success",
+      false,
+      () => {
+        hidePopup();
+        navigation?.goBack();
+      }
+    );
   };
 
   // Document icon with image loading on click
@@ -1986,9 +2143,10 @@ const EditClaimIntimation1 = ({ route }) => {
           if (document.hasImage) {
             loadDocumentImage(document);
           } else {
-            Alert.alert(
+            showPopup(
               "No Image",
-              "This document doesn't have an associated image."
+              "This document doesn't have an associated image.",
+              "info"
             );
           }
         }}
@@ -2025,125 +2183,126 @@ const EditClaimIntimation1 = ({ route }) => {
 
   // Delete claim function with API integration
   const handleDeleteClaim = async () => {
-    Alert.alert(
+    showPopup(
       "Delete Claim",
       "Are you sure you want to delete this claim? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Show loading state (optional - you can add a loading indicator)
-              console.log("Deleting claim:", claimDetails.referenceNo);
+      "warning",
+      true,
+      async () => {
+        try {
+          // Show loading state (optional - you can add a loading indicator)
+          console.log("Deleting claim:", claimDetails.referenceNo);
 
-              // Validate reference number
-              if (!claimDetails.referenceNo) {
-                Alert.alert("Error", "Claim reference number not found.");
-                return;
-              }
+          // Validate reference number
+          if (!claimDetails.referenceNo) {
+            showPopup("Error", "Claim reference number not found.", "error");
+            return;
+          }
 
-              // Prepare API request data
-              const deleteClaimData = {
-                claimNo: claimDetails.referenceNo,
-              };
+          // Prepare API request data
+          const deleteClaimData = {
+            claimNo: claimDetails.referenceNo,
+          };
 
-              console.log("Delete claim request data:", deleteClaimData);
+          console.log("Delete claim request data:", deleteClaimData);
 
-              // Call the Delete Claim API
-              const response = await fetch(
-                `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(deleteClaimData),
-                }
-              );
-
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Delete Claim API Error Response:", errorText);
-                throw new Error(
-                  `HTTP error! status: ${response.status}, message: ${errorText}`
-                );
-              }
-
-              const result = await response.json();
-              console.log("Delete claim API response:", result);
-
-              // Clear stored data after successful deletion
-              try {
-                await SecureStore.deleteItemAsync("edit_referenceNo");
-                await SecureStore.deleteItemAsync("edit_claimType");
-                await SecureStore.deleteItemAsync("edit_createdOn");
-                await SecureStore.deleteItemAsync("edit_enteredBy");
-                await SecureStore.deleteItemAsync("edit_relationship");
-                await SecureStore.deleteItemAsync("edit_illness");
-                await SecureStore.deleteItemAsync("edit_beneficiary_amount");
-                await SecureStore.deleteItemAsync("referenNo");
-              } catch (storageError) {
-                console.warn("Error clearing stored data:", storageError);
-              }
-
-              // Show success message and navigate back
-              Alert.alert("Success", "Claim has been deleted successfully.", [
-                {
-                  text: "OK",
-                  onPress: () => {
-                    // Simply go back - PendingIntimations will auto-refresh
-                    navigation.goBack();
-                  },
-                },
-              ]);
-            } catch (error) {
-              console.error("Error deleting claim:", error);
-
-              // Handle different types of errors
-              if (error.message.includes("404")) {
-                Alert.alert(
-                  "Not Found",
-                  "The claim could not be found in the system. It may have already been deleted.",
-                  [
-                    {
-                      text: "OK",
-                      onPress: () => {
-                        // Simply go back - PendingIntimations will auto-refresh
-                        navigation.goBack();
-                      },
-                    },
-                  ]
-                );
-              } else if (error.message.includes("400")) {
-                Alert.alert(
-                  "Invalid Request",
-                  "The claim could not be deleted. Please check the claim details and try again."
-                );
-              } else if (error.message.includes("500")) {
-                Alert.alert(
-                  "Server Error",
-                  "Server is currently unavailable. Please try again later."
-                );
-              } else if (
-                error.message.includes("Network request failed") ||
-                error.message.includes("fetch")
-              ) {
-                Alert.alert(
-                  "Network Error",
-                  "Unable to connect to the server. Please check your internet connection and try again."
-                );
-              } else {
-                Alert.alert(
-                  "Delete Error",
-                  `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`
-                );
-              }
+          // Call the Delete Claim API
+          const response = await fetch(
+            `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(deleteClaimData),
             }
-          },
-        },
-      ]
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Delete Claim API Error Response:", errorText);
+            throw new Error(
+              `HTTP error! status: ${response.status}, message: ${errorText}`
+            );
+          }
+
+          const result = await response.json();
+          console.log("Delete claim API response:", result);
+
+          // Clear stored data after successful deletion
+          try {
+            await SecureStore.deleteItemAsync("edit_referenceNo");
+            await SecureStore.deleteItemAsync("edit_claimType");
+            await SecureStore.deleteItemAsync("edit_createdOn");
+            await SecureStore.deleteItemAsync("edit_enteredBy");
+            await SecureStore.deleteItemAsync("edit_relationship");
+            await SecureStore.deleteItemAsync("edit_illness");
+            await SecureStore.deleteItemAsync("edit_beneficiary_amount");
+            await SecureStore.deleteItemAsync("referenNo");
+          } catch (storageError) {
+            console.warn("Error clearing stored data:", storageError);
+          }
+
+          // Show success message and navigate back
+          hidePopup();
+          showPopup(
+            "Success", 
+            "Claim has been deleted successfully.", 
+            "success",
+            false,
+            () => {
+              hidePopup();
+              // Simply go back - PendingIntimations will auto-refresh
+              navigation.goBack();
+            }
+          );
+        } catch (error) {
+          console.error("Error deleting claim:", error);
+
+          hidePopup();
+          // Handle different types of errors
+          if (error.message.includes("404")) {
+            showPopup(
+              "Not Found",
+              "The claim could not be found in the system. It may have already been deleted.",
+              "error",
+              false,
+              () => {
+                hidePopup();
+                // Simply go back - PendingIntimations will auto-refresh
+                navigation.goBack();
+              }
+            );
+          } else if (error.message.includes("400")) {
+            showPopup(
+              "Invalid Request",
+              "The claim could not be deleted. Please check the claim details and try again.",
+              "error"
+            );
+          } else if (error.message.includes("500")) {
+            showPopup(
+              "Server Error",
+              "Server is currently unavailable. Please try again later.",
+              "error"
+            );
+          } else if (
+            error.message.includes("Network request failed") ||
+            error.message.includes("fetch")
+          ) {
+            showPopup(
+              "Network Error",
+              "Unable to connect to the server. Please check your internet connection and try again.",
+              "error"
+            );
+          } else {
+            showPopup(
+              "Delete Error",
+              `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+              "error"
+            );
+          }
+        }
+      }
     );
   };
 
@@ -2724,6 +2883,17 @@ const EditClaimIntimation1 = ({ route }) => {
           )}
         </View>
       </Modal>
+
+      {/* Custom Popup */}
+      <CustomPopup
+        visible={popup.visible}
+        title={popup.title}
+        message={popup.message}
+        type={popup.type}
+        showConfirmButton={popup.showConfirmButton}
+        onClose={hidePopup}
+        onConfirm={popup.onConfirm}
+      />
     </LinearGradient>
   );
 };
@@ -3377,6 +3547,103 @@ const styles = StyleSheet.create({
   requiredAsterisk: {
     color: "#FF6B6B",
     fontSize: 16,
+  },
+
+  // Popup Styles with Blur Background
+  popupOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  popupContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    maxWidth: width * 0.85,
+    minWidth: width * 0.7,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  popupIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  popupIcon: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  popupButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupOkButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupOkButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupConfirmButton: {
+    backgroundColor: "#4ECDC4",
+  },
+  popupConfirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  popupCancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  popupCancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
