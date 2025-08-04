@@ -1161,14 +1161,17 @@ export default function PolicyHome({ route }) {
             />
           </View>
           <View style={styles.userSection}>
-            <Image
-              source={require("../assets/images/userhome.png")}
-              style={styles.userAvatar}
-              resizeMode="contain"
-            />
-            <Text style={styles.userName}>{displayMemberName()}</Text>
-            <TouchableOpacity onPress={showPolicySelectionModal}>
-              <Icon name="chevron-down" size={16} color="#666" />
+            <TouchableOpacity
+              style={styles.userTouchableArea}
+              onPress={showPolicySelectionModal}
+            >
+              <Image
+                source={require("../assets/images/userhome.png")}
+                style={styles.userAvatar}
+                resizeMode="contain"
+              />
+              <Text style={styles.userName}>{displayMemberName()}</Text>
+              <Icon style={{ marginRight: 10 }} name="chevron-down" size={16} color="#666" />
             </TouchableOpacity>
           </View>
         </View>
@@ -1203,7 +1206,7 @@ export default function PolicyHome({ route }) {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>MEMBER</Text>
+        <Text style={styles.sectionTitle}>MEMBERS</Text>
         <View style={styles.memberCard}>
           <TouchableOpacity
             style={styles.memberRow}
@@ -1564,7 +1567,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   headerContent: {
-
     paddingHorizontal: 20,
     paddingTop: 30,
     paddingBottom: 20,
@@ -1572,6 +1574,12 @@ const styles = StyleSheet.create({
   logoContainer: {
     display: 'flex',
     alignItems: 'left'
+  }, userTouchableArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   logoRow: {
     alignItems: "center",
@@ -1611,11 +1619,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 50,
     borderRadius: 20,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "right",
-    flexDirection: "row",
-    alignItems: "center", shadowColor: "#000",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 4,
@@ -1626,12 +1631,13 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     height: 30,
     borderRadius: 15,
-    marginRight: 20,
+    marginRight: 15,
   },
   userName: {
     fontSize: 16,
     color: "#333",
-    marginRight: 130,
+    flex: 1,
+    marginLeft: 10,
   },
   body: {
     padding: 15,
@@ -1677,7 +1683,7 @@ const styles = StyleSheet.create({
   },
   totalBadge: {
     backgroundColor: "#16858D",
-    borderRadius: 15,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 6,
     flexDirection: "row",
@@ -1727,13 +1733,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cardOutline: {
-    borderWidth: 1,
-    borderColor: "#16858D",
+    // borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 3,
     borderRadius: 10,
     marginBottom: 15,
   },
   insuranceCard: {
-    backgroundColor: "#17ABB7",
+    backgroundColor: "#ffffff",
     padding: 15,
     borderRadius: 10,
   },
@@ -1810,23 +1820,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   insuranceText: {
-    fontSize: 16,
-    color: "white",
+    fontSize: 14,
+    color: "black",
     marginBottom: 5,
   },
   boldText: {
     fontWeight: "bold",
-    color: "white",
+    color: "black",
     fontSize: 14,
   },
   moreButton: {
     alignSelf: "flex-end",
     marginTop: 10,
+    backgroundColor: "#16858D",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#16858D",
   },
   moreText: {
     color: "#FFFFFF",
     fontSize: 14,
-    textDecorationLine: "underline",
+    fontWeight: "600",
   },
   typeContainer: {
     flexDirection: "row",

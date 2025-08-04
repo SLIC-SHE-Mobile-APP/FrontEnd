@@ -262,7 +262,7 @@ export default function UserDetailsScreen() {
 
         <View style={styles.profileSection}>
           <Image
-            source={require("@/assets/images/defaultavatar.png")}
+            source={require("@/assets/images/userhome.png")}
             style={styles.avatar}
           />
           <ThemedText style={styles.userName}>{userName}</ThemedText>
