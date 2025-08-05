@@ -380,14 +380,14 @@ const AddPolicy = () => {
     try {
       // Set the refresh flag in SecureStore
       await SecureStore.setItemAsync("should_refresh_home", "true");
-      console.log("Refresh flag set, navigating to home");
-
-      // Navigate to home
-      navigation.navigate("home");
+      console.log("Refresh flag set, going back");
+  
+      // Use goBack instead of navigate
+      navigation.goBack();
     } catch (error) {
       console.error("Error setting refresh flag:", error);
-      // Navigate anyway even if setting flag fails
-      navigation.navigate("home");
+      // Go back anyway even if setting flag fails
+      navigation.goBack();
     }
   };
 
