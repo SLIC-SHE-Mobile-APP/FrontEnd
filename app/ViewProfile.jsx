@@ -262,18 +262,12 @@ export default function ViewProfile() {
   }
 
   return (
-    <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
+    <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-            activeOpacity={0.7}
-          >
-            <View style={styles.backButtonContainer}>
-              <Ionicons name="arrow-back" size={20} color="#075349" />
-            </View>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
           </TouchableOpacity>
           <ThemedText style={styles.headerTitle}>View Profile</ThemedText>
         </View>
@@ -333,34 +327,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: height * 0.06,
+    paddingBottom: 20,
     backgroundColor: "transparent",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-  },
-  backButtonContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F8F8",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginRight: 120,
     color: "#075349",
     fontFamily: "Actor",
+    flex: 1,
+    textAlign: "center",
   },
   profileImageSection: {
     alignItems: "center",
@@ -370,9 +348,9 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 95,
+    height:95,
+    borderRadius: 48,
     borderWidth: 3,
     borderColor: "#E8F8F8",
   },

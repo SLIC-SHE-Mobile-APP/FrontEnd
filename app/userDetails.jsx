@@ -214,18 +214,18 @@ export default function UserDetailsScreen() {
       route: "/AddPolicy",
       top: 310,
     },
-    { icon: "help-circle-outline", label: "Help", route: "/help", top: 380 },
+    { icon: "help-circle-outline", label: "Help", route: "/Help", top: 380 },
     {
       icon: "shield-outline",
       label: "Privacy Policy",
-      route: "/privacy-policy",
+      route: "/PrivacyPolicy",
       top: 450,
     },
     { icon: "call-outline", label: "Contact Us", route: "/contact", top: 520 },
     {
       icon: "newspaper-outline",
       label: "Corporate News",
-      route: "/news",
+      route: "/CorpNews",
       top: 590,
     },
     {
@@ -253,11 +253,8 @@ export default function UserDetailsScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
-          activeOpacity={0.7}
         >
-          <View style={styles.backButtonContainer}>
-            <Ionicons name="arrow-back" size={24} color="#075349" />
-          </View>
+          <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
 
         <View style={styles.profileSection}>
@@ -319,28 +316,15 @@ const styles = StyleSheet.create({
     top: height * 0.07,
     zIndex: 10,
   },
-  backButtonContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F8F8",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   profileSection: {
-    position: "absolute",
+    display:'flex',
     alignItems: "center",
-    left: width * 0.35,
-    top: height * 0.08,
+    justifyContent:'center',
+    marginTop:65
   },
   avatar: {
-    width: width * 0.22,
-    height: width * 0.22,
+    width: 80,
+    height: 80,
     borderRadius: width * 0.11,
     borderWidth: 2,
     borderColor: "#E8F8F8",
