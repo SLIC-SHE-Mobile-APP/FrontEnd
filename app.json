@@ -26,14 +26,14 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/general.jpg"
+      "favicon": "./assets/images/general.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/general.jpg",
+          "image": "./assets/images/general.png",
           "imageWidth": 150,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
