@@ -250,6 +250,12 @@ const EditClaimIntimation = ({ route }) => {
     setPopup((prev) => ({ ...prev, visible: false }));
   };
 
+  // Add a new function to handle the complete back press flow
+  const handleCompleteBackPress = () => {
+    // First, save the claim (you might want to add actual save logic here)
+    // Then navigate to home
+    navigation.navigate("home");
+  };
   // Helper function to format amount to 2 decimal places
   const formatAmount = (amount) => {
     if (!amount || isNaN(parseFloat(amount))) {
@@ -277,17 +283,25 @@ const EditClaimIntimation = ({ route }) => {
       "confirm",
       true,
       () => {
-        hidePopup();
-        showPopup(
-          "Claim Saved",
-          "Your claim has been saved in saved claims.",
-          "success",
-          false,
-          () => {
-            hidePopup();
+        // Hide the first popup
+        setPopup((prev) => ({ ...prev, visible: false }));
+
+        // Show success message and navigate
+        setTimeout(() => {
+          showPopup(
+            "Claim Saved",
+            "Your claim has been saved in saved claims.",
+            "success",
+            false,
+            null // No onConfirm needed, will handle in onClose
+          );
+
+          // Auto-close after 2 seconds and navigate
+          setTimeout(() => {
+            setPopup((prev) => ({ ...prev, visible: false }));
             navigation.navigate("home");
-          }
-        );
+          }, 2000);
+        }, 300);
       }
     );
   };
@@ -1378,7 +1392,9 @@ const EditClaimIntimation = ({ route }) => {
       "confirm",
       true,
       async () => {
-        hidePopup();
+        // Hide the first popup
+        setPopup((prev) => ({ ...prev, visible: false }));
+
         try {
           if (!claimDetails.referenceNo) {
             showPopup("Error", "Claim reference number not found.", "error");
@@ -1387,16 +1403,22 @@ const EditClaimIntimation = ({ route }) => {
 
           await submitFinalClaim(claimDetails.referenceNo);
 
-          showPopup(
-            "Success",
-            "Claim submitted successfully!",
-            "success",
-            false,
-            () => {
-              hidePopup();
+          // Show success message and navigate
+          setTimeout(() => {
+            showPopup(
+              "Success",
+              "Claim submitted successfully!",
+              "success",
+              false,
+              null
+            );
+
+            // Auto-close after 2 seconds and navigate
+            setTimeout(() => {
+              setPopup((prev) => ({ ...prev, visible: false }));
               navigation.navigate("home");
-            }
-          );
+            }, 2000);
+          }, 300);
         } catch (error) {
           console.error("Error submitting claim:", error);
 
@@ -1432,13 +1454,30 @@ const EditClaimIntimation = ({ route }) => {
 
   const handleSubmitLater = () => {
     showPopup(
-      "Saved",
-      "Claim saved for later submission.",
-      "success",
-      false,
+      "Save Claim",
+      "Do you want to save this claim for later submission?",
+      "confirm",
+      true,
       () => {
-        hidePopup();
-        navigation?.goBack();
+        // Hide the first popup and show success
+        setPopup((prev) => ({ ...prev, visible: false }));
+
+        // Show success message and navigate
+        setTimeout(() => {
+          showPopup(
+            "Claim Saved",
+            "Your claim has been saved for later submission.",
+            "success",
+            false,
+            null
+          );
+
+          // Auto-close after 2 seconds and navigate
+          setTimeout(() => {
+            setPopup((prev) => ({ ...prev, visible: false }));
+            navigation.navigate("home");
+          }, 2000);
+        }, 300);
       }
     );
   };
