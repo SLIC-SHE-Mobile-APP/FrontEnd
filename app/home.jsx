@@ -812,9 +812,13 @@ export default function PolicyHome({ route }) {
                 console.log("Cleared stored policy data");
               }
 
-              // If no policies left, close modal
+              // If no policies left, close modal and navigate to AddPolicy
               if (updatedPolicies.length === 0) {
                 handleClosePolicySelection();
+                // Navigate to AddPolicy page after a short delay
+                setTimeout(() => {
+                  router.push("/AddPolicy");
+                }, 300);
               }
 
               // Show success message
