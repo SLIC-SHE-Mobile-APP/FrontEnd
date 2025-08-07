@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Animated,
@@ -280,7 +281,7 @@ const HealthPolicyDetails = () => {
       }
 
       const result = JSON.parse(responseText);
-      
+
       // Ensure we have a valid result object
       if (result && typeof result === "object") {
         // Fill in missing fields with appropriate defaults
@@ -288,7 +289,7 @@ const HealthPolicyDetails = () => {
           memberName: result.memberName || "Member Name Not Available",
           memberNumber: result.memberNumber || memberNumber,
           employeeId: result.employeeId || "Not Available",
-          department: result.department || "Not Available", 
+          department: result.department || "Not Available",
           designation: result.designation || "Not Available",
           joinDate: result.joinDate || "Not Available",
           email: result.email || "Not Available",
@@ -705,6 +706,12 @@ const HealthPolicyDetails = () => {
       <View style={styles.headerContainer}>
         {/* Back Icon + Title */}
         <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backIcon}
+          >
+            <Ionicons name="arrow-back" size={24} color="#13646D" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Health Policy Details</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -809,7 +816,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     marginTop: 20,
-    paddingHorizontal: 15,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+    paddingHorizontal: 15,
   },
   headerRow: {
     flexDirection: "row",
@@ -819,6 +826,7 @@ const styles = StyleSheet.create({
   backIcon: {
     marginRight: 1,
     marginLeft: 12,
+    padding: 5
   },
   headerTitle: {
     fontSize: 22,
@@ -828,7 +836,6 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     flex: 1,
     textAlign: "center",
-    marginLeft: 50,
   },
   headerSpacer: {
     width: 35,

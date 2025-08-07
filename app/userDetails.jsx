@@ -2,6 +2,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Animated,
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import * as SecureStore from "expo-secure-store";
 
 const { width, height } = Dimensions.get("window");
 
@@ -203,7 +203,7 @@ export default function UserDetailsScreen() {
   const menuItems = [
     {
       icon: "person-outline",
-      label: "View / Edit Profile",
+      label: "View Profile",
       route: "/ViewProfile",
       top: 240,
       backgroundColor: "black",

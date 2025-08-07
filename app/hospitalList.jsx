@@ -218,9 +218,50 @@ const HospitalList = ({ onClose }) => {
   }, [activeSection]);
 
   // Get filtered data based on search
-  const filteredData = (dataMap[activeSection] || []).filter(item =>
-    item.name.toLowerCase().includes(searchText.toLowerCase())
-  );
+  // Replace the existing filteredData logic (around line 226)
+  const filteredData = React.useMemo(() => {
+    const currentData = dataMap[activeSection] || [];
+
+    if (!searchText.trim()) {
+      return currentData;
+    }
+
+    const searchTerm = searchText.toLowerCase().trim();
+
+    const filtered = currentData.filter(item => {
+      // Check if name starts with search term (first priority)
+      const nameStartsWith = item.name && item.name.toLowerCase().startsWith(searchTerm);
+
+      // Check if location starts with search term (second priority)  
+      const locationStartsWith = item.location && item.location.toLowerCase().startsWith(searchTerm);
+
+      // Check if any word in name starts with search term (third priority)
+      const nameWordsStartWith = item.name && item.name.toLowerCase().split(' ').some(word =>
+        word.startsWith(searchTerm)
+      );
+
+      // Check if any word in location starts with search term (fourth priority)
+      const locationWordsStartWith = item.location && item.location.toLowerCase().split(' ').some(word =>
+        word.startsWith(searchTerm)
+      );
+
+      return nameStartsWith || locationStartsWith || nameWordsStartWith || locationWordsStartWith;
+    });
+
+    // Sort results to prioritize matches that start with the search term
+    return filtered.sort((a, b) => {
+      const aNameStarts = a.name && a.name.toLowerCase().startsWith(searchTerm);
+      const bNameStarts = b.name && b.name.toLowerCase().startsWith(searchTerm);
+      const aLocationStarts = a.location && a.location.toLowerCase().startsWith(searchTerm);
+      const bLocationStarts = b.location && b.location.toLowerCase().startsWith(searchTerm);
+      if (aNameStarts && !bNameStarts) return -1;
+      if (!aNameStarts && bNameStarts) return 1;
+      if (aLocationStarts && !bLocationStarts) return -1;
+      if (!aLocationStarts && bLocationStarts) return 1;
+      return 0;
+    });
+  }, [dataMap, activeSection, searchText]);
+
 
   // Sidebar item renderer
   const renderSidebarItem = ({ item }) => {
@@ -309,13 +350,27 @@ const HospitalList = ({ onClose }) => {
           </View>
 
           {/* Search Bar */}
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search hospitals..."
-            placeholderTextColor="#999"
-            value={searchText}
-            onChangeText={setSearchText}
-          />
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search hospitals, locations..."
+              placeholderTextColor="#999"
+              value={searchText}
+              onChangeText={setSearchText}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing" // iOS only
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => setSearchText('')}
+              >
+                <Ionicons name="close-circle" size={20} color="#999" />
+              </TouchableOpacity>
+            )}
+          </View>
+
 
           {/* Loading Screen */}
           {loadingMap[activeSection] && <LoadingScreen />}
@@ -339,8 +394,18 @@ const HospitalList = ({ onClose }) => {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Ionicons name="search" size={48} color="#B0B0B0" />
-                  <Text style={styles.emptyText}>No hospitals found</Text>
-                  <Text style={styles.emptySubText}>Try adjusting your search</Text>
+                  <Text style={styles.emptyText}>
+                    {searchText.trim()
+                      ? `No results found for "${searchText}"`
+                      : "No hospitals found"
+                    }
+                  </Text>
+                  <Text style={styles.emptySubText}>
+                    {searchText.trim()
+                      ? "Try a different search term"
+                      : "Try adjusting your search"
+                    }
+                  </Text>
                 </View>
               }
             />
@@ -357,7 +422,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     overflow: 'hidden',
-    
+
   },
   header: {
     flexDirection: 'row',
@@ -379,7 +444,7 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     flexDirection: 'row',
-    
+
   },
   sidebar: {
     width: 100,
@@ -474,18 +539,28 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
+  searchContainer: {
+    position: 'relative',
+    marginBottom: 15,
+  },
   searchInput: {
     backgroundColor: '#f8f8f8',
     borderRadius: 10,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    marginBottom: 15,
+    paddingRight: 45,
     height: 40,
     borderColor: '#E0E0E0',
     borderWidth: 1,
     fontSize: 13,
   },
-  // Custom Loading Styles
+  clearButton: {
+    position: 'absolute',
+    right: 15,
+    top: 10,
+    padding: 5,
+  },
+
   loadingOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -587,7 +662,7 @@ const styles = StyleSheet.create({
   phoneText: {
     fontSize: 14,
     marginLeft: 8,
-    color: '#00ADBB', 
+    color: '#00ADBB',
     fontWeight: '600',
   },
   emptyContainer: {
