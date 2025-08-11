@@ -16,6 +16,7 @@ import {
   View,
   Modal,
   Dimensions,
+  Clipboard,
 } from "react-native";
 import {
   SafeAreaProvider,
@@ -282,6 +283,8 @@ function OTPVerificationContent() {
   // Load data on component mount
   useEffect(() => {
     loadUserData();
+    // Check clipboard for OTP on mount
+    checkClipboardForOTP();
   }, []);
 
   // Debug: Log the data being used
@@ -292,6 +295,28 @@ function OTPVerificationContent() {
     console.log("NIC Number:", nicNumber);
     console.log("Mobile Number:", mobileNumber);
   }, [contactInfo, contactType, nicNumber, mobileNumber]);
+
+  // Check if OTP is complete (all 4 digits filled)
+  const isOTPComplete = () => {
+    return otp.every(digit => digit !== "");
+  };
+
+  // Auto-populate OTP from clipboard
+  const checkClipboardForOTP = async () => {
+    try {
+      const clipboardContent = await Clipboard.getString();
+      const otpPattern = /\b\d{4}\b/; // Look for 4-digit numbers
+      const match = clipboardContent.match(otpPattern);
+      
+      if (match) {
+        const foundOTP = match[0];
+        setOtp(foundOTP.split(""));
+        showPopup(`OTP auto-filled from clipboard: ${foundOTP}`, 'info', 'Auto-filled');
+      }
+    } catch (error) {
+      console.log("Clipboard access failed:", error);
+    }
+  };
 
   // Keyboard handling
   useEffect(() => {
@@ -549,6 +574,14 @@ function OTPVerificationContent() {
 
             <Text style={styles.contactInfo}>{contactInfo}</Text>
 
+            {/* Security Warning */}
+            <View style={styles.warningContainer}>
+              <Text style={styles.warningIcon}>🔒</Text>
+              <Text style={styles.warningText}>
+                Never share your OTP with anyone. We will never ask for your OTP over phone or email.
+              </Text>
+            </View>
+
             {/* OTP Input Fields */}
             <View style={styles.otpContainer}>
               {otp.map((digit, index) => (
@@ -579,11 +612,14 @@ function OTPVerificationContent() {
               </Text>
             </View>
 
-            {/* Verify Button */}
+            {/* Verify Button - Disabled until OTP is complete and when canResend is true */}
             <TouchableOpacity
-              style={[styles.verifyButton, loading && styles.buttonDisabled]}
+              style={[
+                styles.verifyButton, 
+                (loading || canResend || !isOTPComplete()) && styles.buttonDisabled
+              ]}
               onPress={verifyOTP}
-              disabled={loading}
+              disabled={loading || canResend || !isOTPComplete()}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" size="small" />
@@ -613,6 +649,14 @@ function OTPVerificationContent() {
                   Resend OTP
                 </Text>
               )}
+            </TouchableOpacity>
+
+            {/* Auto-fill Button */}
+            <TouchableOpacity
+              style={styles.autoFillButton}
+              onPress={checkClipboardForOTP}
+            >
+              <Text style={styles.autoFillButtonText}>📋 Auto-fill from Clipboard</Text>
             </TouchableOpacity>
 
             {/* Footer */}
@@ -815,6 +859,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#4ECDC4",
     fontWeight: "500",
+  },
+  // Warning styles
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 25,
+    width: '100%',
+  },
+  warningIcon: {
+    fontSize: 16,
+    marginRight: 10,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#E65100',
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  // Auto-fill button styles
+  autoFillButton: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  autoFillButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   // Popup Styles
   popupOverlay: {
