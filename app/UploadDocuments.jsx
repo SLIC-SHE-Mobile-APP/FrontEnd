@@ -1480,7 +1480,7 @@ const UploadDocuments = ({ route }) => {
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
-                ? "Amount is required and must be greater than 0 for Bill type"
+                ? "Amount is required for Bill type"
                 : "Amount is required for Bill type"}
             </Text>
           ) : null}

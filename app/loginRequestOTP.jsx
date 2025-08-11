@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Image,
   Keyboard,
   Linking,
@@ -16,7 +17,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Dimensions,
 } from "react-native";
 import {
   SafeAreaProvider,
@@ -89,16 +89,16 @@ const CustomPopup = ({
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
+      <Animated.View
         style={[
           styles.popupOverlay,
           { opacity: fadeAnim }
         ]}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
-          onPress={onClose}
+          // onPress={onClose}
         />
         <Animated.View
           style={[
@@ -502,16 +502,17 @@ function LoginRequestOTPContent() {
               </View>
             </View>
 
-            <TouchableOpacity
-              onPress={handlePress}
-              disabled={loading}
-              style={styles.linkContainer}
-            >
+            <View style={styles.linkContainer}>
               <Text style={styles.alreadyRegisteredText}>
-                Already Registered with our customer portal?
-                <Text style={styles.loginLinkText}> Login</Text>
+                Already registered with our customer portal?
               </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handlePress}
+                disabled={loading}
+              >
+                <Text style={styles.loginLinkText}> Login</Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={[styles.requestButton, loading && styles.buttonDisabled]}
@@ -521,12 +522,12 @@ function LoginRequestOTPContent() {
               {loading ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.requestButtonText}>Request OTP</Text>
+                <Text style={styles.requestButtonText}>Request an OTP</Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.footerContainer}>
-              <Text style={styles.troubleText}>Having Trouble ?</Text>
+              <Text style={styles.troubleText}>Having Trouble?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
                 <Text style={styles.contactText}>Contact Us 0112 - 357357</Text>
               </TouchableOpacity>
@@ -641,7 +642,9 @@ const styles = StyleSheet.create({
   sheDigitalBadge: {
     width: 192,
     height: 44,
-    backgroundColor: "#FF4757",
+    backgroundColor: "transparent", 
+    borderWidth: 2, 
+    borderColor: "#FF4757", 
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderTopRightRadius: 15,
@@ -650,10 +653,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sheDigitalText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
+    color: "#FF4757", 
+  fontSize: 18,
+  fontWeight: "500", 
+  textAlign: "center",
   },
   logInText: {
     fontSize: 18,
@@ -706,6 +709,8 @@ const styles = StyleSheet.create({
   linkContainer: {
     alignItems: "center",
     marginVertical: 15,
+    flexDirection: "row",
+    justifyContent: "center",
   },
   alreadyRegisteredText: {
     fontSize: 14,

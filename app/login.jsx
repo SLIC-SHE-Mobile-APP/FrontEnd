@@ -18,6 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LoginAPI from '@/apis/loginApi';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 function LoginContent() {
   const [username, setUsername] = useState('');
@@ -27,7 +29,9 @@ function LoginContent() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const slideAnim = new Animated.Value(0);
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -104,10 +108,17 @@ function LoginContent() {
       >
         {/* Header with SLIC Logo */}
         <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backIcon}
+          >
+            <Ionicons name="arrow-back" size={24} color="#13646D" />
+          </TouchableOpacity>
           <Image
             source={require('@/assets/images/logo.png')}
             style={styles.logo}
           />
+          <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.skylineContainer}>
@@ -119,9 +130,9 @@ function LoginContent() {
       </LinearGradient>
 
       {/* Bottom Section with Form */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.bottomSection, 
+          styles.bottomSection,
           {
             transform: [{ translateY: slideAnim }],
             marginBottom: isKeyboardVisible ? keyboardHeight - 550 : 0
@@ -137,7 +148,7 @@ function LoginContent() {
           <View style={styles.welcomeCard}>
             <Text style={styles.welcomeText}>Welcome To</Text>
             <View style={styles.sheDigitalBadge}>
-              <Text style={styles.sheDigitalText}>SHE Digital</Text>
+              <Text style={styles.sheDigitalText}>Customer Portal</Text>
             </View>
           </View>
 
@@ -184,13 +195,13 @@ function LoginContent() {
                   secureTextEntry={!showPassword}
                   editable={!loading}
                 />
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeIconContainer}
                 >
                   <Image
-                    source={showPassword ? 
-                      require('../assets/images/visibilityicon.png') : 
+                    source={showPassword ?
+                      require('../assets/images/visibilityicon.png') :
                       require('../assets/images/hiddenicon.png')
                     }
                     style={styles.eyeIcon}
@@ -219,7 +230,7 @@ function LoginContent() {
 
             {/* Footer */}
             <View style={styles.footerContainer}>
-              <Text style={styles.troubleText}>Having Trouble ?</Text>
+              <Text style={styles.troubleText}>Having Trouble?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
                 <Text style={styles.contactText}>
                   Contact Us 011 - 2357357
@@ -301,19 +312,21 @@ const styles = StyleSheet.create({
   sheDigitalBadge: {
     width: 192,
     height: 44,
-    backgroundColor: '#FF4757',
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "#FF4757",
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderTopRightRadius: 15,
     borderBottomLeftRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   sheDigitalText: {
-    color: '#fff',
+    color: "#FF4757",
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "500",
+    textAlign: "center",
   },
   formSection: {
     paddingHorizontal: 0,
