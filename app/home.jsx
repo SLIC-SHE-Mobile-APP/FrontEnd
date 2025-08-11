@@ -1182,7 +1182,7 @@ export default function PolicyHome({ route }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.sectionTitle}>POLICY DETAILS</Text>
+        <Text style={styles.sectionTitle}>Policy Details</Text>
         <View style={styles.cardOutline}>
           <View style={styles.insuranceCard}>
             <View style={styles.policyHeader}>
@@ -1210,7 +1210,7 @@ export default function PolicyHome({ route }) {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>MEMBERS</Text>
+        <Text style={styles.sectionTitle}>Members</Text>
         <View style={styles.memberCard}>
           <TouchableOpacity
             style={styles.memberRow}
@@ -1224,7 +1224,7 @@ export default function PolicyHome({ route }) {
             </View>
             <View style={styles.memberActions}>
               <View style={styles.totalBadge}>
-                <Text style={styles.totalText}>Total </Text>
+                <Text style={styles.totalText}>Total : </Text>
                 <Text style={styles.totalNumber}>
                   {membersCount.toString().padStart(2, "0")}
                 </Text>
@@ -1265,7 +1265,7 @@ export default function PolicyHome({ route }) {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>TYPE</Text>
+        <Text style={styles.sectionTitle}>Type</Text>
         <View style={styles.typeContainer}>
           {renderType(
             "New\nClaim",
@@ -1289,7 +1289,7 @@ export default function PolicyHome({ route }) {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>HEALTH CARD</Text>
+        <Text style={styles.sectionTitle}>Health Card</Text>
         <View style={styles.healthCardContainer}>
           <Image
             source={require("../assets/images/healthcard.png")}

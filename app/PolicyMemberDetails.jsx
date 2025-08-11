@@ -53,14 +53,80 @@ export default function PolicyMemberDetails() {
     return dateOfBirth;
   };
 
+  // Function to mask policy number
+  const maskPolicyNumber = (policyNumber) => {
+    if (!policyNumber || policyNumber === "N/A" || policyNumber === "Not Available")
+      return "Not Available";
+    const policy = policyNumber.toString();
+    if (policy.length <= 4) return policy;
+    // Show first 3 digits and last 3 digits, mask the middle
+    const firstPart = policy.substring(0, 3);
+    const lastPart = policy.substring(policy.length - 3);
+    const maskedMiddle = "*".repeat(policy.length - 6);
+    return `${firstPart}${maskedMiddle}${lastPart}`;
+  };
+
+  // Function to mask member number
+  const maskMemberNumber = (memberNumber) => {
+    if (!memberNumber || memberNumber === "N/A" || memberNumber === "Not Available")
+      return "Not Available";
+    const member = memberNumber.toString();
+    if (member.length <= 4) return member;
+    // Show first 2 digits and last 2 digits, mask the middle
+    const firstPart = member.substring(0, 2);
+    const lastPart = member.substring(member.length - 2);
+    const maskedMiddle = "*".repeat(member.length - 4);
+    return `${firstPart}${maskedMiddle}${lastPart}`;
+  };
+
+  // Function to mask member name
+  const maskMemberName = (memberName) => {
+    if (!memberName || memberName === "N/A" || memberName === "Not Available")
+      return "Not Available";
+    const names = memberName.trim().split(' ');
+    if (names.length === 1) {
+      // Single name - show first 2 and last 1 characters
+      const name = names[0];
+      if (name.length <= 3) return name;
+      const firstPart = name.substring(0, 2);
+      const lastPart = name.substring(name.length - 1);
+      const maskedMiddle = "*".repeat(name.length - 3);
+      return `${firstPart}${maskedMiddle}${lastPart}`;
+    } else {
+      // Multiple names - show first name fully, mask middle names, show last name first and last char
+      const firstName = names[0];
+      const lastName = names[names.length - 1];
+      let maskedName = firstName;
+
+      // Mask middle names completely if any
+      if (names.length > 2) {
+        for (let i = 1; i < names.length - 1; i++) {
+          maskedName += " " + "*".repeat(names[i].length);
+        }
+      }
+
+      // Mask last name
+      if (lastName.length <= 2) {
+        maskedName += " " + lastName;
+      } else {
+        const lastFirstChar = lastName.substring(0, 1);
+        const lastLastChar = lastName.substring(lastName.length - 1);
+        const lastMasked = "*".repeat(lastName.length - 2);
+        maskedName += " " + lastFirstChar + lastMasked + lastLastChar;
+      }
+
+      return maskedName;
+    }
+  };
+
   // Function to create fallback member details from stored data
   const createFallbackMemberDetails = (storedData) => {
     return {
-      policyNumber: storedData.policyNumber || "Not Available",
-      memberName: storedData.memberName || "Not Available",
+      policyNumber: maskPolicyNumber(storedData.policyNumber) || "Not Available",
+      memberName: maskMemberName(storedData.memberName) || "Not Available",
       contactNo: maskContactNumber(storedData.userMobile) || "Not Available",
       company: "Not Available",
-      memberNo: storedData.memberNumber || "Not Available",
+      memberNo: maskMemberNumber(storedData.memberNumber) || "Not Available",
       empCategory: "Not Available",
       dateOfBirth: "Not Available",
       effectiveDate: "Not Available",
@@ -459,23 +525,20 @@ export default function PolicyMemberDetails() {
         // We have API data, use it with fallbacks for missing fields
         const policyPeriod = policyDatesData
           ? formatPolicyPeriod(
-              policyDatesData.policyStartDate,
-              policyDatesData.policyEndDate
-            )
+            policyDatesData.policyStartDate,
+            policyDatesData.policyEndDate
+          )
           : {
-              from: formatDate(apiData.effectiveDate),
-              to: "Not Available",
-            };
+            from: formatDate(apiData.effectiveDate),
+            to: "Not Available",
+          };
 
         transformedData = {
-          policyNumber: stored.policyNumber || "Not Available",
-          memberName:
-            apiData.memberName || stored.memberName || "Not Available",
+          policyNumber: maskPolicyNumber(stored.policyNumber) || "Not Available",
+          memberName: maskMemberName(apiData.memberName || stored.memberName) || "Not Available",
           contactNo: maskContactNumber(stored.userMobile) || "Not Available",
           company: policyInfo?.name || "Not Available",
-          memberNo:
-            apiData.employeeNumber || stored.memberNumber || "Not Available",
-          empCategory: apiData.employeeCategory || "Not Available",
+          memberNo: maskMemberNumber(apiData.employeeNumber || stored.memberNumber) || "Not Available",
           dateOfBirth:
             maskDateOfBirth(formatDate(apiData.dateOfBirth)) || "Not Available",
           effectiveDate: formatDate(apiData.effectiveDate) || "Not Available",
@@ -628,7 +691,7 @@ export default function PolicyMemberDetails() {
                 style={[
                   styles.periodValue,
                   memberDetails.policyPeriod.from === "Not Available" &&
-                    styles.notAvailableText,
+                  styles.notAvailableText,
                 ]}
               >
                 {memberDetails.policyPeriod.from}
@@ -640,7 +703,7 @@ export default function PolicyMemberDetails() {
                 style={[
                   styles.periodValue,
                   memberDetails.policyPeriod.to === "Not Available" &&
-                    styles.notAvailableText,
+                  styles.notAvailableText,
                 ]}
               >
                 {memberDetails.policyPeriod.to}
@@ -675,13 +738,13 @@ export default function PolicyMemberDetails() {
             <View style={styles.limitColumn}>
               <Text style={styles.limitLabel}>Year Limit</Text>
               <Text style={styles.limitValue}>
-                {memberDetails.indoorLimits.yearLimit}
+                Rs {memberDetails.indoorLimits.yearLimit}
               </Text>
             </View>
             <View style={styles.limitColumn}>
               <Text style={styles.limitLabel}>Event Limit</Text>
               <Text style={styles.limitValue}>
-                {memberDetails.indoorLimits.eventLimit}
+                Rs {memberDetails.indoorLimits.eventLimit}
               </Text>
             </View>
           </View>
