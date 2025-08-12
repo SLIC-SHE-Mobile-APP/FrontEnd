@@ -716,11 +716,6 @@ const UploadDocumentsSaved = ({ route }) => {
         setAmount("");
         setDocumentDate(new Date());
 
-        showPopup(
-          "Success",
-          "Document uploaded successfully!",
-          "success"
-        );
       }
     } catch (error) {
       console.error("Error picking document:", error);
@@ -845,11 +840,6 @@ const UploadDocumentsSaved = ({ route }) => {
           prev.filter((doc) => doc.id !== documentId)
         );
         hidePopup();
-        showPopup(
-          "Success",
-          "Document deleted successfully.",
-          "success"
-        );
       }
     );
   };

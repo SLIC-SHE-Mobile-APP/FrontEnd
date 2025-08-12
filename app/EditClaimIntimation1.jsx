@@ -20,7 +20,7 @@ import {
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 // Custom Popup Component with Blur Background
 const CustomPopup = ({
@@ -84,14 +84,14 @@ const CustomPopup = ({
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
-        <TouchableOpacity 
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
@@ -129,7 +129,7 @@ const CustomPopup = ({
                   ? styles.popupCancelButton
                   : styles.popupOkButton,
               ]}
-              onPress={showConfirmButton ? onClose : (onConfirm || onClose)}
+              onPress={showConfirmButton ? onClose : onConfirm || onClose}
             >
               <Text
                 style={[
@@ -401,7 +401,11 @@ const EditClaimIntimation1 = ({ route }) => {
       setDocumentTypes(docTypesData);
     } catch (error) {
       console.error("Error fetching document types:", error);
-      showPopup("Error", "Failed to load document types. Please try again.", "error");
+      showPopup(
+        "Error",
+        "Failed to load document types. Please try again.",
+        "error"
+      );
 
       // Set fallback data in case of error
       setDocumentTypes([
@@ -1458,7 +1462,11 @@ const EditClaimIntimation1 = ({ route }) => {
       });
 
       // Show success message
-      showPopup("Success", "Beneficiary information updated successfully!", "success");
+      showPopup(
+        "Success",
+        "Beneficiary information updated successfully!",
+        "success"
+      );
 
       // Refresh patient details from API to ensure data consistency
       try {
@@ -1606,7 +1614,7 @@ const EditClaimIntimation1 = ({ route }) => {
 
         // Store the updated beneficiary data
         await storeBeneficiaryData(updatedBeneficiaries);
-        
+
         hidePopup();
       }
     );
@@ -1676,15 +1684,9 @@ const EditClaimIntimation1 = ({ route }) => {
     setNewDocument((prev) => ({
       ...prev,
       type: docType.docDesc,
+      // Clear amount for BILL type or set to 0.00 for non-bill types
+      amount: docType.docId === "O01" ? "" : "0.00",
     }));
-
-    // Set amount to 0.00 for non-bill types
-    if (docType.docId !== "O01") {
-      setNewDocument((prev) => ({
-        ...prev,
-        amount: "0.00",
-      }));
-    }
 
     setEditDocTypeDropdownVisible(false);
   };
@@ -1707,8 +1709,8 @@ const EditClaimIntimation1 = ({ route }) => {
   };
 
   const handleEditAmountChange = (text) => {
-    // Only allow editing if document type is BILL (O01)
-    if (editDocumentType !== "O01") {
+    // Allow editing for BILL (O01) and OTHER (O04) types
+    if (editDocumentType !== "O01" && editDocumentType !== "O04") {
       return;
     }
 
@@ -1738,7 +1740,7 @@ const EditClaimIntimation1 = ({ route }) => {
   };
 
   const isEditAmountEditable = () => {
-    return editDocumentType === "O01";
+    return editDocumentType === "O01" || editDocumentType === "O04";
   };
 
   const updateDocumentAPI = async (documentData) => {
@@ -1834,7 +1836,11 @@ const EditClaimIntimation1 = ({ route }) => {
 
       // Validate required fields
       if (!editDocumentType) {
-        showPopup("Validation Error", "Please select a document type.", "warning");
+        showPopup(
+          "Validation Error",
+          "Please select a document type.",
+          "warning"
+        );
         return;
       }
 
@@ -1853,7 +1859,11 @@ const EditClaimIntimation1 = ({ route }) => {
       // Get stored user NIC
       const storedNic = await SecureStore.getItemAsync("user_nic");
       if (!storedNic) {
-        showPopup("Error", "User information not found. Please login again.", "error");
+        showPopup(
+          "Error",
+          "User information not found. Please login again.",
+          "error"
+        );
         return;
       }
 
@@ -1933,8 +1943,7 @@ const EditClaimIntimation1 = ({ route }) => {
           "error",
           true,
           async () => {
-            const referenceNo =
-              claimDetails.referenceNo || claim?.referenceNo;
+            const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
             if (referenceNo) {
               await fetchDocuments(referenceNo);
             }
@@ -2009,13 +2018,10 @@ const EditClaimIntimation1 = ({ route }) => {
           }
 
           // Remove from local state regardless of API call success
-          setDocuments((prev) =>
-            prev.filter((item) => item.id !== documentId)
-          );
+          setDocuments((prev) => prev.filter((item) => item.id !== documentId));
 
           // Optionally refresh documents from API
-          const referenceNo =
-            claimDetails.referenceNo || claim?.referenceNo;
+          const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
           if (referenceNo) {
             await fetchDocuments(referenceNo);
           }
@@ -2023,7 +2029,7 @@ const EditClaimIntimation1 = ({ route }) => {
           // Refresh claim amount after deleting document
           console.log("Document deleted, refreshing claim amount...");
           await refreshClaimAmount();
-          
+
           hidePopup();
         } catch (error) {
           console.error("Error deleting document:", error);
@@ -2054,8 +2060,8 @@ const EditClaimIntimation1 = ({ route }) => {
   // Handle submit - Updated with API integration
   const handleSubmitClaim = () => {
     showPopup(
-      "Submit Claim", 
-      "Are you sure you want to submit this claim?", 
+      "Submit Claim",
+      "Are you sure you want to submit this claim?",
       "info",
       true,
       async () => {
@@ -2074,8 +2080,8 @@ const EditClaimIntimation1 = ({ route }) => {
           // Show success message and navigate back
           hidePopup();
           showPopup(
-            "Success", 
-            "Claim submitted successfully!", 
+            "Success",
+            "Claim submitted successfully!",
             "success",
             false,
             () => {
@@ -2121,8 +2127,8 @@ const EditClaimIntimation1 = ({ route }) => {
   // Handle submit later
   const handleSubmitLater = () => {
     showPopup(
-      "Saved", 
-      "Claim saved for later submission.", 
+      "Saved",
+      "Claim saved for later submission.",
       "success",
       false,
       () => {
@@ -2246,8 +2252,8 @@ const EditClaimIntimation1 = ({ route }) => {
           // Show success message and navigate back
           hidePopup();
           showPopup(
-            "Success", 
-            "Claim has been deleted successfully.", 
+            "Success",
+            "Claim has been deleted successfully.",
             "success",
             false,
             () => {
@@ -2775,7 +2781,12 @@ const EditClaimIntimation1 = ({ route }) => {
                   is24Hour={true}
                   display="default"
                   onChange={handleEditDateChange}
-                  maximumDate={new Date()} // Prevent future dates
+                  maximumDate={new Date()} // Current date
+                  minimumDate={(() => {
+                    const threeMonthsAgo = new Date();
+                    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                    return threeMonthsAgo;
+                  })()} // 3 months ago
                 />
               )}
 
@@ -2796,12 +2807,19 @@ const EditClaimIntimation1 = ({ route }) => {
                       parseFloat(newDocument.amount) <= 0) &&
                     styles.textInputError,
                 ]}
-                placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                placeholder={
+                  editDocumentType === "O01"
+                    ? "Enter amount"
+                    : editDocumentType === "O04"
+                    ? "Enter amount"
+                    : "0.00"
+                }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
                 onChangeText={handleEditAmountChange}
                 keyboardType="decimal-pad"
                 editable={isEditAmountEditable()}
+                selectTextOnFocus={editDocumentType === "O01"} // Auto-select text for BILL type
               />
 
               {/* Help text for amount field */}
@@ -3552,17 +3570,17 @@ const styles = StyleSheet.create({
   // Popup Styles with Blur Background
   popupOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
     backgroundColor: "white",

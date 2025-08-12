@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Image,
   Keyboard,
   Linking,
@@ -16,7 +17,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Dimensions,
 } from "react-native";
 import {
   SafeAreaProvider,
@@ -24,7 +24,7 @@ import {
 } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../constants/index.js";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 // Custom Popup Component with Blur Background
 const CustomPopup = ({
@@ -88,14 +88,14 @@ const CustomPopup = ({
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
-        <TouchableOpacity 
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
@@ -502,16 +502,18 @@ function LoginRequestOTPContent() {
               </View>
             </View>
 
-            <TouchableOpacity
-              onPress={handlePress}
-              disabled={loading}
-              style={styles.linkContainer}
-            >
+            <View style={styles.linkContainer}>
               <Text style={styles.alreadyRegisteredText}>
-                Already Registered with our customer portal?
-                <Text style={styles.loginLinkText}> Login</Text>
+                Already Registered with our customer portal?{" "}
+                <TouchableOpacity
+                  onPress={handlePress}
+                  disabled={loading}
+                  style={styles.inlineLoginButton}
+                >
+                  <Text style={styles.loginLinkText}>Login</Text>
+                </TouchableOpacity>
               </Text>
-            </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={[styles.requestButton, loading && styles.buttonDisabled]}
@@ -706,10 +708,14 @@ const styles = StyleSheet.create({
   linkContainer: {
     alignItems: "center",
     marginVertical: 15,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
   },
   alreadyRegisteredText: {
     fontSize: 14,
     color: "#666",
+    textAlign: 'center',
   },
   loginLinkText: {
     color: "#4ECDC4",
@@ -747,17 +753,17 @@ const styles = StyleSheet.create({
   // Popup Styles with Blur Background
   popupOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
     backgroundColor: "white",
