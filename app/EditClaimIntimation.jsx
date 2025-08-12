@@ -389,7 +389,7 @@ const EditClaimIntimation = ({ route }) => {
       const day = date.getDate().toString().padStart(2, "0");
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
+      return `${day}/${month}/${'20'+year}`;
     } catch (error) {
       console.error("Error formatting date:", error);
       return dateString;

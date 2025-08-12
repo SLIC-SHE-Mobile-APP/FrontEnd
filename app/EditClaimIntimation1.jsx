@@ -1659,7 +1659,7 @@ const EditClaimIntimation1 = ({ route }) => {
       const billExists = documents.some(
         (doc) => doc.type === "BILL" && doc.id !== selectedDocument?.id
       );
-
+  
       if (billExists) {
         showPopup(
           "Document Type Restriction",
@@ -1669,23 +1669,17 @@ const EditClaimIntimation1 = ({ route }) => {
         return;
       }
     }
-
+  
     setEditDocumentType(docType.docId);
-
+  
     // Update newDocument type with the description
     setNewDocument((prev) => ({
       ...prev,
       type: docType.docDesc,
+      // Clear amount when switching to BILL type, set to 0.00 for others
+      amount: docType.docId === "O01" ? "" : "0.00"
     }));
-
-    // Set amount to 0.00 for non-bill types
-    if (docType.docId !== "O01") {
-      setNewDocument((prev) => ({
-        ...prev,
-        amount: "0.00",
-      }));
-    }
-
+  
     setEditDocTypeDropdownVisible(false);
   };
 
@@ -1711,26 +1705,26 @@ const EditClaimIntimation1 = ({ route }) => {
     if (editDocumentType !== "O01") {
       return;
     }
-
+  
     // Remove any non-numeric characters except decimal point
     const cleanedText = text.replace(/[^0-9.]/g, "");
-
+  
     // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
-
+  
     // Format the amount
     let formattedAmount = cleanedText;
-
+  
     // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
       }
     }
-
+  
     setNewDocument((prev) => ({
       ...prev,
       amount: formattedAmount,

@@ -168,13 +168,13 @@ const CustomPopup = ({
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
+      <Animated.View
         style={[
           styles.popupOverlay,
           { opacity: fadeAnim }
         ]}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={showConfirmButton ? undefined : onClose}
@@ -623,11 +623,11 @@ const UploadDocumentsSaved = ({ route }) => {
   const isAllowedFileType = (mimeType, name) => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-    
+
     if (allowedTypes.includes(mimeType)) {
       return true;
     }
-    
+
     // Fallback check using file extension
     const extension = name.toLowerCase().split('.').pop();
     return ['jpg', 'jpeg', 'png'].includes(extension);
@@ -672,7 +672,7 @@ const UploadDocumentsSaved = ({ route }) => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        
+
         // Check if file type is allowed
         if (!isAllowedFileType(file.mimeType, file.name)) {
           showPopup(
@@ -1157,7 +1157,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                      styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1168,7 +1168,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                          styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1180,7 +1180,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                          styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1206,14 +1206,14 @@ const UploadDocumentsSaved = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.textInputError,
+              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+              styles.textInputError,
             ]}
             placeholder={
-              !selectedDocumentType 
-                ? "Select document type first" 
-                : isAmountEditable() 
-                  ? "Enter amount" 
+              !selectedDocumentType
+                ? "Select document type first"
+                : isAmountEditable()
+                  ? "Enter amount"
                   : "0.00"
             }
             placeholderTextColor="#B0B0B0"
@@ -1236,7 +1236,7 @@ const UploadDocumentsSaved = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                  styles.errorText,
+                styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1313,7 +1313,7 @@ const UploadDocumentsSaved = ({ route }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Document</Text>
               <Text style={styles.sectionSubtitle}>
-                Allowed formats: JPG, JPEG, PNG only
+                Maximum file size: 5MB. Allowed formats: JPG, JPEG, PNG only
               </Text>
 
               <Text
@@ -1347,7 +1347,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1366,7 +1366,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1381,7 +1381,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1400,7 +1400,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1455,10 +1455,19 @@ const UploadDocumentsSaved = ({ route }) => {
 
         {/* Add Document Button */}
         <TouchableOpacity
-          style={styles.addDocumentButton}
-          onPress={handleAddDocument}
+          style={[
+            styles.addDocumentButton,
+            uploadedDocuments.length === 0 && styles.addDocumentButtonDisabled
+          ]}
+          onPress={handleAddDocumentButton}
+          disabled={uploadedDocuments.length === 0}
         >
-          <Text style={styles.addDocumentButtonText}>Add Document</Text>
+          <Text style={[
+            styles.addDocumentButtonText,
+            uploadedDocuments.length === 0 && styles.addDocumentButtonTextDisabled
+          ]}>
+            Add Document
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -1523,7 +1532,7 @@ const UploadDocumentsSaved = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                      editDocumentType.slice(1)
+                    editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1548,7 +1557,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                editDocumentType === "diagnosis" ? (
+                  editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
@@ -1999,6 +2008,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
+  },
+  addDocumentButtonDisabled: {
+    backgroundColor: "#bfbfbf",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  addDocumentButtonTextDisabled: {
+    color: "#666",
   },
   // Modal styles
   modalOverlay: {

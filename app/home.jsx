@@ -1224,7 +1224,7 @@ export default function PolicyHome({ route }) {
             </View>
             <View style={styles.memberActions}>
               <View style={styles.totalBadge}>
-                <Text style={styles.totalText}>Total : </Text>
+                <Text style={styles.totalText}>Total  </Text>
                 <Text style={styles.totalNumber}>
                   {membersCount.toString().padStart(2, "0")}
                 </Text>

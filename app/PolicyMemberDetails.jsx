@@ -55,15 +55,10 @@ export default function PolicyMemberDetails() {
 
   // Function to mask policy number
   const maskPolicyNumber = (policyNumber) => {
-    if (!policyNumber || policyNumber === "N/A" || policyNumber === "Not Available")
-      return "Not Available";
-    const policy = policyNumber.toString();
-    if (policy.length <= 4) return policy;
-    // Show first 3 digits and last 3 digits, mask the middle
-    const firstPart = policy.substring(0, 3);
-    const lastPart = policy.substring(policy.length - 3);
-    const maskedMiddle = "*".repeat(policy.length - 6);
-    return `${firstPart}${maskedMiddle}${lastPart}`;
+    if (!policyNumber || policyNumber.length <= 10) return policyNumber;
+    const firstTen = policyNumber.substring(0, 10);
+    const maskedEnd = '*'.repeat(policyNumber.length - 10);
+    return `${firstTen}${maskedEnd}`;
   };
 
   // Function to mask member number
