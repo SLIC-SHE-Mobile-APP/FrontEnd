@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -24,7 +24,7 @@ import {
 } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../constants/index.js";
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
 
 // Custom Popup Component with Blur Background
 const CustomPopup = ({
@@ -88,17 +88,17 @@ const CustomPopup = ({
   if (!visible) return null;
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="none"
-      statusBarTranslucent={true}
-    >
-      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
+      <Animated.View
+        style={[
+          styles.popupOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
-          onPress={onClose}
+          // onPress={onClose}
         />
         <Animated.View
           style={[
@@ -504,15 +504,14 @@ function LoginRequestOTPContent() {
 
             <View style={styles.linkContainer}>
               <Text style={styles.alreadyRegisteredText}>
-                Already Registered with our customer portal?{" "}
-                <TouchableOpacity
-                  onPress={handlePress}
-                  disabled={loading}
-                  style={styles.inlineLoginButton}
-                >
-                  <Text style={styles.loginLinkText}>Login</Text>
-                </TouchableOpacity>
+                Already registered with our customer portal?
               </Text>
+              <TouchableOpacity
+                onPress={handlePress}
+                disabled={loading}
+              >
+                <Text style={styles.loginLinkText}> Login</Text>
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
@@ -523,12 +522,12 @@ function LoginRequestOTPContent() {
               {loading ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.requestButtonText}>Request OTP</Text>
+                <Text style={styles.requestButtonText}>Request an OTP</Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.footerContainer}>
-              <Text style={styles.troubleText}>Having Trouble ?</Text>
+              <Text style={styles.troubleText}>Having Trouble?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
                 <Text style={styles.contactText}>Contact Us 0112 - 357357</Text>
               </TouchableOpacity>
@@ -643,7 +642,9 @@ const styles = StyleSheet.create({
   sheDigitalBadge: {
     width: 192,
     height: 44,
-    backgroundColor: "#FF4757",
+    backgroundColor: "transparent", 
+    borderWidth: 2, 
+    borderColor: "#FF4757", 
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderTopRightRadius: 15,
@@ -652,10 +653,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sheDigitalText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
+    color: "#FF4757", 
+  fontSize: 18,
+  fontWeight: "500", 
+  textAlign: "center",
   },
   logInText: {
     fontSize: 18,
@@ -708,14 +709,12 @@ const styles = StyleSheet.create({
   linkContainer: {
     alignItems: "center",
     marginVertical: 15,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   alreadyRegisteredText: {
     fontSize: 14,
     color: "#666",
-    textAlign: 'center',
   },
   loginLinkText: {
     color: "#4ECDC4",
@@ -753,17 +752,17 @@ const styles = StyleSheet.create({
   // Popup Styles with Blur Background
   popupOverlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   backdrop: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   popupContainer: {
     backgroundColor: "white",
