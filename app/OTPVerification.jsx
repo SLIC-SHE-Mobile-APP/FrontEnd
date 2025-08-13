@@ -280,13 +280,6 @@ function OTPVerificationContent() {
     }
   };
 
-  // Load data on component mount
-  useEffect(() => {
-    loadUserData();
-    // Check clipboard for OTP on mount
-    checkClipboardForOTP();
-  }, []);
-
   // Debug: Log the data being used
   useEffect(() => {
     console.log("OTP Verification Data:");
@@ -301,22 +294,7 @@ function OTPVerificationContent() {
     return otp.every(digit => digit !== "");
   };
 
-  // Auto-populate OTP from clipboard
-  const checkClipboardForOTP = async () => {
-    try {
-      const clipboardContent = await Clipboard.getString();
-      const otpPattern = /\b\d{4}\b/; // Look for 4-digit numbers
-      const match = clipboardContent.match(otpPattern);
-      
-      if (match) {
-        const foundOTP = match[0];
-        setOtp(foundOTP.split(""));
-        showPopup(`OTP auto-filled from clipboard: ${foundOTP}`, 'info', 'Auto-filled');
-      }
-    } catch (error) {
-      console.log("Clipboard access failed:", error);
-    }
-  };
+ 
 
   // Keyboard handling
   useEffect(() => {
@@ -578,7 +556,7 @@ function OTPVerificationContent() {
             <View style={styles.warningContainer}>
               <Text style={styles.warningIcon}>🔒</Text>
               <Text style={styles.warningText}>
-                Never share your OTP with anyone. We will never ask for your OTP over phone or email.
+                Never share your OTP with anyone. 
               </Text>
             </View>
 
@@ -651,14 +629,7 @@ function OTPVerificationContent() {
               )}
             </TouchableOpacity>
 
-            {/* Auto-fill Button */}
-            <TouchableOpacity
-              style={styles.autoFillButton}
-              onPress={checkClipboardForOTP}
-            >
-              <Text style={styles.autoFillButtonText}>📋 Auto-fill from Clipboard</Text>
-            </TouchableOpacity>
-
+           
             {/* Footer */}
             <View style={styles.footerContainer}>
               <Text style={styles.troubleText}>Having Trouble ?</Text>
@@ -764,14 +735,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    marginBottom: 10,
+    // marginBottom: 10,
     lineHeight: 22,
   },
   contactInfo: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#13646D",
-    marginBottom: 30,
+    marginBottom: 8,
   },
   debugContainer: {
     backgroundColor: "#f0f0f0",
@@ -848,7 +819,7 @@ const styles = StyleSheet.create({
   },
   footerContainer: {
     alignItems: "center",
-    marginTop: 30,
+    marginTop: 15,
   },
   troubleText: {
     fontSize: 14,
@@ -869,7 +840,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#FF9800',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 25,
+    marginBottom: 15,
     width: '100%',
   },
   warningIcon: {
