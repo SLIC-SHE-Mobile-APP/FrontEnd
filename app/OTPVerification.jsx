@@ -402,6 +402,7 @@ function OTPVerificationContent() {
           body: JSON.stringify({
             mobileNumber: mobileNumber,
             otp: otpCode,
+            nicNumber: nicNumber,
           }),
         }
       );
