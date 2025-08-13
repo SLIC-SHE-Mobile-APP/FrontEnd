@@ -1,21 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Image,
-  Modal,
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Animated,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import axios from "axios";
 import { API_BASE_URL } from "../constants/index.js";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -118,7 +116,6 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
         }
       } catch (error) {
         console.error("Document fetch error:", error);
-        Alert.alert("Error", "Failed to load claim documents.");
       } finally {
         setLoading(false);
       }
