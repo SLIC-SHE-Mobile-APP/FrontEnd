@@ -1,6 +1,7 @@
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -17,7 +18,7 @@ import {
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 // Custom Popup Component with Blur Background
 const CustomPopup = ({
@@ -81,14 +82,14 @@ const CustomPopup = ({
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
-        <TouchableOpacity 
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
@@ -162,7 +163,6 @@ const AddPolicy = () => {
   });
   const navigation = useNavigation();
 
-  // Required prefix for policy numbers
   const REQUIRED_PREFIX = "G/010/SHE/";
 
   // Show popup function
@@ -235,7 +235,7 @@ const AddPolicy = () => {
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
+      outputRange: ["0deg", "360deg"],
     });
 
     return (
@@ -257,7 +257,10 @@ const AddPolicy = () => {
   };
 
   // Loading Screen Component with Custom Icon
-  const LoadingScreen = ({ text = "Loading Policies...", subText = "Please wait a moment" }) => (
+  const LoadingScreen = ({
+    text = "Loading Policies...",
+    subText = "Please wait a moment",
+  }) => (
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContainer}>
         <LoadingIcon />
@@ -270,13 +273,10 @@ const AddPolicy = () => {
   // Load policies from API when component mounts
   useEffect(() => {
     const initializeData = async () => {
-      await Promise.all([
-        loadPoliciesFromAPI(),
-        loadRemovedPolicies()
-      ]);
+      await Promise.all([loadPoliciesFromAPI(), loadRemovedPolicies()]);
       setInitialLoading(false);
     };
-    
+
     initializeData();
   }, []);
 
@@ -320,8 +320,8 @@ const AddPolicy = () => {
 
       if (!storedNic) {
         showPopup(
-          "Authentication Error", 
-          "Your session has expired. Please login again to continue.", 
+          "Authentication Error",
+          "Your session has expired. Please login again to continue.",
           "error"
         );
         return;
@@ -344,7 +344,7 @@ const AddPolicy = () => {
 
       if (result.success && result.data) {
         const formattedPolicies = result.data.map((policy) => ({
-          id: policy.policyNumber, // Using policy number as ID
+          id: policy.policyNumber,
           policyNumber: policy.policyNumber,
           memberId: policy.memNumber,
           policyPeriod: `${new Date(
@@ -352,7 +352,7 @@ const AddPolicy = () => {
           ).toLocaleDateString()} - ${new Date(
             policy.policyEndDate
           ).toLocaleDateString()}`,
-          contactNo: "0713158877", // Default contact number
+          contactNo: "", // Default contact number
           status:
             new Date(policy.policyEndDate) > new Date() ? "Active" : "Inactive",
         }));
@@ -360,48 +360,55 @@ const AddPolicy = () => {
         setPolicyList(formattedPolicies);
       } else {
         showPopup(
-          "Data Loading Error", 
-          "Unable to load your policies at this time. Please try refreshing the page or contact support if the issue persists.", 
+          "Data Loading Error",
+          "Unable to load your policies at this time. Please try refreshing the page or contact support if the issue persists.",
           "error"
         );
       }
     } catch (error) {
       console.error("Error loading policies:", error);
       showPopup(
-        "Connection Error", 
-        "Unable to connect to the server. Please check your internet connection and try again.", 
+        "Connection Error",
+        "Unable to connect to the server. Please check your internet connection and try again.",
         "error"
       );
     }
   };
 
   // Function to set refresh flag and navigate to home - ONLY for back button
-  const navigateToHomeWithRefresh = async () => {
+  const navigateToHomeWithRefresh = async (isBackButton = false) => {
     try {
       // Set the refresh flag in SecureStore
       await SecureStore.setItemAsync("should_refresh_home", "true");
-      console.log("Refresh flag set, going back");
-  
-      // Use goBack instead of navigate
-      navigation.goBack();
+
+      // MODIFIED: Only set from_add_policy flag for back button navigation
+      if (isBackButton) {
+        await SecureStore.setItemAsync("from_add_policy", "true");
+        console.log("Back button pressed - will show policy selection modal");
+      } else {
+        // Clear the flag if policy was selected
+        await SecureStore.deleteItemAsync("from_add_policy");
+        console.log("Policy selected - will not show policy selection modal");
+      }
+
+      console.log("Refresh flag set, navigating to home from AddPolicy");
+      router.push("/home");
     } catch (error) {
       console.error("Error setting refresh flag:", error);
-      // Go back anyway even if setting flag fails
-      navigation.goBack();
+      router.push("/home");
     }
   };
 
   const handleAddPolicy = async () => {
     if (!policyNumber.trim()) {
       showPopup(
-        "Missing Information", 
-        "Please enter a policy number to continue.", 
+        "Missing Information",
+        "Please enter a policy number to continue.",
         "warning"
       );
       return;
     }
 
-    // Check if policy number starts with required prefix
     if (!policyNumber.startsWith(REQUIRED_PREFIX)) {
       showPopup(
         "Invalid Policy Format",
@@ -416,8 +423,8 @@ const AddPolicy = () => {
     );
     if (existing) {
       showPopup(
-        "Duplicate Policy", 
-        `Policy ${policyNumber} already exists in your account.\n\nPlease enter a different policy number.`, 
+        "Duplicate Policy",
+        `Policy ${policyNumber} already exists in your account.\n\nPlease enter a different policy number.`,
         "warning"
       );
       return;
@@ -467,90 +474,28 @@ const AddPolicy = () => {
 
         // Show enhanced success popup
         showPopup(
-          "Policy Added Successfully", 
-          `Policy ${policyNumber} has been added to your account and is now active.`, 
+          "Policy Added Successfully",
+          `Policy ${policyNumber} has been added to your account and is now active.`,
           "success"
         );
       } else {
         showPopup(
-          "Policy Not Found", 
-          result.message || "The policy number you entered could not be found in our system. Please verify the policy number and try again.", 
+          "Policy Not Found",
+          result.message ||
+            "The policy number you entered could not be found in our system. Please verify the policy number and try again.",
           "error"
         );
       }
     } catch (error) {
       console.error("Error adding policy:", error);
       showPopup(
-        "Connection Error", 
-        "Unable to connect to the server. Please check your internet connection and try again.", 
+        "Connection Error",
+        "Unable to connect to the server. Please check your internet connection and try again.",
         "error"
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeletePolicy = async (id, policyNumber) => {
-    showPopup(
-      "Delete Policy",
-      `Are you sure you want to delete policy ${policyNumber}?`,
-      "warning",
-      true,
-      async () => {
-        try {
-          setLoading(true);
-          hidePopup(); // Hide the confirmation popup
-
-          // Call the API to remove the policy
-          const response = await fetch(
-            `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                policyNumber: policyNumber,
-              }),
-            }
-          );
-
-          const result = await response.json();
-
-          if (response.ok && result.success) {
-            // Remove from policy list
-            setPolicyList((prev) => prev.filter((item) => item.id !== id));
-
-            // Only add to deleted policies if it's not already from the API
-            if (!removedPoliciesFromAPI.includes(policyNumber)) {
-              setDeletedPolicies((prev) => [...prev, policyNumber]);
-            }
-
-            // Show success popup with more context
-            showPopup(
-              "Policy Deleted",
-              `Policy ${policyNumber} has been successfully removed from your account.`,
-              "success"
-            );
-          } else {
-            showPopup(
-              "Deletion Failed",
-              result.message || "Unable to remove the policy. Please try again later.",
-              "error"
-            );
-          }
-        } catch (error) {
-          console.error("Error removing policy:", error);
-          showPopup(
-            "Connection Error", 
-            "Unable to connect to the server. Please check your internet connection and try again.",
-            "error"
-          );
-        } finally {
-          setLoading(false);
-        }
-      }
-    );
   };
 
   const handleRestoreDeleted = (number) => {
@@ -601,23 +546,95 @@ const AddPolicy = () => {
     );
   };
 
+  const handlePolicySelect = async (policy) => {
+    try {
+      // Store the selected policy data
+      await SecureStore.setItemAsync(
+        "selected_policy_number",
+        policy.policyNumber
+      );
+      await SecureStore.setItemAsync(
+        "selected_member_number",
+        policy.memberId.toString()
+      );
+
+      // Store additional policy data for consistency
+      await SecureStore.setItemAsync(
+        "selected_policy_id",
+        policy.memberId.toString()
+      );
+      await SecureStore.setItemAsync(
+        "selected_policy_period",
+        policy.policyPeriod
+      );
+      await SecureStore.setItemAsync(
+        "selected_policy_type",
+        "Health Insurance"
+      );
+
+      // Store the full policy data as JSON string
+      const fullPolicyData = {
+        id: policy.id,
+        policyNumber: policy.policyNumber,
+        policyID: policy.memberId,
+        policyPeriod: policy.policyPeriod,
+        type: "Health Insurance",
+        memNumber: policy.memberId,
+        endDate: new Date().toISOString(),
+      };
+
+      await SecureStore.setItemAsync(
+        "selected_policy_data",
+        JSON.stringify(fullPolicyData)
+      );
+
+      // ADDED: Set a flag to indicate policy was selected in AddPolicy
+      await SecureStore.setItemAsync("policy_selected_in_add_policy", "true");
+
+      console.log("Policy selected:", policy.policyNumber);
+      console.log("Member ID stored:", policy.memberId);
+
+      // Show success popup
+      showPopup(
+        "Policy Selected",
+        `Policy ${policy.policyNumber} has been selected successfully.`,
+        "success"
+      );
+
+      // Navigate back to home with a delay to show the success message
+      setTimeout(() => {
+        navigateToHomeWithRefresh();
+      }, 1500);
+    } catch (error) {
+      console.error("Error selecting policy:", error);
+      showPopup(
+        "Selection Error",
+        "Failed to select policy. Please try again.",
+        "error"
+      );
+    }
+  };
+
   const renderPolicyItem = ({ item }) => (
-    <View style={styles.policyCard}>
+    <TouchableOpacity
+      style={styles.policyCard}
+      onPress={() => handlePolicySelect(item)}
+      activeOpacity={0.7}
+    >
       <View style={styles.row}>
         <Text style={styles.label}>Policy Number :</Text>
         <Text style={styles.value}>{item.policyNumber}</Text>
-        <TouchableOpacity
-          onPress={() => handleDeletePolicy(item.id, item.policyNumber)}
-        >
-          <FontAwesome
-            name="trash"
-            size={18}
-            color="white"
-            style={{ marginLeft: 10 }}
-          />
-        </TouchableOpacity>
       </View>
-    </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Member Number :</Text>
+        <Text style={styles.value}>{item.memberId}</Text>
+      </View>
+      {/* Add a visual indicator that items are clickable */}
+      <View style={styles.clickIndicator}>
+        <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
+        <Icon name="arrow-right" size={16} color="#FFFFFF" />
+      </View>
+    </TouchableOpacity>
   );
 
   // Show loading screen during initial load
@@ -633,9 +650,9 @@ const AddPolicy = () => {
   if (loading && !initialLoading) {
     return (
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
-        <LoadingScreen 
-          text="Processing..." 
-          subText="Please wait while we process your request" 
+        <LoadingScreen
+          text="Processing..."
+          subText="Please wait while we process your request"
         />
       </LinearGradient>
     );
@@ -646,7 +663,7 @@ const AddPolicy = () => {
       <View style={styles.container}>
         <TouchableOpacity
           style={styles.header}
-          onPress={navigateToHomeWithRefresh}
+          onPress={() => navigateToHomeWithRefresh(true)}
         >
           <Ionicons name="arrow-back" size={24} color="#05445E" />
           <Text style={styles.title}>Manage Policy</Text>
@@ -684,8 +701,8 @@ const AddPolicy = () => {
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.addButton, loading && styles.buttonDisabled]} 
+        <TouchableOpacity
+          style={[styles.addButton, loading && styles.buttonDisabled]}
           onPress={handleAddPolicy}
           disabled={loading}
         >
@@ -748,12 +765,12 @@ const styles = StyleSheet.create({
   // Custom Loading Styles
   loadingOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 30,
     minWidth: 200,
     minHeight: 150,
@@ -765,32 +782,32 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#16858D',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#6DD3D3',
+    borderColor: "#6DD3D3",
   },
   loadingIconInner: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#17ABB7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '600',
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
     marginBottom: 5,
   },
   loadingSubText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   inputLabel: {
     fontSize: 14,
@@ -855,6 +872,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
   infoText: {
     color: "white",
@@ -914,17 +933,17 @@ const styles = StyleSheet.create({
   // Popup Styles with Blur Background
   popupOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
     backgroundColor: "white",
@@ -1006,5 +1025,20 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
+  },
+  clickIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.3)",
+  },
+  clickIndicatorText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontStyle: "italic",
+    opacity: 0.8,
   },
 });
