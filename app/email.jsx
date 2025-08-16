@@ -309,9 +309,9 @@ function EmailVerificationContent() {
 
             {/* Footer */}
             <View style={styles.footerContainer}>
-              <Text style={styles.troubleText}>Having Trouble ?</Text>
+              <Text style={styles.troubleText}>Having Trouble?</Text>
               <TouchableOpacity onPress={makePhoneCall}>
-                <Text style={styles.contactText}>Contact Us 011 - 2357357</Text>
+                <Text style={styles.contactText}>Contact Us 0112 - 357357</Text>
               </TouchableOpacity>
             </View>
           </View>

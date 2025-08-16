@@ -14,7 +14,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -58,6 +58,8 @@ export default function PolicyHome({ route }) {
   const [policyInfo, setPolicyInfo] = useState(null);
   const [isLoadingPolicyInfo, setIsLoadingPolicyInfo] = useState(false);
   const [isDropdownDisabled, setIsDropdownDisabled] = useState(false);
+  const [isManualPolicySelection, setIsManualPolicySelection] = useState(false);
+  const [isFromAddPolicy, setIsFromAddPolicy] = useState(false);
 
   // Add new loading state for policy selection
   const [isLoadingPolicySelection, setIsLoadingPolicySelection] =
@@ -84,17 +86,48 @@ export default function PolicyHome({ route }) {
     React.useCallback(() => {
       const refreshPageData = async () => {
         try {
-          // Check if we should refresh (you can set a flag in SecureStore when navigating)
+          // Check if we should refresh
           const shouldRefresh = await SecureStore.getItemAsync(
             "should_refresh_home"
+          );
+
+          // Check if navigation is from AddPolicy back button
+          const fromAddPolicy = await SecureStore.getItemAsync(
+            "from_add_policy"
+          );
+
+          // ADDED: Check if policy was selected in AddPolicy
+          const policySelectedInAddPolicy = await SecureStore.getItemAsync(
+            "policy_selected_in_add_policy"
           );
 
           // Also check for refresh parameter from navigation
           const shouldRefreshFromNav = route?.params?.refreshPendingClaims;
 
-          if (shouldRefresh === "true" || shouldRefreshFromNav) {
-            // Clear the refresh flag
+          if (
+            shouldRefresh === "true" ||
+            shouldRefreshFromNav ||
+            fromAddPolicy === "true" ||
+            policySelectedInAddPolicy === "true"
+          ) {
+            // Clear the refresh flags
             await SecureStore.deleteItemAsync("should_refresh_home");
+
+            // ADDED: Clear the policy selection flag
+            if (policySelectedInAddPolicy === "true") {
+              await SecureStore.deleteItemAsync(
+                "policy_selected_in_add_policy"
+              );
+            }
+
+            // Set the fromAddPolicy flag for modal behavior - MODIFIED: Don't delete the flag yet
+            if (fromAddPolicy === "true") {
+              setIsFromAddPolicy(true);
+              // Don't delete the flag here - we'll delete it after showing the modal
+              console.log(
+                "Coming from AddPolicy back button - will show policy selection modal"
+              );
+            }
 
             // Clear navigation parameter
             if (shouldRefreshFromNav) {
@@ -422,7 +455,6 @@ export default function PolicyHome({ route }) {
     return `${day}/${month}/${year}`;
   };
 
-  // Function to fetch policies from API
   const fetchPolicies = async () => {
     try {
       setIsLoadingPolicies(true);
@@ -446,20 +478,16 @@ export default function PolicyHome({ route }) {
         }
       );
 
-      // Check if response is ok
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Get response text first to check what we're receiving
       const responseText = await response.text();
 
-      // Check if response is empty
       if (!responseText || responseText.trim() === "") {
         throw new Error("Empty response from server");
       }
 
-      // Try to parse JSON
       let result;
       try {
         result = JSON.parse(responseText);
@@ -470,7 +498,6 @@ export default function PolicyHome({ route }) {
       }
 
       if (result.success && result.data) {
-        // Transform API data to match the expected format
         const transformedPolicies = result.data.map((policy, index) => ({
           id: index + 1,
           policyNumber: policy.policyNumber,
@@ -479,7 +506,7 @@ export default function PolicyHome({ route }) {
             policy.policyStartDate,
             policy.policyEndDate
           ),
-          type: "Health Insurance", // Default type since it's not in API response
+          type: "Health Insurance",
           nicNumber: policy.nicNumber,
           memNumber: policy.memNumber,
           policyStartDate: policy.policyStartDate,
@@ -489,13 +516,87 @@ export default function PolicyHome({ route }) {
 
         setAvailablePolicies(transformedPolicies);
 
-        // If no policy selected and policies are available, show selection modal
-        if (
+        // Check if policy is already selected
+        const storedPolicyNumber = await SecureStore.getItemAsync(
+          "selected_policy_number"
+        );
+        const storedMemberNumber = await SecureStore.getItemAsync(
+          "selected_member_number"
+        );
+
+        // Check again if coming from AddPolicy (in case the state was missed)
+        const fromAddPolicyFlag = await SecureStore.getItemAsync(
+          "from_add_policy"
+        );
+        const isComingFromAddPolicy =
+          isFromAddPolicy || fromAddPolicyFlag === "true";
+
+        console.log("fetchPolicies - isFromAddPolicy:", isFromAddPolicy);
+        console.log("fetchPolicies - fromAddPolicyFlag:", fromAddPolicyFlag);
+        console.log(
+          "fetchPolicies - isComingFromAddPolicy:",
+          isComingFromAddPolicy
+        );
+
+        // FIXED: Always show policy selection modal if coming from AddPolicy back button
+        if (isComingFromAddPolicy && transformedPolicies.length > 0) {
+          console.log(
+            "Showing policy selection modal because coming from AddPolicy"
+          );
+
+          // Clear the flag now that we're about to show the modal
+          await SecureStore.deleteItemAsync("from_add_policy");
+
+          setTimeout(() => {
+            setIsManualPolicySelection(false); // No close button for back navigation
+            setShowPolicySelection(true);
+            Animated.timing(policySelectSlideAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+
+            // Reset the fromAddPolicy flag after showing modal
+            setIsFromAddPolicy(false);
+          }, 500);
+
+          return; // Exit early after showing modal
+        }
+
+        // Original logic for other cases
+        if (storedPolicyNumber && storedMemberNumber) {
+          console.log("Policy already selected, skipping modal");
+          setSelectedPolicyNumber(storedPolicyNumber);
+          setIsFirstTime(false);
+
+          // Find the selected policy and set policy details
+          const selectedPolicy = transformedPolicies.find(
+            (policy) => policy.policyNumber === storedPolicyNumber
+          );
+
+          if (selectedPolicy) {
+            setPolicyDetails({
+              policyID: selectedPolicy.policyID,
+              policyNumber: selectedPolicy.policyNumber,
+              policyPeriod: selectedPolicy.policyPeriod,
+              type: selectedPolicy.type,
+              endDate: formatDate(selectedPolicy.endDate),
+            });
+          }
+
+          return; // Exit early, don't show modal
+        }
+
+        // Show modal for first-time users or when no policy is selected
+        const shouldShowModal =
           !selectedPolicyNumber &&
           transformedPolicies.length > 0 &&
-          isFirstTime
-        ) {
+          isFirstTime &&
+          !(await SecureStore.getItemAsync("policy_selected_in_add_policy"));
+
+        if (shouldShowModal) {
           setTimeout(() => {
+            setIsManualPolicySelection(false);
             setShowPolicySelection(true);
             Animated.timing(policySelectSlideAnim, {
               toValue: 0,
@@ -576,7 +677,6 @@ export default function PolicyHome({ route }) {
       // 1. Clear all existing data first
       await clearAllData();
 
-      // 2. Store new policy data in SecureStore
       await SecureStore.setItemAsync(
         "selected_policy_number",
         policy.policyNumber
@@ -635,7 +735,7 @@ export default function PolicyHome({ route }) {
         refreshMembersData(),
         refreshDependentsData(),
       ]);
-
+      setIsManualPolicySelection(false);
       console.log("Policy selection completed and all data refreshed");
     } catch (error) {
       console.error("Error during policy selection:", error);
@@ -791,8 +891,6 @@ export default function PolicyHome({ route }) {
                 }
               }
 
-              // If API call was successful, proceed with local cleanup
-              // Remove policy from the list
               const updatedPolicies = availablePolicies.filter(
                 (policy) => policy.id !== policyId
               );
@@ -811,18 +909,6 @@ export default function PolicyHome({ route }) {
                 await clearStoredPolicyData();
                 console.log("Cleared stored policy data");
               }
-
-              // If no policies left, close modal and navigate to AddPolicy
-              if (updatedPolicies.length === 0) {
-                handleClosePolicySelection();
-                // Navigate to AddPolicy page after a short delay
-                setTimeout(() => {
-                  router.push("/AddPolicy");
-                }, 300);
-              }
-
-              // Show success message
-              Alert.alert("Success", "Policy deleted successfully.");
             } catch (error) {
               console.error("Error deleting policy:", error);
               Alert.alert(
@@ -943,14 +1029,16 @@ export default function PolicyHome({ route }) {
   };
 
   const handleClosePolicySelection = () => {
-    // Only close if a policy has been selected
-    if (selectedPolicyNumber) {
+    // Only allow closing if it's a manual selection AND a policy has been selected
+    if (isManualPolicySelection && selectedPolicyNumber) {
       Animated.timing(policySelectSlideAnim, {
         toValue: screenHeight,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
         setShowPolicySelection(false);
+        setIsManualPolicySelection(false); // Reset the flag
+        setIsFromAddPolicy(false); // Reset this flag too
       });
     }
   };
@@ -1018,6 +1106,7 @@ export default function PolicyHome({ route }) {
   };
 
   const showPolicySelectionModal = () => {
+    setIsManualPolicySelection(true); // Mark as manual selection
     setShowPolicySelection(true);
     Animated.timing(policySelectSlideAnim, {
       toValue: 0,
@@ -1175,7 +1264,12 @@ export default function PolicyHome({ route }) {
                 resizeMode="contain"
               />
               <Text style={styles.userName}>{displayMemberName()}</Text>
-              <Icon style={{ marginRight: 10 }} name="chevron-down" size={16} color="#666" />
+              <Icon
+                style={{ marginRight: 10 }}
+                name="chevron-down"
+                size={16}
+                color="#666"
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -1224,7 +1318,7 @@ export default function PolicyHome({ route }) {
             </View>
             <View style={styles.memberActions}>
               <View style={styles.totalBadge}>
-                <Text style={styles.totalText}>Total  </Text>
+                <Text style={styles.totalText}>Total </Text>
                 <Text style={styles.totalNumber}>
                   {membersCount.toString().padStart(2, "0")}
                 </Text>
@@ -1345,14 +1439,13 @@ export default function PolicyHome({ route }) {
         transparent
         animationType="none"
         onRequestClose={() => {
-          // Prevent closing modal with back button if no policy selected
-          if (selectedPolicyNumber) {
+          // Only allow back button to close if it's manual selection and policy is selected
+          if (isManualPolicySelection && selectedPolicyNumber) {
             handleClosePolicySelection();
           }
         }}
       >
         <View style={styles.overlay}>
-          {/* Remove the TouchableOpacity that was allowing outside clicks */}
           <Animated.View
             style={[
               styles.policySelectionModal,
@@ -1364,24 +1457,63 @@ export default function PolicyHome({ route }) {
               <Text style={styles.policyModalSubtitle}>
                 Please select a policy to continue
               </Text>
+
+              {/* Conditionally render close button */}
+              {isManualPolicySelection && selectedPolicyNumber && (
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleClosePolicySelection}
+                >
+                  <Icon name="times" size={20} color="#666" />
+                </TouchableOpacity>
+              )}
             </View>
+
             <ScrollView style={styles.policyList}>
               {isLoadingPolicies ? (
                 <View style={styles.loadingContainer}>
                   <Text style={styles.loadingText}>Loading policies...</Text>
                 </View>
               ) : availablePolicies.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No policies found</Text>
+                // No Policies Found - Add Policy Button
+                <View style={styles.noPoliciesContainer}>
+                  <Text style={styles.noPoliciesTitle}>No Policies Found</Text>
+                  <Text style={styles.noPoliciesMessage}>
+                    You don't have any policies associated with your account
+                    yet.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.addPolicyButton}
+                    onPress={() => {
+                      // Close modal first
+                      setShowPolicySelection(false);
+                      // Navigate to AddPolicy page
+                      router.push("/AddPolicy");
+                    }}
+                  >
+                    <Icon
+                      name="plus"
+                      size={20}
+                      color="#FFFFFF"
+                      style={styles.addPolicyIcon}
+                    />
+                    <Text style={styles.addPolicyButtonText}>
+                      Add New Policy
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.noPoliciesHelp}>
+                    Need help? Contact us at 0112-357357
+                  </Text>
                 </View>
               ) : (
+                // Existing policy list
                 availablePolicies.map((policy) => (
                   <View key={policy.id} style={styles.policyItemContainer}>
                     <TouchableOpacity
                       style={[
                         styles.policyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                        styles.selectedPolicyItem,
+                          styles.selectedPolicyItem,
                       ]}
                       onPress={() => handlePolicySelection(policy)}
                     >
@@ -1576,9 +1708,10 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   logoContainer: {
-    display: 'flex',
-    alignItems: 'left'
-  }, userTouchableArea: {
+    display: "flex",
+    alignItems: "left",
+  },
+  userTouchableArea: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
@@ -1587,7 +1720,8 @@ const styles = StyleSheet.create({
   },
   logoRow: {
     alignItems: "center",
-    marginBottom: 15, marginTop: 15,
+    marginBottom: 15,
+    marginTop: 15,
     display: "flex",
     justifyContent: "left",
   },
@@ -1619,8 +1753,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   userSection: {
-    backgroundColor: 'white',
-    width: '100%',
+    backgroundColor: "white",
+    width: "100%",
     height: 50,
     borderRadius: 20,
     justifyContent: "center",
@@ -2071,5 +2205,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    padding: 10,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noPoliciesContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+    minHeight: 300,
+  },
+
+  noPoliciesTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  noPoliciesMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 30,
+    paddingHorizontal: 20,
+  },
+  addPolicyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#16858D",
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  addPolicyIcon: {
+    marginRight: 10,
+  },
+  addPolicyButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  noPoliciesHelp: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });
