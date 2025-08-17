@@ -73,7 +73,7 @@ const LoadingIcon = () => {
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ["0deg", "360deg"],
   });
 
   return (
@@ -167,13 +167,13 @@ const CustomPopup = ({
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
@@ -621,16 +621,16 @@ const UploadDocumentsSaved = ({ route }) => {
 
   // Check if file type is allowed (only jpg, jpeg, png)
   const isAllowedFileType = (mimeType, name) => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const allowedExtensions = [".jpg", ".jpeg", ".png"];
 
     if (allowedTypes.includes(mimeType)) {
       return true;
     }
 
     // Fallback check using file extension
-    const extension = name.toLowerCase().split('.').pop();
-    return ['jpg', 'jpeg', 'png'].includes(extension);
+    const extension = name.toLowerCase().split(".").pop();
+    return ["jpg", "jpeg", "png"].includes(extension);
   };
 
   const handleBrowseFiles = async () => {
@@ -716,19 +716,11 @@ const UploadDocumentsSaved = ({ route }) => {
         setAmount("");
         setDocumentDate(new Date());
 
-        showPopup(
-          "Success",
-          "Document uploaded successfully!",
-          "success"
-        );
+        showPopup("Success", "Document uploaded successfully!", "success");
       }
     } catch (error) {
       console.error("Error picking document:", error);
-      showPopup(
-        "Error",
-        "Failed to pick document",
-        "error"
-      );
+      showPopup("Error", "Failed to pick document", "error");
     }
   };
 
@@ -826,11 +818,7 @@ const UploadDocumentsSaved = ({ route }) => {
       }
     } catch (error) {
       console.error("Error taking photo:", error);
-      showPopup(
-        "Error",
-        "Failed to take photo",
-        "error"
-      );
+      showPopup("Error", "Failed to take photo", "error");
     }
   };
 
@@ -845,11 +833,7 @@ const UploadDocumentsSaved = ({ route }) => {
           prev.filter((doc) => doc.id !== documentId)
         );
         hidePopup();
-        showPopup(
-          "Success",
-          "Document deleted successfully.",
-          "success"
-        );
+        showPopup("Success", "Document deleted successfully.", "success");
       }
     );
   };
@@ -863,11 +847,7 @@ const UploadDocumentsSaved = ({ route }) => {
           "warning"
         );
       } else {
-        showPopup(
-          "Validation Error",
-          "Please enter a valid amount",
-          "warning"
-        );
+        showPopup("Validation Error", "Please enter a valid amount", "warning");
       }
       return;
     }
@@ -884,11 +864,7 @@ const UploadDocumentsSaved = ({ route }) => {
     setEditingDocument(null);
     setEditAmount("");
     setEditDocumentType("");
-    showPopup(
-      "Success",
-      "Document details updated successfully.",
-      "success"
-    );
+    showPopup("Success", "Document details updated successfully.", "success");
   };
 
   const validateEditAmount = (amountString) => {
@@ -1157,7 +1133,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                      styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1168,7 +1144,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                          styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1180,7 +1156,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                          styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1206,15 +1182,15 @@ const UploadDocumentsSaved = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                  ? "Enter amount"
-                  : "0.00"
+                ? "Enter amount"
+                : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1226,7 +1202,8 @@ const UploadDocumentsSaved = ({ route }) => {
             <Text style={styles.helpText}>
               Please select a document type first to enable amount input
             </Text>
-          ) : selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
+          ) : selectedDocumentType === "O02" ||
+            selectedDocumentType === "O03" ? (
             <Text style={styles.helpText}>
               Amount is automatically set to 0.00 for{" "}
               {getDocumentTypeLabel(selectedDocumentType)}
@@ -1236,11 +1213,11 @@ const UploadDocumentsSaved = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                  styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
-                ? "Amount is required for Bill type"
+                ? "Amount is required and must be greater than 0 for Bill type"
                 : "Amount is required for Bill type"}
             </Text>
           ) : null}
@@ -1313,7 +1290,7 @@ const UploadDocumentsSaved = ({ route }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Document</Text>
               <Text style={styles.sectionSubtitle}>
-                Maximum file size: 5MB. Allowed formats: JPG, JPEG, PNG only
+                Allowed formats: JPG, JPEG, PNG only
               </Text>
 
               <Text
@@ -1347,7 +1324,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1366,7 +1343,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1381,7 +1358,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1400,7 +1377,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1455,19 +1432,10 @@ const UploadDocumentsSaved = ({ route }) => {
 
         {/* Add Document Button */}
         <TouchableOpacity
-          style={[
-            styles.addDocumentButton,
-            uploadedDocuments.length === 0 && styles.addDocumentButtonDisabled
-          ]}
-          onPress={handleAddDocumentButton}
-          disabled={uploadedDocuments.length === 0}
+          style={styles.addDocumentButton}
+          onPress={handleAddDocument}
         >
-          <Text style={[
-            styles.addDocumentButtonText,
-            uploadedDocuments.length === 0 && styles.addDocumentButtonTextDisabled
-          ]}>
-            Add Document
-          </Text>
+          <Text style={styles.addDocumentButtonText}>Add Document</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -1532,7 +1500,7 @@ const UploadDocumentsSaved = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                    editDocumentType.slice(1)
+                      editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1557,7 +1525,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
+                editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
@@ -1642,12 +1610,12 @@ const styles = StyleSheet.create({
   // Loading Screen Styles
   loadingOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 30,
     minWidth: 200,
     minHeight: 150,
@@ -1659,32 +1627,32 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#16858D',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#6DD3D3',
+    borderColor: "#6DD3D3",
   },
   loadingIconInner: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#17ABB7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '600',
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
     marginBottom: 5,
   },
   loadingSubText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   patientInfoCard: {
     backgroundColor: "#fff",
@@ -2009,14 +1977,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-  addDocumentButtonDisabled: {
-    backgroundColor: "#bfbfbf",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  addDocumentButtonTextDisabled: {
-    color: "#666",
-  },
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -2164,17 +2124,17 @@ const styles = StyleSheet.create({
   // Popup Styles
   popupOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
     backgroundColor: "white",

@@ -661,14 +661,15 @@ const AddPolicy = () => {
   return (
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
       <View style={styles.container}>
-        <TouchableOpacity
-          style={styles.header}
-          onPress={() => navigateToHomeWithRefresh(true)}
-        >
-          <Ionicons name="arrow-back" size={24} color="#05445E" />
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigateToHomeWithRefresh(true)}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#05445E" />
+          </TouchableOpacity>
           <Text style={styles.title}>Manage Policy</Text>
-        </TouchableOpacity>
-
+        </View>
         {deletedPolicies.length > 0 && (
           <View style={{ marginBottom: 10 }}>
             <View style={styles.sectionTitleContainer}>
@@ -749,18 +750,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    marginTop: 30,
-  },
-  title: {
-    fontSize: 20,
-    color: "#05445E",
-    fontWeight: "bold",
-    marginLeft: 20,
   },
   // Custom Loading Styles
   loadingOverlay: {
@@ -1040,5 +1029,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: "italic",
     opacity: 0.8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 30,
+  },
+  backButton: {
+    padding: 5, // Add some padding for better touch area
+  },
+  title: {
+    fontSize: 20,
+    color: "#05445E",
+    fontWeight: "bold",
+    marginLeft: 15, // Adjust spacing between arrow and title
   },
 });
