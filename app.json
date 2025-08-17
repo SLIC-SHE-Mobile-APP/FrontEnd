@@ -4,21 +4,18 @@
     "slug": "SLIC-SHE-Application",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/general.png",
+    "icon": "./assets/images/SHEMobileApp.png",
     "scheme": "slicsheapplication",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/images/SHEMobileApp.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/general.png",
+        "foregroundImage": "./assets/images/SHEMobileApp.png",
         "backgroundColor": "#ffffff"
-      },
-      "ios": {
-        "supportsTablet": true,
-        "icon": "./assets/images/general.png"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.SLICSHEApplication"
@@ -26,15 +23,15 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/general.png"
+      "favicon": "./assets/images/SHEMobileApp.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/general.png",
-          "imageWidth": 150,
+          "image": "./assets/images/SHEMobileApp.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }

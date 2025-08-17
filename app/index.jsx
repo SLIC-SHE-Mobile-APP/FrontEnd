@@ -10,7 +10,7 @@ import OTPVerification from './OTPVerification.jsx';
 
 export default function HomeScreen() {
   return (
-    <Home/>
+    <LoginRequestOTP/>
   );
 }
 const styles = StyleSheet.create({

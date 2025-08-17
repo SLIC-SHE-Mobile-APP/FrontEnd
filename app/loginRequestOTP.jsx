@@ -158,6 +158,7 @@ function LoginRequestOTPContent() {
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [popup, setPopup] = useState({
     visible: false,
     title: "",
@@ -169,6 +170,11 @@ function LoginRequestOTPContent() {
 
   const slideAnim = new Animated.Value(0);
   const insets = useSafeAreaInsets();
+
+  // Load saved user credentials on component mount
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -202,6 +208,58 @@ function LoginRequestOTPContent() {
       keyboardDidHideListener?.remove();
     };
   }, []);
+
+  // Load saved credentials from SecureStore
+  const loadSavedCredentials = async () => {
+    try {
+      const savedNIC = await SecureStore.getItemAsync("saved_user_nic");
+      const savedMobile = await SecureStore.getItemAsync("saved_user_mobile");
+      
+      if (savedNIC) {
+        setNIC(savedNIC);
+      }
+      if (savedMobile) {
+        setMobile(savedMobile);
+      }
+      
+      setIsDataLoaded(true);
+      
+      // Optional: Show a subtle indicator that data was restored
+      if (savedNIC || savedMobile) {
+        console.log("Previous login credentials restored");
+      }
+    } catch (error) {
+      console.error("Error loading saved credentials:", error);
+      setIsDataLoaded(true);
+    }
+  };
+
+  // Save user credentials to SecureStore
+  const saveCredentials = async (nicValue, mobileValue) => {
+    try {
+      // Only save if both values are valid
+      if (validateNIC(nicValue) && mobileValue && mobileValue.length >= 9) {
+        await SecureStore.setItemAsync("saved_user_nic", nicValue);
+        await SecureStore.setItemAsync("saved_user_mobile", mobileValue);
+        await SecureStore.setItemAsync("credentials_saved_at", new Date().toISOString());
+        console.log("User credentials saved for future logins");
+      }
+    } catch (error) {
+      console.error("Error saving credentials:", error);
+    }
+  };
+
+  // Clear saved credentials (optional function for logout or reset)
+  const clearSavedCredentials = async () => {
+    try {
+      await SecureStore.deleteItemAsync("saved_user_nic");
+      await SecureStore.deleteItemAsync("saved_user_mobile");
+      await SecureStore.deleteItemAsync("credentials_saved_at");
+      console.log("Saved credentials cleared");
+    } catch (error) {
+      console.error("Error clearing saved credentials:", error);
+    }
+  };
 
   // Show popup function
   const showPopup = (
@@ -356,6 +414,9 @@ function LoginRequestOTPContent() {
       if (result.success && result.isValid && result.otpSent) {
         // Store the mobile number and NIC number from API response securely
         await storeUserData(result.mobileNumber, result.nicNumber);
+        
+        // Save credentials for future logins (auto-fill feature)
+        await saveCredentials(nic, mobile);
 
         const maskedNumber = maskPhoneNumber(mobile);
 
@@ -411,6 +472,16 @@ function LoginRequestOTPContent() {
       setLoading(false);
     }
   };
+
+  // Show loading indicator while credentials are being loaded
+  if (!isDataLoaded) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#4ECDC4" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -475,6 +546,13 @@ function LoginRequestOTPContent() {
                   autoCapitalize="characters"
                   editable={!loading}
                 />
+                {nic && (
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    
+                  >
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -499,6 +577,12 @@ function LoginRequestOTPContent() {
                   maxLength={9}
                   editable={!loading}
                 />
+                {mobile && (
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                  >
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -562,6 +646,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#4ECDC4",
   },
   topSection: {
     flex: 0.6,
@@ -654,9 +747,9 @@ const styles = StyleSheet.create({
   },
   sheDigitalText: {
     color: "#FF4757", 
-  fontSize: 18,
-  fontWeight: "500", 
-  textAlign: "center",
+    fontSize: 18,
+    fontWeight: "500", 
+    textAlign: "center",
   },
   logInText: {
     fontSize: 18,
@@ -689,6 +782,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#333",
+  },
+  clearButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   countryCodeContainer: {
     marginRight: 10,

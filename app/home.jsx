@@ -1031,8 +1031,8 @@ export default function PolicyHome({ route }) {
   };
 
   const handleClosePolicySelection = () => {
-    // Allow closing if it's a manual selection OR if a policy has been selected (modified condition)
-    if (isManualPolicySelection || selectedPolicyNumber) {
+    // Allow closing when user has a selected policy
+    if (selectedPolicyNumber) {
       Animated.timing(policySelectSlideAnim, {
         toValue: screenHeight,
         duration: 300,
@@ -1441,8 +1441,8 @@ export default function PolicyHome({ route }) {
         transparent
         animationType="none"
         onRequestClose={() => {
-          // Only allow back button to close if it's manual selection and policy is selected
-          if (isManualPolicySelection && selectedPolicyNumber) {
+          // Allow back button to close if there's a selected policy
+          if (selectedPolicyNumber) {
             handleClosePolicySelection();
           }
         }}
@@ -1460,8 +1460,8 @@ export default function PolicyHome({ route }) {
                 Please select a policy to continue
               </Text>
 
-              {/* Conditionally render close button */}
-              {isManualPolicySelection && selectedPolicyNumber && (
+              {/* Show close button when user has a currently selected policy */}
+              {selectedPolicyNumber && (
                 <TouchableOpacity
                   style={styles.closeButton}
                   onPress={handleClosePolicySelection}
@@ -1516,18 +1516,16 @@ export default function PolicyHome({ route }) {
                         styles.policyItem,
                         selectedPolicyNumber === policy.policyNumber &&
                           styles.selectedPolicyItem,
+                        selectedPolicyNumber === policy.policyNumber &&
+                          styles.disabledPolicyItem,
                       ]}
                       onPress={() => {
-                        // Modified logic: Close modal if clicking on currently selected policy
-                        if (selectedPolicyNumber === policy.policyNumber) {
-                          // Close the modal since user clicked on already selected policy
-                          handleClosePolicySelection();
-                        } else {
-                          // Select the new policy
+                        // Only allow selection if it's not the currently selected policy
+                        if (selectedPolicyNumber !== policy.policyNumber) {
                           handlePolicySelection(policy);
                         }
                       }}
-                      // Remove the disabled prop since we want to allow clicking on selected policy
+                      disabled={selectedPolicyNumber === policy.policyNumber}
                     >
                       <View style={styles.policyContent}>
                         <Text style={styles.policyNumber}>
@@ -2321,8 +2319,8 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   disabledPolicyItem: {
-    opacity: 0.6, 
-    backgroundColor: "#F5F5F5", 
+    opacity: 0.6,
+    backgroundColor: "#F5F5F5",
   },
   selectedIndicator: {
     flexDirection: "row",
@@ -2332,7 +2330,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E8E8E8",
   },
-  
+
   selectedText: {
     fontSize: 12,
     color: "#16858D",
