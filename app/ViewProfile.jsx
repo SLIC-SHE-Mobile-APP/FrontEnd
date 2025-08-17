@@ -269,7 +269,6 @@ export default function ViewProfile() {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
           </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>View Profile</ThemedText>
         </View>
 
         {/* Profile Image Section */}

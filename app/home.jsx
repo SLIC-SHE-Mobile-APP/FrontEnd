@@ -927,6 +927,8 @@ export default function PolicyHome({ route }) {
       navigation.navigate("HealthPolicyDetails");
     } else if (label === "Add") {
       router.push("/AddPolicy");
+    } else if (label === "Manage Policy") {
+      router.push("/AddPolicy");
     } else if (label === "Profile") {
       router.push("/userDetails");
     }
@@ -1029,8 +1031,8 @@ export default function PolicyHome({ route }) {
   };
 
   const handleClosePolicySelection = () => {
-    // Only allow closing if it's a manual selection AND a policy has been selected
-    if (isManualPolicySelection && selectedPolicyNumber) {
+    // Allow closing if it's a manual selection OR if a policy has been selected (modified condition)
+    if (isManualPolicySelection || selectedPolicyNumber) {
       Animated.timing(policySelectSlideAnim, {
         toValue: screenHeight,
         duration: 300,
@@ -1428,7 +1430,7 @@ export default function PolicyHome({ route }) {
 
       <View style={styles.navbar}>
         {renderNavItem("home", "Home", handleNavigation)}
-        {renderNavItem("bell", "Notification", handleNavigation)}
+        {renderNavItem("plus", "Manage Policy", handleNavigation)}
         {renderNavItem("file-text", "Policy Details", handleNavigation)}
         {renderNavItem("user", "Profile", handleNavigation)}
       </View>
@@ -1515,18 +1517,56 @@ export default function PolicyHome({ route }) {
                         selectedPolicyNumber === policy.policyNumber &&
                           styles.selectedPolicyItem,
                       ]}
-                      onPress={() => handlePolicySelection(policy)}
+                      onPress={() => {
+                        // Modified logic: Close modal if clicking on currently selected policy
+                        if (selectedPolicyNumber === policy.policyNumber) {
+                          // Close the modal since user clicked on already selected policy
+                          handleClosePolicySelection();
+                        } else {
+                          // Select the new policy
+                          handlePolicySelection(policy);
+                        }
+                      }}
+                      // Remove the disabled prop since we want to allow clicking on selected policy
                     >
                       <View style={styles.policyContent}>
                         <Text style={styles.policyNumber}>
-                          {policy.policyNumber}
+                          <Text style={styles.policyLabel}>
+                            Policy Number:{" "}
+                          </Text>
+                          <Text style={styles.policyValue}>
+                            {policy.policyNumber}
+                          </Text>
                         </Text>
-                        <Text style={styles.policyID}>
-                          Member: {policy.policyID}
+                        <Text style={styles.policyNumber}>
+                          <Text style={styles.policyLabel}>
+                            Member Number:{" "}
+                          </Text>
+                          <Text style={styles.policyValue}>
+                            {policy.policyID}
+                          </Text>
                         </Text>
-                        <Text style={styles.policyPeriod}>
-                          {policy.policyPeriod}
+                        <Text style={styles.policyNumber}>
+                          <Text style={styles.policyLabel}>
+                            Policy Period:{" "}
+                          </Text>
+                          <Text style={styles.policyValue}>
+                            {policy.policyPeriod}
+                          </Text>
                         </Text>
+                        {/* Add "Currently Selected" indicator */}
+                        {selectedPolicyNumber === policy.policyNumber && (
+                          <View style={styles.selectedIndicator}>
+                            <Icon
+                              name="check-circle"
+                              size={16}
+                              color="#16858D"
+                            />
+                            <Text style={styles.selectedText}>
+                              Currently Selected
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -2162,14 +2202,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   policyNumber: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 14,
     color: "#333",
     marginBottom: 4,
   },
   policyPeriod: {
     fontSize: 14,
-    color: "#666",
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 2,
   },
   policyID: {
@@ -2269,5 +2309,34 @@ const styles = StyleSheet.create({
     color: "#999",
     textAlign: "center",
     fontStyle: "italic",
+  },
+  policyLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  policyValue: {
+    fontSize: 14,
+    fontWeight: "normal",
+    color: "#333",
+  },
+  disabledPolicyItem: {
+    opacity: 0.6, 
+    backgroundColor: "#F5F5F5", 
+  },
+  selectedIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E8E8E8",
+  },
+  
+  selectedText: {
+    fontSize: 12,
+    color: "#16858D",
+    fontWeight: "500",
+    marginLeft: 5,
   },
 });
