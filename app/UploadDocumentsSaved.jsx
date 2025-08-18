@@ -247,16 +247,16 @@ const UploadDocumentsSaved = ({ route }) => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDocument, setEditingDocument] = useState(null);
-  const [editAmount, setEditAmount] = useState("");
-  const [editDocumentType, setEditDocumentType] = useState("");
-  const [documentTypes, setDocumentTypes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [storedReferenceNo, setStoredReferenceNo] = useState("");
-  const [storedNic, setStoredNic] = useState("");
-  const [selectedDocId, setSelectedDocId] = useState("");
-  const [storedDocAmount, setStoredDocAmount] = useState(0);
+  const [showEditModal, setShowEditModal] = useState(false);0
+  const [editingDocument, setEditingDocument] = useState(null);0
+  const [editAmount, setEditAmount] = useState("");0
+  const [editDocumentType, setEditDocumentType] = useState("");0
+  const [documentTypes, setDocumentTypes] = useState([]);0
+  const [loading, setLoading] = useState(true);0
+  const [storedReferenceNo, setStoredReferenceNo] = useState("");0
+  const [storedNic, setStoredNic] = useState("");0
+  const [selectedDocId, setSelectedDocId] = useState("");0
+  const [storedDocAmount, setStoredDocAmount] = useState(0);0
 
   // Popup state
   const [popup, setPopup] = useState({
@@ -1106,12 +1106,19 @@ const UploadDocumentsSaved = ({ route }) => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Patient Info Display */}
-        {patientData.patientName && (
+        {(patientData.patientName || storedReferenceNo) && (
           <View style={styles.patientInfoCard}>
             <Text style={styles.patientInfoTitle}>Patient Information</Text>
-            <Text style={styles.patientName}>
-              Name: {patientData.patientName}
-            </Text>
+            {storedReferenceNo && (
+              <Text style={styles.patientReferenceNo}>
+                Reference No: {storedReferenceNo}
+              </Text>
+            )}
+            {patientData.patientName && (
+              <Text style={styles.patientName}>
+                Name: {patientData.patientName}
+              </Text>
+            )}
             {patientData.illness && (
               <Text style={styles.patientIllness}>
                 Illness: {patientData.illness}
@@ -1119,7 +1126,6 @@ const UploadDocumentsSaved = ({ route }) => {
             )}
           </View>
         )}
-
         {/* Document Type Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Document Type</Text>
@@ -1133,7 +1139,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                      styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1144,7 +1150,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                          styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1156,7 +1162,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                          styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1182,15 +1188,15 @@ const UploadDocumentsSaved = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.textInputError,
+              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+              styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                ? "Enter amount"
-                : "0.00"
+                  ? "Enter amount"
+                  : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1213,7 +1219,7 @@ const UploadDocumentsSaved = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                  styles.errorText,
+                styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1324,7 +1330,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1343,7 +1349,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1358,7 +1364,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1377,7 +1383,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1500,7 +1506,7 @@ const UploadDocumentsSaved = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                      editDocumentType.slice(1)
+                    editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1525,7 +1531,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                editDocumentType === "diagnosis" ? (
+                  editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>

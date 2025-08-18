@@ -1353,21 +1353,73 @@ const UploadDocuments = ({ route }) => {
         <View style={styles.placeholder} />
       </View>
 
+
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Patient Info Display */}
-        {patientData.patientName && (
-          <View style={styles.patientInfoCard}>
+        {/* Patient Info Display - Updated */}
+        <View style={styles.patientInfoCard}>
+          <View style={styles.patientInfoHeader}>
             <Text style={styles.patientInfoTitle}>Patient Information</Text>
-            <Text style={styles.patientName}>
-              Name: {patientData.patientName}
-            </Text>
-            {patientData.illness && (
-              <Text style={styles.patientIllness}>
-                Illness: {patientData.illness}
-              </Text>
-            )}
+            <View style={styles.patientInfoActions}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  // Handle edit action
+                  console.log("Edit patient info");
+                  // You can add your edit logic here
+                }}
+              >
+               <Ionicons name="create-outline" size={22} color="#2E7D7D" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  showPopup(
+                    "Delete Patient Info",
+                    "Are you sure you want to delete this patient information?",
+                    "warning",
+                    true,
+                    () => {
+                      // Handle delete action
+                      console.log("Delete patient info");
+                      hidePopup();
+                      showPopup(
+                        "Success",
+                        "Patient information deleted successfully.",
+                        "success"
+                      );
+                    }
+                  );
+                }}
+              >
+                <Ionicons name="trash-outline" size={22} color="#2E7D7D" />
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
+
+          <View style={styles.patientInfoContent}>
+            <View style={styles.patientInfoRow}>
+              <Text style={styles.patientInfoLabel}>Reference No:</Text>
+              <Text style={styles.patientInfoValue}>
+                {storedReferenceNo || referenceNo || "N/A"}
+              </Text>
+            </View>
+
+            <View style={styles.patientInfoRow}>
+              <Text style={styles.patientInfoLabel}>Patient Name:</Text>
+              <Text style={styles.patientInfoValue}>
+                {storedPatientName || patientData.patientName || "N/A"}
+              </Text>
+            </View>
+
+            <View style={styles.patientInfoRow}>
+              <Text style={styles.patientInfoLabel}>Illness:</Text>
+              <Text style={styles.patientInfoValue}>
+                {storedIllness || illness || patientData.illness || "N/A"}
+              </Text>
+            </View>
+          </View>
+        </View>
 
         {/* CLAIM AMOUNT DISPLAY */}
         {fromEditClaim && (
@@ -1383,6 +1435,7 @@ const UploadDocuments = ({ route }) => {
             )}
           </View>
         )}
+
 
         {/* Document Type Selection */}
         <View style={styles.section}>
@@ -1924,6 +1977,48 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  patientInfoHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  patientInfoActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F8F9FA",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E9ECEF",
+  },
+  patientInfoContent: {
+    gap: 12,
+  },
+  patientInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 2,
+  },
+  patientInfoLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#13646D",
+    flex: 0.4,
+  },
+  patientInfoValue: {
+    fontSize: 14,
+    color: "#333",
+    flex: 0.6,
+    textAlign: "right",
+    flexWrap: "wrap",
   },
   patientInfoCard: {
     backgroundColor: "#fff",
