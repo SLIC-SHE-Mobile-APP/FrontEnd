@@ -171,6 +171,334 @@ const EditClaimIntimation = ({ route }) => {
   const [showEditDatePicker, setShowEditDatePicker] = useState(false);
   const [isEditDocTypeDropdownVisible, setEditDocTypeDropdownVisible] =
     useState(false);
+  const [memberOptions, setMemberOptions] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [isDropdownVisible, setDropdownVisible] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [isEditBeneficiaryModalVisible, setEditBeneficiaryModalVisible] = useState(false);
+  const [selectedBeneficiary, setSelectedBeneficiary] = useState(null);
+  const [newBeneficiary, setNewBeneficiary] = useState({
+    name: "",
+    relationship: "",
+    illness: "",
+    amount: "",
+  });
+
+
+  const fetchDependents = async () => {
+    try {
+      setLoadingMembers(true);
+      console.log("Fetching dependents data...");
+
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+
+      if (!policyNumber || !memberNumber) {
+        console.log("Policy number or member number not found in SecureStore");
+        setMemberOptions([]);
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const dependentsData = await response.json();
+      console.log("Dependents API response:", dependentsData);
+
+      const transformedMembers = dependentsData.map((dependent, index) => ({
+        id: index + 1,
+        name: dependent.dependentName,
+        relationship: dependent.relationship === "Employee" ? "Self" : dependent.relationship,
+        memberCode: dependent.memberCode,
+        birthDay: dependent.depndentBirthDay,
+        effectiveDate: dependent.effectiveDate,
+      }));
+
+      setMemberOptions(transformedMembers);
+      console.log("Transformed member options:", transformedMembers);
+    } catch (error) {
+      console.error("Error fetching dependents:", error);
+      showPopup("Error", "Failed to load member information. Please try again.", "error");
+      setMemberOptions([{ id: 1, name: "Unknown Member", relationship: "Self" }]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  // 3. Add these functions for beneficiary editing:
+  const handleEditBeneficiary = (beneficiary) => {
+    setSelectedBeneficiary(beneficiary);
+    const member = memberOptions.find((m) => m.name === beneficiary.name);
+    setSelectedMember(member);
+    setNewBeneficiary({
+      name: beneficiary.name,
+      relationship: beneficiary.relationship,
+      illness: beneficiary.illness,
+      amount: beneficiary.amount,
+    });
+    setEditBeneficiaryModalVisible(true);
+  };
+
+  const handleMemberSelect = (member) => {
+    setSelectedMember(member);
+    setNewBeneficiary((prev) => ({
+      ...prev,
+      name: member.name,
+      relationship: member.relationship,
+    }));
+    setDropdownVisible(false);
+  };
+
+  const updateIntimationAPI = async (beneficiaryData) => {
+    try {
+      console.log("Updating intimation via API:", beneficiaryData);
+
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const storedMobile = await SecureStore.getItemAsync("user_mobile");
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+
+      if (!policyNumber || !memberNumber || !storedMobile || !storedNic) {
+        throw new Error("Required user information not found in storage");
+      }
+
+      const updateIntimationData = {
+        policyNo: policyNumber,
+        memId: memberNumber,
+        contactNo: storedMobile,
+        createdBy: storedNic,
+        indOut: "O",
+        patientName: beneficiaryData.name,
+        illness: beneficiaryData.illness,
+        relationship: beneficiaryData.relationship,
+        claimSeqNo: claimDetails.referenceNo,
+      };
+
+      console.log("Update intimation request data:", updateIntimationData);
+
+      const response = await fetch(`${API_BASE_URL}/UpdateIntimation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateIntimationData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Update Intimation API Error Response:", errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log("Update intimation API response:", result);
+      return result;
+    } catch (error) {
+      console.error("Error updating intimation via API:", error);
+      throw error;
+    }
+  };
+
+  const handleSaveBeneficiaryEdit = async () => {
+    try {
+      if (!newBeneficiary.name || !newBeneficiary.relationship) {
+        showPopup("Validation Error", "Patient name and relationship are required.", "warning");
+        return;
+      }
+
+      if (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") {
+        showPopup("Validation Error", "Illness field is required.", "warning");
+        return;
+      }
+
+      console.log("Saving beneficiary edit with API integration...");
+
+      const beneficiaryDataForAPI = {
+        name: newBeneficiary.name,
+        relationship: newBeneficiary.relationship,
+        illness: newBeneficiary.illness.trim(),
+      };
+
+      await updateIntimationAPI(beneficiaryDataForAPI);
+
+      const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+
+      const updatedBeneficiaries = beneficiaries.map((item) =>
+        item.id === selectedBeneficiary.id
+          ? { ...item, ...newBeneficiary, amount: claimAmount }
+          : item
+      );
+
+      setBeneficiaries(updatedBeneficiaries);
+
+      setEditBeneficiaryModalVisible(false);
+      setDropdownVisible(false);
+      setSelectedMember(null);
+      setNewBeneficiary({
+        name: "",
+        relationship: "",
+        illness: "",
+        amount: "",
+      });
+
+      showPopup("Success", "Beneficiary information updated successfully!", "success");
+
+      console.log("Beneficiary edit saved successfully with API integration");
+    } catch (error) {
+      console.error("Error in handleSaveBeneficiaryEdit:", error);
+
+      if (error.message.includes("Required user information not found")) {
+        showPopup(
+          "Authentication Error",
+          "User information not found. Please logout and login again.",
+          "error"
+        );
+      } else if (error.message.includes("404")) {
+        showPopup(
+          "Not Found Error",
+          "The claim could not be found in the system. Please refresh and try again.",
+          "error",
+          true,
+          async () => {
+            hidePopup();
+            const referenceNo = claimDetails.referenceNo;
+            if (referenceNo) {
+              await retrieveBeneficiaryData(referenceNo);
+            }
+            setEditBeneficiaryModalVisible(false);
+            setDropdownVisible(false);
+            setSelectedMember(null);
+            setNewBeneficiary({
+              name: "",
+              relationship: "",
+              illness: "",
+              amount: "",
+            });
+          }
+        );
+      } else {
+        showPopup(
+          "Update Error",
+          `Failed to update beneficiary information: ${error.message}`,
+          "error"
+        );
+      }
+    }
+  };
+
+  // 4. Add delete claim function:
+  const handleDeleteClaim = async () => {
+    showPopup(
+      "Delete Claim",
+      "Are you sure you want to delete this claim? This action cannot be undone.",
+      "confirm",
+      true,
+      async () => {
+        try {
+          console.log("Deleting claim:", claimDetails.referenceNo);
+
+          if (!claimDetails.referenceNo) {
+            showPopup("Error", "Claim reference number not found.", "error");
+            return;
+          }
+
+          const deleteClaimData = {
+            claimNo: claimDetails.referenceNo,
+          };
+
+          console.log("Delete claim request data:", deleteClaimData);
+
+          const response = await fetch(`${API_BASE_URL}/DeleteClaim/DeleteClaim`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(deleteClaimData),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Delete Claim API Error Response:", errorText);
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+          }
+
+          const result = await response.json();
+          console.log("Delete claim API response:", result);
+
+          try {
+            await SecureStore.deleteItemAsync("edit_referenceNo");
+            await SecureStore.deleteItemAsync("edit_claimType");
+            await SecureStore.deleteItemAsync("edit_createdOn");
+            await SecureStore.deleteItemAsync("edit_enteredBy");
+            await SecureStore.deleteItemAsync("edit_relationship");
+            await SecureStore.deleteItemAsync("edit_illness");
+            await SecureStore.deleteItemAsync("edit_beneficiary_amount");
+            await SecureStore.deleteItemAsync("referenNo");
+          } catch (storageError) {
+            console.warn("Error clearing stored data:", storageError);
+          }
+
+          hidePopup();
+          showPopup(
+            "Success",
+            "Claim has been deleted successfully.",
+            "success",
+            false,
+            () => {
+              hidePopup();
+              navigation.goBack();
+            }
+          );
+        } catch (error) {
+          console.error("Error deleting claim:", error);
+
+          hidePopup();
+          if (error.message.includes("404")) {
+            showPopup(
+              "Not Found",
+              "The claim could not be found in the system. It may have already been deleted.",
+              "error",
+              false,
+              () => {
+                hidePopup();
+                navigation.goBack();
+              }
+            );
+          } else if (error.message.includes("400")) {
+            showPopup(
+              "Invalid Request",
+              "The claim could not be deleted. Please check the claim details and try again.",
+              "error"
+            );
+          } else if (error.message.includes("500")) {
+            showPopup(
+              "Server Error",
+              "Server is currently unavailable. Please try again later.",
+              "error"
+            );
+          } else {
+            showPopup(
+              "Delete Error",
+              `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+              "error"
+            );
+          }
+        }
+      }
+    );
+  };
 
   // Popup state
   const [popup, setPopup] = useState({
@@ -389,7 +717,7 @@ const EditClaimIntimation = ({ route }) => {
       const day = date.getDate().toString().padStart(2, "0");
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const year = date.getFullYear();
-      return `${day}/${month}/${'20'+year}`;
+      return `${day}/${month}/${'20' + year}`;
     } catch (error) {
       console.error("Error formatting date:", error);
       return dateString;
@@ -908,6 +1236,7 @@ const EditClaimIntimation = ({ route }) => {
           fetchEmployeeInfo(),
           storeClaimDetails(),
           fetchDocumentTypes(),
+          fetchDependents(), // Add this line
         ];
 
         if (referenceNo) {
@@ -925,6 +1254,7 @@ const EditClaimIntimation = ({ route }) => {
 
     initializeComponent();
   }, []);
+
 
   // Hardware back button handler
   useEffect(() => {
@@ -1523,8 +1853,8 @@ const EditClaimIntimation = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -1552,6 +1882,13 @@ const EditClaimIntimation = ({ route }) => {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Claim Details Section */}
         <View style={styles.claimDetailsSection}>
+          <TouchableOpacity
+            style={styles.claimDeleteButton}
+            onPress={handleDeleteClaim}
+          >
+            <Ionicons name="trash-outline" size={28} color="#2E7D7D" />
+          </TouchableOpacity>
+
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Reference No</Text>
             <Text style={styles.colon}>:</Text>
@@ -1580,6 +1917,7 @@ const EditClaimIntimation = ({ route }) => {
             <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
           </View>
         </View>
+
 
         {/* Beneficiaries Title */}
         <View style={styles.beneficiariesTitleContainer}>
@@ -1620,6 +1958,14 @@ const EditClaimIntimation = ({ route }) => {
                       {beneficiary.amount}
                     </Text>
                   </View>
+                </View>
+                <View style={styles.beneficiaryActionIcons}>
+                  <TouchableOpacity
+                    style={styles.beneficiaryIconButton}
+                    onPress={() => handleEditBeneficiary(beneficiary)}
+                  >
+                    <Ionicons name="create-outline" size={28} color="#2E7D7D" />
+                  </TouchableOpacity>
                 </View>
               </View>
             ))
@@ -1797,10 +2143,10 @@ const EditClaimIntimation = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -1828,7 +2174,7 @@ const EditClaimIntimation = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -1838,7 +2184,7 @@ const EditClaimIntimation = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -1850,6 +2196,138 @@ const EditClaimIntimation = ({ route }) => {
                   })}
                 </View>
               )}
+
+              <Modal
+                visible={isEditBeneficiaryModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setEditBeneficiaryModalVisible(false)}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.documentModalContent}>
+                    <ScrollView
+                      contentContainerStyle={styles.documentModalScrollContent}
+                      showsVerticalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      <Text style={styles.modalTitle}>Edit Beneficiary</Text>
+
+                      {/* Patient Name Dropdown */}
+                      <Text style={styles.documentFieldLabel}>Patient Name</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.documentDropdownButton,
+                          loadingMembers && styles.dropdownButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          !loadingMembers && setDropdownVisible(!isDropdownVisible)
+                        }
+                        disabled={loadingMembers}
+                      >
+                        <Text style={styles.dropdownButtonText}>
+                          {loadingMembers
+                            ? "Loading members..."
+                            : selectedMember
+                              ? selectedMember.name
+                              : newBeneficiary.name || "Select Patient"}
+                        </Text>
+                        <Ionicons
+                          name={isDropdownVisible ? "chevron-up" : "chevron-down"}
+                          size={20}
+                          color={loadingMembers ? "#ccc" : "#666"}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Member Dropdown Options */}
+                      {isDropdownVisible && !loadingMembers && (
+                        <View style={styles.documentDropdownOptions}>
+                          {memberOptions.map((member) => (
+                            <TouchableOpacity
+                              key={member.id}
+                              style={[
+                                styles.documentDropdownOption,
+                                selectedMember?.id === member.id && styles.selectedDropdownOption,
+                              ]}
+                              onPress={() => handleMemberSelect(member)}
+                            >
+                              <Text
+                                style={[
+                                  styles.dropdownOptionText,
+                                  selectedMember?.id === member.id && styles.selectedDropdownOptionText,
+                                ]}
+                              >
+                                {member.name} ({member.relationship})
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Relationship (Read-only) */}
+                      <Text style={styles.documentFieldLabel}>Relationship</Text>
+                      <TextInput
+                        style={[styles.documentModalInput, styles.textInputDisabled]}
+                        value={newBeneficiary.relationship}
+                        editable={false}
+                        placeholder="Relationship will auto-fill"
+                      />
+
+                      {/* Illness */}
+                      <Text style={styles.documentFieldLabel}>
+                        Illness<Text style={styles.requiredAsterisk}> *</Text>
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.documentModalInput,
+                          (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") &&
+                          styles.textInputError,
+                        ]}
+                        placeholder="Enter illness description"
+                        value={newBeneficiary.illness}
+                        onChangeText={(text) =>
+                          setNewBeneficiary((prev) => ({ ...prev, illness: text }))
+                        }
+                        multiline
+                        numberOfLines={3}
+                      />
+
+                      {/* Amount (Read-only) */}
+                      <Text style={styles.documentFieldLabel}>Claim Amount</Text>
+                      <TextInput
+                        style={[styles.documentModalInput, styles.textInputDisabled]}
+                        value={newBeneficiary.amount}
+                        editable={false}
+                        placeholder="Amount will be calculated automatically"
+                      />
+                    </ScrollView>
+
+                    <View style={styles.documentModalButtons}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEditBeneficiaryModalVisible(false);
+                          setDropdownVisible(false);
+                          setSelectedMember(null);
+                          setNewBeneficiary({
+                            name: "",
+                            relationship: "",
+                            illness: "",
+                            amount: "",
+                          });
+                        }}
+                        style={styles.cancelBtn}
+                      >
+                        <Text style={styles.cancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleSaveBeneficiaryEdit}
+                        style={styles.saveBtn}
+                      >
+                        <Text style={styles.saveText}>Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
 
               {/* Document Date */}
               <Text style={styles.documentFieldLabel}>Document Date</Text>
@@ -1887,10 +2365,10 @@ const EditClaimIntimation = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   editDocumentType === "O01" &&
-                    (!newDocument.amount ||
-                      newDocument.amount.trim() === "" ||
-                      parseFloat(newDocument.amount) <= 0) &&
-                    styles.textInputError,
+                  (!newDocument.amount ||
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0) &&
+                  styles.textInputError,
                 ]}
                 placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
                 placeholderTextColor="#B0B0B0"
@@ -1917,12 +2395,12 @@ const EditClaimIntimation = ({ route }) => {
                     (!newDocument.amount ||
                       newDocument.amount.trim() === "" ||
                       parseFloat(newDocument.amount) <= 0) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!newDocument.amount ||
-                  newDocument.amount.trim() === "" ||
-                  parseFloat(newDocument.amount) <= 0
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0
                     ? "Amount is required and must be greater than 0 for Bill type"
                     : "Amount is required for Bill type"}
                 </Text>
@@ -2634,6 +3112,31 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
+  },
+  claimDeleteButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 45,
+    height: 45,
+  },
+
+  beneficiaryActionIcons: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  beneficiaryIconButton: {
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 45,
+    height: 45,
   },
 });
 

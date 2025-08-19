@@ -32,8 +32,9 @@
         {
           "image": "./assets/images/SHEMobileApp.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "resizeMode": "center",
+          "backgroundColor": "#ffffff",
+          "gravity": "center"
         }
       ],
       "expo-font",
