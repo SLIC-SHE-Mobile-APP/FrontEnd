@@ -1678,10 +1678,6 @@ export default function PolicyHome({ route }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "black",
-  },
   container: {
     flex: 1,
   },
