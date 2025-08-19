@@ -267,9 +267,235 @@ const UploadDocuments = ({ route }) => {
   const [storedPatientName, setStoredPatientName] = useState("");
   const [storedClaimType, setStoredClaimType] = useState("");
   const [storedIllness, setStoredIllness] = useState("");
-
   const [actualClaimAmount, setActualClaimAmount] = useState("0.00");
-  const [claimAmountLoading, setClaimAmountLoading] = useState(false);
+  const [claimAmountLoading, setClaimAmountLoading] = useState(false); const [isEditPatientModalVisible, setEditPatientModalVisible] = useState(false);
+  const [editPatientData, setEditPatientData] = useState({
+    referenceNo: "",
+    patientName: "",
+    illness: "",
+  });
+  const [memberOptions, setMemberOptions] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [isDropdownVisible, setDropdownVisible] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+
+
+  const fetchDependents = async () => {
+    try {
+      setLoadingMembers(true);
+      console.log("Fetching dependents data...");
+
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+
+      if (!policyNumber || !memberNumber) {
+        console.log("Policy number or member number not found in SecureStore");
+        setMemberOptions([]);
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/Dependents/WithEmployee?policyNo=${policyNumber}&memberNo=${memberNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const dependentsData = await response.json();
+      console.log("Dependents API response:", dependentsData);
+
+      const transformedMembers = dependentsData.map((dependent, index) => ({
+        id: index + 1,
+        name: dependent.dependentName,
+        relationship: dependent.relationship === "Employee" ? "Self" : dependent.relationship,
+        memberCode: dependent.memberCode,
+        birthDay: dependent.depndentBirthDay,
+        effectiveDate: dependent.effectiveDate,
+      }));
+
+      setMemberOptions(transformedMembers);
+      console.log("Transformed member options:", transformedMembers);
+    } catch (error) {
+      console.error("Error fetching dependents:", error);
+      showPopup("Error", "Failed to load member information. Please try again.", "error");
+      setMemberOptions([{ id: 1, name: "Unknown Member", relationship: "Self" }]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const updateIntimationAPI = async (patientInfo) => {
+    try {
+      console.log("Updating intimation via API:", patientInfo);
+
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const storedMobile = await SecureStore.getItemAsync("user_mobile");
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+
+      if (!policyNumber || !memberNumber || !storedMobile || !storedNic) {
+        throw new Error("Required user information not found in storage");
+      }
+
+      const updateIntimationData = {
+        policyNo: policyNumber,
+        memId: memberNumber,
+        contactNo: storedMobile,
+        createdBy: storedNic,
+        indOut: "O",
+        patientName: patientInfo.patientName,
+        illness: patientInfo.illness,
+        relationship: selectedMember?.relationship || "Self",
+        claimSeqNo: patientInfo.referenceNo,
+      };
+
+      console.log("Update intimation request data:", updateIntimationData);
+
+      const response = await fetch(`${API_BASE_URL}/UpdateIntimation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateIntimationData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Update Intimation API Error Response:", errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log("Update intimation API response:", result);
+      return result;
+    } catch (error) {
+      console.error("Error updating intimation via API:", error);
+      throw error;
+    }
+  };
+
+  const handleEditPatientInfo = () => {
+    setEditPatientData({
+      referenceNo: storedReferenceNo || referenceNo || "",
+      patientName: storedPatientName || patientName || "",
+      illness: storedIllness || illness || "",
+    });
+
+    const currentMember = memberOptions.find(
+      (member) => member.name === (storedPatientName || patientName)
+    );
+    setSelectedMember(currentMember);
+
+    if (memberOptions.length === 0) {
+      fetchDependents();
+    }
+
+    setEditPatientModalVisible(true);
+  };
+
+  const handleMemberSelect = (member) => {
+    setSelectedMember(member);
+    setEditPatientData((prev) => ({
+      ...prev,
+      patientName: member.name,
+    }));
+    setDropdownVisible(false);
+  };
+
+  const handleSavePatientEdit = async () => {
+    try {
+      if (!editPatientData.patientName || !editPatientData.illness) {
+        showPopup("Validation Error", "Patient name and illness are required.", "warning");
+        return;
+      }
+
+      if (editPatientData.illness.trim() === "") {
+        showPopup("Validation Error", "Illness field cannot be empty.", "warning");
+        return;
+      }
+
+      console.log("Saving patient edit with API integration...");
+
+      await updateIntimationAPI(editPatientData);
+
+      setStoredPatientName(editPatientData.patientName);
+      setStoredIllness(editPatientData.illness);
+
+      await SecureStore.setItemAsync("stored_patient_name", editPatientData.patientName);
+      await SecureStore.setItemAsync("stored_illness_description", editPatientData.illness);
+
+      setEditPatientModalVisible(false);
+      setDropdownVisible(false);
+      setSelectedMember(null);
+      setEditPatientData({
+        referenceNo: "",
+        patientName: "",
+        illness: "",
+      });
+
+      showPopup("Success", "Patient information updated successfully!", "success");
+
+      console.log("Patient edit saved successfully with API integration");
+    } catch (error) {
+      console.error("Error in handleSavePatientEdit:", error);
+
+      if (error.message.includes("Required user information not found")) {
+        showPopup(
+          "Authentication Error",
+          "User information not found. Please logout and login again.",
+          "error"
+        );
+      } else if (error.message.includes("404")) {
+        showPopup(
+          "Not Found Error",
+          "The claim could not be found in the system. Please refresh and try again.",
+          "error"
+        );
+      } else if (error.message.includes("400")) {
+        showPopup("Validation Error", "Please check your input data and try again.", "error");
+      } else if (error.message.includes("500")) {
+        showPopup("Server Error", "Server is currently unavailable. Please try again later.", "error");
+      } else {
+        showPopup("Update Error", `Failed to update patient information: ${error.message}`, "error");
+      }
+    }
+  };
+
+  const handleDeletePatientInfo = () => {
+    showPopup(
+      "Delete Patient Information",
+      "Are you sure you want to delete this patient information? ",
+      true,
+      async () => {
+        try {
+          await SecureStore.deleteItemAsync("stored_patient_name");
+          await SecureStore.deleteItemAsync("stored_illness_description");
+          await SecureStore.deleteItemAsync("stored_claim_type");
+
+          setStoredPatientName("");
+          setStoredIllness("");
+          setStoredClaimType("");
+
+          hidePopup();
+          showPopup("Success", "Patient information deleted successfully.", "success");
+
+          console.log("Patient information deleted successfully");
+        } catch (error) {
+          console.error("Error deleting patient information:", error);
+          hidePopup();
+          showPopup("Error", "Failed to delete patient information. Please try again.", "error");
+        }
+      }
+    );
+  };
 
   // Popup state
   const [popup, setPopup] = useState({
@@ -1363,34 +1589,13 @@ const UploadDocuments = ({ route }) => {
             <View style={styles.patientInfoActions}>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => {
-                  // Handle edit action
-                  console.log("Edit patient info");
-                  // You can add your edit logic here
-                }}
+                onPress={handleEditPatientInfo}
               >
-               <Ionicons name="create-outline" size={22} color="#2E7D7D" />
+                <Ionicons name="create-outline" size={22} color="#2E7D7D" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => {
-                  showPopup(
-                    "Delete Patient Info",
-                    "Are you sure you want to delete this patient information?",
-                    "warning",
-                    true,
-                    () => {
-                      // Handle delete action
-                      console.log("Delete patient info");
-                      hidePopup();
-                      showPopup(
-                        "Success",
-                        "Patient information deleted successfully.",
-                        "success"
-                      );
-                    }
-                  );
-                }}
+                onPress={handleDeletePatientInfo}
               >
                 <Ionicons name="trash-outline" size={22} color="#2E7D7D" />
               </TouchableOpacity>
@@ -1799,80 +2004,91 @@ const UploadDocuments = ({ route }) => {
         </View>
       </Modal>
 
-      {/* Edit Document Modal */}
       <Modal
-        visible={showEditModal}
-        transparent={true}
+        visible={isEditPatientModalVisible}
+        transparent
         animationType="slide"
-        onRequestClose={() => setShowEditModal(false)}
+        onRequestClose={() => setEditPatientModalVisible(false)}
       >
-        <View style={styles.editModalOverlay}>
-          <View style={styles.editModalContent}>
-            <View style={styles.editModalHeader}>
-              <Text style={styles.editModalTitle}>Edit Document Details</Text>
-              <TouchableOpacity
-                onPress={() => setShowEditModal(false)}
-                style={styles.editModalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalOverlay}>
+          <View style={styles.editPatientModalContent}>
+            <Text style={styles.modalTitle}>Edit Patient Information</Text>
 
-            <View style={styles.editModalBody}>
-              <View style={styles.editSection}>
-                <Text style={styles.editLabel}>Document Type</Text>
-                <Text style={styles.editValue}>
-                  {editDocumentType
-                    ? editDocumentType.charAt(0).toUpperCase() +
-                    editDocumentType.slice(1)
-                    : "Unknown"}
-                </Text>
+            {/* Member Name Dropdown */}
+            <Text style={styles.fieldLabel}>Patient Name</Text>
+            <TouchableOpacity
+              style={[
+                styles.dropdownButton,
+                loadingMembers && styles.dropdownButtonDisabled,
+              ]}
+              onPress={() => !loadingMembers && setDropdownVisible(!isDropdownVisible)}
+              disabled={loadingMembers}
+            >
+              <Text style={styles.dropdownButtonText}>
+                {loadingMembers
+                  ? "Loading members..."
+                  : selectedMember
+                    ? selectedMember.name
+                    : editPatientData.patientName || "Select Member"}
+              </Text>
+              <Ionicons
+                name={isDropdownVisible ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={loadingMembers ? "#ccc" : "#666"}
+              />
+            </TouchableOpacity>
+
+            {/* Dropdown Options */}
+            {isDropdownVisible && !loadingMembers && (
+              <View style={styles.dropdownOptions}>
+                {memberOptions.map((member) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.dropdownOption,
+                      selectedMember?.id === member.id && styles.selectedDropdownOption,
+                    ]}
+                    onPress={() => handleMemberSelect(member)}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        selectedMember?.id === member.id && styles.selectedDropdownOptionText,
+                      ]}
+                    >
+                      {member.name} ({member.relationship})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
+            )}
 
-              <View style={styles.editSection}>
-                <Text style={styles.editLabel}>
-                  Amount{" "}
-                  {editDocumentType === "bill" && (
-                    <Text style={styles.requiredAsterisk}>*</Text>
-                  )}
-                </Text>
-                <TextInput
-                  style={[
-                    styles.editInput,
-                    !isEditAmountEditable() && styles.editInputDisabled,
-                  ]}
-                  placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
-                  placeholderTextColor="#B0B0B0"
-                  value={editAmount}
-                  onChangeText={handleEditAmountChange}
-                  keyboardType="decimal-pad"
-                  editable={isEditAmountEditable()}
-                />
-                {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
-                  <Text style={styles.editHelpText}>
-                    Amount is automatically set to 0.00 for {editDocumentType}
-                  </Text>
-                ) : editDocumentType === "bill" ? (
-                  <Text style={styles.editHelpText}>
-                    Amount is required for Bill type
-                  </Text>
-                ) : null}
-              </View>
-            </View>
+            {/* Illness Field */}
+            <Text style={styles.fieldLabel}>Illness</Text>
+            <TextInput
+              style={styles.editPatientModalInput}
+              value={editPatientData.illness}
+              onChangeText={(value) =>
+                setEditPatientData((prev) => ({ ...prev, illness: value }))
+              }
+              placeholder="Enter illness"
+              multiline
+              numberOfLines={3}
+            />
 
-            <View style={styles.editModalFooter}>
+            <View style={styles.editPatientModalButtons}>
               <TouchableOpacity
-                style={styles.editCancelButton}
-                onPress={() => setShowEditModal(false)}
+                onPress={() => {
+                  setEditPatientModalVisible(false);
+                  setDropdownVisible(false);
+                  setSelectedMember(null);
+                }}
+                style={styles.cancelBtn}
               >
-                <Text style={styles.editCancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.editSaveButton}
-                onPress={handleSaveEdit}
-              >
-                <Text style={styles.editSaveButtonText}>Save Changes</Text>
+              <TouchableOpacity onPress={handleSavePatientEdit} style={styles.saveBtn}>
+                <Text style={styles.saveText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2588,6 +2804,111 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
+  },editPatientModalContent: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
+    elevation: 5,
+    maxHeight: "75%",
+    minHeight: "40%",
+  },
+  editPatientModalInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 15,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
+  editPatientModalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 15,
+    paddingTop: 10,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#2E7D7D",
+    marginBottom: 8,
+    marginTop: 10,
+  },
+  dropdownButton: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    minHeight: 45,
+  },
+  dropdownButtonText: {
+    fontSize: 14,
+    color: "#333",
+    flex: 1,
+  },
+  dropdownOptions: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    marginBottom: 15,
+    maxHeight: 200,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  dropdownOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  selectedDropdownOption: {
+    backgroundColor: "#E3F2FD",
+  },
+  dropdownOptionText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  selectedDropdownOptionText: {
+    color: "#2E7D7D",
+    fontWeight: "500",
+  },
+  dropdownButtonDisabled: {
+    backgroundColor: "#f5f5f5",
+    opacity: 0.6,
+  },
+  cancelBtn: {
+    marginRight: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  cancelText: {
+    color: "#888",
+    fontWeight: "500",
+    fontSize: 14,
+  },
+  saveBtn: {
+    backgroundColor: "#4DD0E1",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  saveText: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 14,
   },
 });
 
