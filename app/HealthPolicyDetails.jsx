@@ -128,9 +128,9 @@ const HealthPolicyDetails = () => {
     </View>
   );
 
-  // Memoize available height calculation
+  // Memoize available height calculation - UPDATED: No longer need to account for navbar
   const availableHeight = useMemo(() => {
-    return screenHeight - insets.top - insets.bottom - 85;
+    return screenHeight - insets.top - insets.bottom;
   }, [screenHeight, insets.top, insets.bottom]);
 
   // Function to load data from SecureStore
@@ -479,29 +479,7 @@ const HealthPolicyDetails = () => {
     [availableHeight]
   );
 
-  // Navigation handler
-  const handleNavigation = useCallback(
-    (label) => {
-      try {
-        if (label === "Policy Details") {
-          // Already on this page, do nothing or scroll to top
-          return;
-        } else if (label === "Home") {
-          navigation.goBack();
-        } else if (label === "Add") {
-          router.push("/AddPolicy");
-        } else if (label === "Profile") {
-          router.push("/userDetails");
-        } else if (label === "Notification") {
-          // Handle notification navigation
-          console.log("Notification pressed");
-        }
-      } catch (error) {
-        console.error("Navigation error:", error);
-      }
-    },
-    [navigation]
-  );
+  // REMOVED: Navigation handler - no longer needed since navbar is removed
 
   const handleButtonPress = useCallback(
     (buttonLabel) => {
@@ -589,25 +567,7 @@ const HealthPolicyDetails = () => {
     employeeInfo,
   ]);
 
-  // Navigation item renderer
-  const renderNavItem = useCallback((iconName, label, onPress) => {
-    if (!iconName || !label || typeof label !== "string") {
-      return null;
-    }
-
-    return (
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onPress(label)}
-        key={label}
-        accessible={true}
-        accessibilityLabel={label}
-      >
-        <Icon name={iconName} size={25} color="white" />
-        <Text style={styles.navText}>{label}</Text>
-      </TouchableOpacity>
-    );
-  }, []);
+  // REMOVED: Navigation item renderer - no longer needed
 
   // Retry function for failed API calls
   const handleRetry = useCallback(() => {
@@ -726,7 +686,7 @@ const HealthPolicyDetails = () => {
         </View>
       </View>
 
-      {/* Scrollable Buttons Section */}
+      {/* Scrollable Buttons Section - UPDATED: Now takes full remaining space */}
       <View style={styles.buttonsContainer}>
         <View style={styles.buttonsWrapper}>
           <ScrollView
@@ -748,13 +708,7 @@ const HealthPolicyDetails = () => {
         </View>
       </View>
 
-      {/* Bottom Navigation Bar */}
-      <View style={[styles.navbar, { paddingBottom: insets.bottom }]}>
-        {renderNavItem("home", "Home", handleNavigation)}
-        {renderNavItem("bell", "Notification", handleNavigation)}
-        {renderNavItem("file-text", "Policy Details", handleNavigation)}
-        {renderNavItem("user", "Profile", handleNavigation)}
-      </View>
+      {/* REMOVED: Bottom Navigation Bar */}
 
       {/* Modal for displaying pages */}
       <Modal
@@ -858,10 +812,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.38,
     marginBottom: 8,
   },
+  // UPDATED: Buttons container now takes full remaining space
   buttonsContainer: {
     flex: 1,
     marginTop: 20,
-    marginBottom: 35,
+    marginBottom: 20, // Reduced margin since no navbar
   },
   buttonsWrapper: {
     borderRadius: 30,
@@ -948,32 +903,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 20,
   },
-  navbar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 10,
-    backgroundColor: "#6DD3D3",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    alignItems: "center",
-    height: 60,
-  },
-  navItem: {
-    alignItems: "center",
-  },
-  navText: {
-    fontSize: 12,
-    marginTop: 2,
-    color: "#FFFFFF",
-  },
+  // REMOVED: navbar styles - no longer needed
   // Custom Loading Styles
   loadingOverlay: {
     flex: 1,
