@@ -201,9 +201,13 @@ const CustomPopup = ({
             {showConfirmButton && (
               <TouchableOpacity
                 style={[styles.popupButton, styles.popupConfirmButton]}
-                onPress={onConfirm}
+                onPress={() => {
+                  if (onConfirm) {
+                    onConfirm(); // This calls the camera function
+                  }
+                }}
               >
-                <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+                <Text style={styles.popupConfirmButtonText}>Yes</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -213,7 +217,10 @@ const CustomPopup = ({
                   ? styles.popupCancelButton
                   : styles.popupOkButton,
               ]}
-              onPress={onClose}
+              onPress={() => {
+                // Always close popup, do NOT call onConfirm for NO button
+                onClose();
+              }}
             >
               <Text
                 style={[
@@ -222,7 +229,7 @@ const CustomPopup = ({
                     : styles.popupOkButtonText,
                 ]}
               >
-                {showConfirmButton ? "Cancel" : "OK"}
+                {showConfirmButton ? "NO" : "YES"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -331,6 +338,33 @@ const UploadDocuments = ({ route }) => {
       setLoadingMembers(false);
     }
   };
+
+  const formatAmountWithCommas = (amount) => {
+    if (!amount) return "";
+
+    // Remove any existing commas and non-numeric characters except decimal point
+    const cleanAmount = amount.toString().replace(/[^0-9.]/g, "");
+
+    // Split into integer and decimal parts
+    const parts = cleanAmount.split(".");
+    const integerPart = parts[0];
+    const decimalPart = parts[1];
+
+    // Add thousand separators to integer part
+    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    // Return formatted amount
+    if (decimalPart !== undefined) {
+      return `${formattedInteger}.${decimalPart}`;
+    }
+    return formattedInteger;
+  };
+
+  const removeCommasFromAmount = (amount) => {
+    if (!amount) return "";
+    return amount.toString().replace(/,/g, "");
+  };
+
 
   const updateIntimationAPI = async (patientInfo) => {
     try {
@@ -606,9 +640,11 @@ const UploadDocuments = ({ route }) => {
         ? claimAmount
         : `${claimAmount}.00`;
 
-      console.log("Formatted claim amount:", formattedAmount);
-      setActualClaimAmount(formattedAmount);
-      return formattedAmount;
+      // Format with commas for display
+      const displayAmount = formatAmountWithCommas(formattedAmount);
+      console.log("Formatted claim amount with commas:", displayAmount);
+      setActualClaimAmount(displayAmount);
+      return displayAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
       setActualClaimAmount("0.00");
@@ -758,7 +794,10 @@ const UploadDocuments = ({ route }) => {
       "DocDate",
       formatDateForAPI(new Date(document.date.split("/").reverse().join("-")))
     );
-    formData.append("DocAmount", document.amount);
+
+    // Remove commas from amount before sending to API
+    const cleanAmount = removeCommasFromAmount(document.amount);
+    formData.append("DocAmount", cleanAmount);
     formData.append("CreatedBy", storedNic);
 
     return formData;
@@ -782,10 +821,13 @@ const UploadDocuments = ({ route }) => {
   // UPDATED: Use actualClaimAmount from API
   const isDocumentTypeDisabled = (docTypeId) => {
     if (docTypeId === "O01") {
-      const beneficiaryAmount = parseFloat(actualClaimAmount || "0");
+      // Remove commas before parsing
+      const cleanAmount = removeCommasFromAmount(actualClaimAmount || "0");
+      const beneficiaryAmount = parseFloat(cleanAmount);
       console.log("Checking BILL disable condition:", {
         docTypeId,
         actualClaimAmount,
+        cleanAmount,
         beneficiaryAmount,
         isDisabled: beneficiaryAmount > 0,
       });
@@ -842,9 +884,16 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
+    // Remove commas first to get clean number
     const cleanedText = text.replace(/[^0-9.]/g, "");
     const parts = cleanedText.split(".");
+
     if (parts.length > 2) {
+      return;
+    }
+
+    // Check if integer part exceeds 9 digits
+    if (parts[0].length > 9) {
       return;
     }
 
@@ -855,8 +904,11 @@ const UploadDocuments = ({ route }) => {
       }
     }
 
-    setAmount(formattedAmount);
+    // Format with commas for display
+    const displayAmount = formatAmountWithCommas(formattedAmount);
+    setAmount(displayAmount);
   };
+
 
   const compressImage = async (imageUri) => {
     try {
@@ -922,9 +974,16 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
+    // Remove commas first to get clean number
     const cleanedText = text.replace(/[^0-9.]/g, "");
     const parts = cleanedText.split(".");
+
     if (parts.length > 2) {
+      return;
+    }
+
+    // Check if integer part exceeds 9 digits
+    if (parts[0].length > 9) {
       return;
     }
 
@@ -935,7 +994,9 @@ const UploadDocuments = ({ route }) => {
       }
     }
 
-    setEditAmount(formattedAmount);
+    // Format with commas for display
+    const displayAmount = formatAmountWithCommas(formattedAmount);
+    setEditAmount(displayAmount);
   };
 
   const validateAmount = (amountString) => {
@@ -948,7 +1009,9 @@ const UploadDocuments = ({ route }) => {
         return false;
       }
 
-      const amount = parseFloat(amountString);
+      // Remove commas before parsing
+      const cleanAmount = removeCommasFromAmount(amountString);
+      const amount = parseFloat(cleanAmount);
       if (isNaN(amount) || amount <= 0) {
         return false;
       }
@@ -960,7 +1023,9 @@ const UploadDocuments = ({ route }) => {
       return false;
     }
 
-    const amount = parseFloat(amountString);
+    // Remove commas before parsing
+    const cleanAmount = removeCommasFromAmount(amountString);
+    const amount = parseFloat(cleanAmount);
     if (isNaN(amount) || amount < 0) {
       return false;
     }
@@ -971,10 +1036,13 @@ const UploadDocuments = ({ route }) => {
   const formatAmountForDisplay = (amountString) => {
     if (!amountString) return "";
 
-    const amount = parseFloat(amountString);
+    // Remove commas first
+    const cleanAmount = removeCommasFromAmount(amountString);
+    const amount = parseFloat(cleanAmount);
     if (isNaN(amount)) return amountString;
 
-    return amount.toFixed(2);
+    // Format with commas and ensure 2 decimal places
+    return formatAmountWithCommas(amount.toFixed(2));
   };
 
   const canAddMoreDocuments = () => {
@@ -1131,77 +1199,87 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        showPopup(
-          "Permission Required",
-          "Camera permission is required to take photos",
-          "warning"
-        );
-        return;
-      }
+    // Show Yes/No confirmation popup before opening camera
+    showPopup(
+      "Take Photo",
+      "Do you want to open the camera to take a photo?",
+      "info",
+      true, // showConfirmButton = true
+      async () => {
+        // This function only runs when "Yes" is clicked
+        try {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== "granted") {
+            showPopup(
+              "Permission Required",
+              "Camera permission is required to take photos",
+              "warning"
+            );
+            return;
+          }
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const photo = result.assets[0];
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            const photo = result.assets[0];
 
-        showPopup(
-          "Processing Image",
-          "Please wait while we optimize your image...",
-          "info"
-        );
+            showPopup(
+              "Processing Image",
+              "Please wait while we optimize your image...",
+              "info"
+            );
 
-        const compressedUri = await compressImage(photo.uri);
-        if (!compressedUri) {
-          return;
+            const compressedUri = await compressImage(photo.uri);
+            if (!compressedUri) {
+              return;
+            }
+
+            hidePopup(); // Hide the processing message
+
+            const docTypeLabel =
+              documentTypes.find((type) => type.id === selectedDocumentType)
+                ?.label || selectedDocumentType;
+
+            const customName = `${docTypeLabel}.jpg`;
+
+            const newDocument = {
+              id: Date.now(),
+              name: customName,
+              uri: compressedUri,
+              type: "image/jpeg",
+              size: photo.fileSize || 0,
+              documentType: selectedDocumentType,
+              amount: formatAmountForDisplay(amount),
+              date: formatDate(documentDate),
+            };
+            setUploadedDocuments((prev) => [...prev, newDocument]);
+
+            setSelectedDocumentType("");
+            setAmount("");
+            setDocumentDate(new Date());
+
+            showPopup(
+              "Success",
+              "Photo captured and uploaded successfully!",
+              "success"
+            );
+          }
+        } catch (error) {
+          console.error("Error taking photo:", error);
+          showPopup(
+            "Error",
+            "Failed to take photo",
+            "error"
+          );
         }
-
-        hidePopup(); // Hide the processing message
-
-        const docTypeLabel =
-          documentTypes.find((type) => type.id === selectedDocumentType)
-            ?.label || selectedDocumentType;
-
-        const customName = `${docTypeLabel}.jpg`;
-
-        const newDocument = {
-          id: Date.now(),
-          name: customName,
-          uri: compressedUri,
-          type: "image/jpeg",
-          size: photo.fileSize || 0,
-          documentType: selectedDocumentType,
-          amount: formatAmountForDisplay(amount),
-          date: formatDate(documentDate),
-        };
-        setUploadedDocuments((prev) => [...prev, newDocument]);
-
-        setSelectedDocumentType("");
-        setAmount("");
-        setDocumentDate(new Date());
-
-        showPopup(
-          "Success",
-          "Photo captured and uploaded successfully!",
-          "success"
-        );
       }
-    } catch (error) {
-      console.error("Error taking photo:", error);
-      showPopup(
-        "Error",
-        "Failed to take photo",
-        "error"
-      );
-    }
+    );
   };
-
+  
   const handleRemoveDocument = (documentId) => {
     showPopup(
       "Delete Document",
@@ -1269,7 +1347,9 @@ const UploadDocuments = ({ route }) => {
         return false;
       }
 
-      const amount = parseFloat(amountString);
+      // Remove commas before parsing
+      const cleanAmount = removeCommasFromAmount(amountString);
+      const amount = parseFloat(cleanAmount);
       if (isNaN(amount) || amount <= 0) {
         return false;
       }
@@ -1281,7 +1361,9 @@ const UploadDocuments = ({ route }) => {
       return false;
     }
 
-    const amount = parseFloat(amountString);
+    // Remove commas before parsing
+    const cleanAmount = removeCommasFromAmount(amountString);
+    const amount = parseFloat(cleanAmount);
     if (isNaN(amount) || amount < 0) {
       return false;
     }
@@ -2804,7 +2886,7 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
-  },editPatientModalContent: {
+  }, editPatientModalContent: {
     width: "90%",
     backgroundColor: "white",
     borderRadius: 15,
