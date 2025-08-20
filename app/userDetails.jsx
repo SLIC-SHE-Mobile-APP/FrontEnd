@@ -11,6 +11,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 
@@ -186,6 +187,53 @@ export default function UserDetailsScreen() {
     }
   };
 
+  // Clear saved credentials function
+  const clearSavedCredentials = async () => {
+    try {
+      await SecureStore.deleteItemAsync("saved_user_nic");
+      await SecureStore.deleteItemAsync("saved_user_mobile");
+      await SecureStore.deleteItemAsync("credentials_saved_at");
+      // You might also want to clear other user-related data
+      await SecureStore.deleteItemAsync("user_nic");
+      await SecureStore.deleteItemAsync("selected_policy_number");
+      await SecureStore.deleteItemAsync("selected_member_number");
+      console.log("Saved credentials cleared");
+    } catch (error) {
+      console.error("Error clearing saved credentials:", error);
+    }
+  };
+
+  // Handle logout with confirmation
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Clear saved credentials
+              await clearSavedCredentials();
+              // Navigate to login screen
+              router.replace("/loginRequestOTP");
+            } catch (error) {
+              console.error("Error during logout:", error);
+              // Navigate to login screen even if clearing fails
+              router.replace("/loginRequestOTP");
+            }
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
   useEffect(() => {
     // Fetch employee info when component mounts
     fetchEmployeeInfo();
@@ -214,20 +262,19 @@ export default function UserDetailsScreen() {
       route: "/AddPolicy",
       top: 310,
     },
-    { icon: "help-circle-outline", 
-      label: "Help", 
-      route: "/Help", 
-      top: 380 },
+    { icon: "help-circle-outline", label: "Help", route: "/Help", top: 380 },
     {
       icon: "shield-outline",
       label: "Privacy Policy",
       route: "/PrivacyPolicy",
       top: 450,
     },
-    { icon: "call-outline", 
-      label: "Contact Us", 
-      route: "/ContactUs", 
-      top: 520 },
+    {
+      icon: "call-outline",
+      label: "Contact Us",
+      route: "/ContactUs",
+      top: 520,
+    },
     {
       icon: "newspaper-outline",
       label: "Corporate News",
@@ -237,7 +284,7 @@ export default function UserDetailsScreen() {
     {
       icon: "log-out-outline",
       label: "Logout",
-      route: "/loginRequestOTP",
+      action: "logout", // Changed from route to action
       top: 660,
     },
   ];
@@ -278,8 +325,8 @@ export default function UserDetailsScreen() {
               style={[styles.menuItem, { top: item.top }]}
               activeOpacity={0.7}
               onPress={() => {
-                if (item.label === "Logout") {
-                  router.replace(item.route);
+                if (item.action === "logout") {
+                  handleLogout();
                 } else {
                   router.push(item.route);
                 }
@@ -323,10 +370,10 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   profileSection: {
-    display:'flex',
+    display: "flex",
     alignItems: "center",
-    justifyContent:'center',
-    marginTop:65
+    justifyContent: "center",
+    marginTop: 65,
   },
   avatar: {
     width: 80,
