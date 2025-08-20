@@ -1279,7 +1279,7 @@ const UploadDocuments = ({ route }) => {
       }
     );
   };
-  
+
   const handleRemoveDocument = (documentId) => {
     showPopup(
       "Delete Document",
@@ -2045,7 +2045,7 @@ const UploadDocuments = ({ route }) => {
             styles.addDocumentButtonText,
             uploadedDocuments.length === 0 && styles.addDocumentButtonTextDisabled
           ]}>
-            Add Document
+            Upload Document
           </Text>
         </TouchableOpacity>
       </ScrollView>

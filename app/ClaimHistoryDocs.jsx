@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -23,77 +23,82 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Add ref to track component mounting state
+  const isMountedRef = useRef(true);
 
-  // Custom Loading Animation Component
-  const LoadingIcon = () => {
-    const [rotateAnim] = useState(new Animated.Value(0));
-    const [scaleAnim] = useState(new Animated.Value(1));
+  // Custom Loading Animation Component - Memoized to prevent re-renders
+  const LoadingIcon = useMemo(() => {
+    return () => {
+      const [rotateAnim] = useState(new Animated.Value(0));
+      const [scaleAnim] = useState(new Animated.Value(1));
 
-    useEffect(() => {
-      const createRotateAnimation = () => {
-        return Animated.loop(
-          Animated.timing(rotateAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          })
-        );
-      };
-
-      const createPulseAnimation = () => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.timing(scaleAnim, {
-              toValue: 1.2,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
+      useEffect(() => {
+        const createRotateAnimation = () => {
+          return Animated.loop(
+            Animated.timing(rotateAnim, {
               toValue: 1,
-              duration: 1000,
+              duration: 2000,
               useNativeDriver: true,
-            }),
-          ])
-        );
-      };
+            })
+          );
+        };
 
-      const rotateAnimation = createRotateAnimation();
-      const pulseAnimation = createPulseAnimation();
+        const createPulseAnimation = () => {
+          return Animated.loop(
+            Animated.sequence([
+              Animated.timing(scaleAnim, {
+                toValue: 1.2,
+                duration: 1000,
+                useNativeDriver: true,
+              }),
+              Animated.timing(scaleAnim, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+              }),
+            ])
+          );
+        };
 
-      rotateAnimation.start();
-      pulseAnimation.start();
+        const rotateAnimation = createRotateAnimation();
+        const pulseAnimation = createPulseAnimation();
 
-      return () => {
-        rotateAnimation.stop();
-        pulseAnimation.stop();
-      };
-    }, []);
+        rotateAnimation.start();
+        pulseAnimation.start();
 
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
+        return () => {
+          rotateAnimation.stop();
+          pulseAnimation.stop();
+        };
+      }, []);
 
-    return (
-      <Animated.View
-        style={[
-          styles.customLoadingIcon,
-          {
-            transform: [{ rotate: spin }, { scale: scaleAnim }],
-          },
-        ]}
-      >
-        <View style={styles.loadingIconOuter}>
-          <View style={styles.loadingIconInner}>
-            <Icon name="heartbeat" size={20} color="#FFFFFF" />
+      const spin = rotateAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+      });
+
+      return (
+        <Animated.View
+          style={[
+            styles.customLoadingIcon,
+            {
+              transform: [{ rotate: spin }, { scale: scaleAnim }],
+            },
+          ]}
+        >
+          <View style={styles.loadingIconOuter}>
+            <View style={styles.loadingIconInner}>
+              <Icon name="heartbeat" size={20} color="#FFFFFF" />
+            </View>
           </View>
-        </View>
-      </Animated.View>
-    );
-  };
+        </Animated.View>
+      );
+    };
+  }, []);
 
-  // Loading Screen Component with Custom Icon
-  const LoadingScreen = () => (
+  // Loading Screen Component - Memoized
+  const LoadingScreen = useMemo(() => () => (
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContainer}>
         <LoadingIcon />
@@ -101,7 +106,14 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
         <Text style={styles.loadingSubText}>Please wait a moment</Text>
       </View>
     </View>
-  );
+  ), [LoadingIcon]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -109,22 +121,35 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
         const response = await axios.get(
           `${API_BASE_URL}/UploadedDocumentCon/${claimData.seqNo}`
         );
-        if (Array.isArray(response.data)) {
-          setDocuments(response.data);
-        } else {
-          setDocuments([response.data]); // in case it's a single object
+        
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          if (Array.isArray(response.data)) {
+            setDocuments(response.data);
+          } else {
+            setDocuments([response.data]);
+          }
         }
       } catch (error) {
         console.error("Document fetch error:", error);
       } finally {
-        setLoading(false);
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchDocuments();
   }, [claimData]);
 
-  const openImageModal = (doc) => {
+  // Ultra-fast close handler - call onClose immediately without any async operations
+  const handleClose = useCallback(() => {
+    // Call onClose synchronously for immediate response
+    onClose?.();
+  }, [onClose]);
+
+  const openImageModal = useCallback((doc) => {
     let imageSource;
     let imageDescription = `${doc.docType} - Claim No: ${doc.clmSeqNo}`;
 
@@ -142,14 +167,15 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
       amount: doc.docAmount,
     });
     setIsImageModalVisible(true);
-  };
+  }, []);
 
-  const closeImageModal = () => {
+  const closeImageModal = useCallback(() => {
     setIsImageModalVisible(false);
     setSelectedImage(null);
-  };
+  }, []);
 
-  const renderDocumentCard = (document, index) => (
+  // Memoized document card to prevent unnecessary re-renders
+  const renderDocumentCard = useCallback((document, index) => (
     <View key={index} style={styles.documentCard}>
       <TouchableOpacity
         onPress={() => openImageModal(document)}
@@ -169,7 +195,6 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
             resizeMode="contain"
           />
         )}
-        {/* Add expand icon overlay */}
         <View style={styles.expandOverlay}>
           <Ionicons name="expand-outline" size={16} color="#fff" />
         </View>
@@ -195,20 +220,36 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
         </View>
       </View>
     </View>
-  );
+  ), [openImageModal]);
+
+  // Memoize documents list to prevent re-renders
+  const documentsList = useMemo(() => {
+    return documents.length > 0 
+      ? documents.map(renderDocumentCard)
+      : (
+          <View style={styles.noDocumentsContainer}>
+            <Ionicons name="document-outline" size={48} color="#888" />
+            <Text style={styles.noDocumentsText}>No documents found.</Text>
+          </View>
+        );
+  }, [documents, renderDocumentCard]);
 
   return (
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
-      {/* Fixed Header - moved outside modalContainer like ClaimHistory */}
+      {/* Ultra-responsive header with instant close */}
       <View style={styles.header}>
         <View style={{ width: 26 }} />
         <Text style={styles.headerTitle}>Claim History Documents</Text>
-        <TouchableOpacity onPress={onClose}>
+        <TouchableOpacity 
+          onPress={handleClose}
+          style={styles.closeButton}
+          activeOpacity={0.7}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
           <Ionicons
             name="close"
             size={26}
             color="#13646D"
-            style={{ marginRight: 15 }}
           />
         </TouchableOpacity>
       </View>
@@ -221,24 +262,21 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            removeClippedSubviews={true} // Performance optimization
+            maxToRenderPerBatch={5} // Render optimization
+            windowSize={10} // Memory optimization
           >
-            {documents.length > 0 ? (
-              documents.map(renderDocumentCard)
-            ) : (
-              <View style={styles.noDocumentsContainer}>
-                <Ionicons name="document-outline" size={48} color="#888" />
-                <Text style={styles.noDocumentsText}>No documents found.</Text>
-              </View>
-            )}
+            {documentsList}
           </ScrollView>
         )}
 
-        {/* Image Modal - Close icon removed, tap outside to close preserved */}
+        {/* Image Modal - Optimized */}
         <Modal
           visible={isImageModalVisible}
           transparent={true}
           animationType="fade"
           onRequestClose={closeImageModal}
+          hardwareAccelerated={true} // Performance boost on Android
         >
           <View style={styles.modalOverlay}>
             <TouchableOpacity
@@ -289,7 +327,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 25,
     overflow: "hidden",
   },
-  // Updated header styles to match ClaimHistory exactly
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -305,11 +342,16 @@ const styles = StyleSheet.create({
     textAlign: "left",
     flex: 1,
   },
+  closeButton: {
+    padding: 5,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalContainer: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  // Custom Loading Styles
   loadingOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -439,7 +481,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 15,
   },
-  // Modal Styles - Close button removed
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
