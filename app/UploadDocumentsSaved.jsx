@@ -1441,7 +1441,7 @@ const UploadDocumentsSaved = ({ route }) => {
           style={styles.addDocumentButton}
           onPress={handleAddDocument}
         >
-          <Text style={styles.addDocumentButtonText}>Add Document</Text>
+          <Text style={styles.addDocumentButtonText}>Upload Document</Text>
         </TouchableOpacity>
       </ScrollView>
 

@@ -2194,14 +2194,11 @@ const UploadDocuments = ({ route }) => {
           onPress={handleAddDocumentButton}
           disabled={uploadedDocuments.length === 0}
         >
-          <Text
-            style={[
-              styles.addDocumentButtonText,
-              uploadedDocuments.length === 0 &&
-                styles.addDocumentButtonTextDisabled,
-            ]}
-          >
-            Add Document
+          <Text style={[
+            styles.addDocumentButtonText,
+            uploadedDocuments.length === 0 && styles.addDocumentButtonTextDisabled
+          ]}>
+            Upload Document
           </Text>
         </TouchableOpacity>
       </ScrollView>

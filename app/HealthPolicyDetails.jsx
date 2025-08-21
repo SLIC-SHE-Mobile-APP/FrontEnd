@@ -1,11 +1,9 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   Modal,
@@ -29,8 +27,9 @@ import DependentDetails from "./dependentDetails";
 import DownloadClaimForms from "./DownloadClaimForms";
 import HealthInsuCard from "./HealthInsuCard";
 import HospitalList from "./hospitalList";
-import OnlineClaimIntimations from "./OnlineClaimIntimations";
+import NewClaim from "./NewClaim.jsx";
 import PaymentHistory from "./PaymentHistory";
+import SavedClaims from "./PendingIntimations.jsx";
 import PendingRequirement from "./PendingRequirement";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
@@ -431,9 +430,15 @@ const HealthPolicyDetails = () => {
           preferredRatio: 0.6,
           contentBased: true,
         },
-        "Online Claim Intimations": {
-          minHeight: 200,
-          maxHeight: 300,
+        "New Claim": {
+          minHeight: 400,
+          maxHeight: 530,
+          preferredRatio: 0.75,
+          contentBased: true,
+        },
+        "Saved Claims": {
+          minHeight: 400,
+          maxHeight: 530,
           preferredRatio: 0.75,
           contentBased: true,
         },
@@ -541,9 +546,11 @@ const HealthPolicyDetails = () => {
           return <HospitalList {...commonProps} />;
         case "Download Claim Forms":
           return <DownloadClaimForms {...commonProps} />;
-        case "Online Claim Intimations":
-          return <OnlineClaimIntimations {...commonProps} />;
-        case "Online Claim History":
+        case "New Claim":
+          return <NewClaim {...commonProps} />;
+          case "Saved Claims":
+            return <SavedClaims {...commonProps} />;
+        case "Claim History":
           return <ClaimHistory {...commonProps} />;
         case "Payment History":
           return <PaymentHistory {...commonProps} />;
@@ -615,8 +622,8 @@ const HealthPolicyDetails = () => {
       "Claim Documents Required",
       "Hospitals List",
       "Download Claim Forms",
-      "Online Claim Intimations",
-      "Online Claim History",
+      "New Claim","Saved Claims",
+      "Claim History",
       "Pending Requirements",
       "Payment History",
     ],
