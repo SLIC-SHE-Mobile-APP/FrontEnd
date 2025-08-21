@@ -74,7 +74,7 @@ const LoadingIcon = () => {
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ["0deg", "360deg"],
   });
 
   return (
@@ -168,13 +168,13 @@ const CustomPopup = ({
   if (!visible) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
@@ -275,7 +275,9 @@ const UploadDocuments = ({ route }) => {
   const [storedClaimType, setStoredClaimType] = useState("");
   const [storedIllness, setStoredIllness] = useState("");
   const [actualClaimAmount, setActualClaimAmount] = useState("0.00");
-  const [claimAmountLoading, setClaimAmountLoading] = useState(false); const [isEditPatientModalVisible, setEditPatientModalVisible] = useState(false);
+  const [claimAmountLoading, setClaimAmountLoading] = useState(false);
+  const [isEditPatientModalVisible, setEditPatientModalVisible] =
+    useState(false);
   const [editPatientData, setEditPatientData] = useState({
     referenceNo: "",
     patientName: "",
@@ -286,14 +288,17 @@ const UploadDocuments = ({ route }) => {
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
 
-
   const fetchDependents = async () => {
     try {
       setLoadingMembers(true);
       console.log("Fetching dependents data...");
 
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
 
       if (!policyNumber || !memberNumber) {
         console.log("Policy number or member number not found in SecureStore");
@@ -322,7 +327,10 @@ const UploadDocuments = ({ route }) => {
       const transformedMembers = dependentsData.map((dependent, index) => ({
         id: index + 1,
         name: dependent.dependentName,
-        relationship: dependent.relationship === "Employee" ? "Self" : dependent.relationship,
+        relationship:
+          dependent.relationship === "Employee"
+            ? "Self"
+            : dependent.relationship,
         memberCode: dependent.memberCode,
         birthDay: dependent.depndentBirthDay,
         effectiveDate: dependent.effectiveDate,
@@ -332,8 +340,14 @@ const UploadDocuments = ({ route }) => {
       console.log("Transformed member options:", transformedMembers);
     } catch (error) {
       console.error("Error fetching dependents:", error);
-      showPopup("Error", "Failed to load member information. Please try again.", "error");
-      setMemberOptions([{ id: 1, name: "Unknown Member", relationship: "Self" }]);
+      showPopup(
+        "Error",
+        "Failed to load member information. Please try again.",
+        "error"
+      );
+      setMemberOptions([
+        { id: 1, name: "Unknown Member", relationship: "Self" },
+      ]);
     } finally {
       setLoadingMembers(false);
     }
@@ -365,13 +379,16 @@ const UploadDocuments = ({ route }) => {
     return amount.toString().replace(/,/g, "");
   };
 
-
   const updateIntimationAPI = async (patientInfo) => {
     try {
       console.log("Updating intimation via API:", patientInfo);
 
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
       const storedMobile = await SecureStore.getItemAsync("user_mobile");
       const storedNic = await SecureStore.getItemAsync("user_nic");
 
@@ -404,7 +421,9 @@ const UploadDocuments = ({ route }) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Update Intimation API Error Response:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
       }
 
       const result = await response.json();
@@ -447,12 +466,20 @@ const UploadDocuments = ({ route }) => {
   const handleSavePatientEdit = async () => {
     try {
       if (!editPatientData.patientName || !editPatientData.illness) {
-        showPopup("Validation Error", "Patient name and illness are required.", "warning");
+        showPopup(
+          "Validation Error",
+          "Patient name and illness are required.",
+          "warning"
+        );
         return;
       }
 
       if (editPatientData.illness.trim() === "") {
-        showPopup("Validation Error", "Illness field cannot be empty.", "warning");
+        showPopup(
+          "Validation Error",
+          "Illness field cannot be empty.",
+          "warning"
+        );
         return;
       }
 
@@ -463,8 +490,14 @@ const UploadDocuments = ({ route }) => {
       setStoredPatientName(editPatientData.patientName);
       setStoredIllness(editPatientData.illness);
 
-      await SecureStore.setItemAsync("stored_patient_name", editPatientData.patientName);
-      await SecureStore.setItemAsync("stored_illness_description", editPatientData.illness);
+      await SecureStore.setItemAsync(
+        "stored_patient_name",
+        editPatientData.patientName
+      );
+      await SecureStore.setItemAsync(
+        "stored_illness_description",
+        editPatientData.illness
+      );
 
       setEditPatientModalVisible(false);
       setDropdownVisible(false);
@@ -475,7 +508,11 @@ const UploadDocuments = ({ route }) => {
         illness: "",
       });
 
-      showPopup("Success", "Patient information updated successfully!", "success");
+      showPopup(
+        "Success",
+        "Patient information updated successfully!",
+        "success"
+      );
 
       console.log("Patient edit saved successfully with API integration");
     } catch (error) {
@@ -494,38 +531,164 @@ const UploadDocuments = ({ route }) => {
           "error"
         );
       } else if (error.message.includes("400")) {
-        showPopup("Validation Error", "Please check your input data and try again.", "error");
+        showPopup(
+          "Validation Error",
+          "Please check your input data and try again.",
+          "error"
+        );
       } else if (error.message.includes("500")) {
-        showPopup("Server Error", "Server is currently unavailable. Please try again later.", "error");
+        showPopup(
+          "Server Error",
+          "Server is currently unavailable. Please try again later.",
+          "error"
+        );
       } else {
-        showPopup("Update Error", `Failed to update patient information: ${error.message}`, "error");
+        showPopup(
+          "Update Error",
+          `Failed to update patient information: ${error.message}`,
+          "error"
+        );
       }
     }
   };
 
   const handleDeletePatientInfo = () => {
     showPopup(
-      "Delete Patient Information",
-      "Are you sure you want to delete this patient information? ",
-      true,
+      "Delete Claim",
+      "Are you sure you want to delete this Claim? This action cannot be undone.",
+      "warning",
+      true, // showConfirmButton = true
       async () => {
+        // This function only runs when "Yes" is clicked
         try {
-          await SecureStore.deleteItemAsync("stored_patient_name");
-          await SecureStore.deleteItemAsync("stored_illness_description");
-          await SecureStore.deleteItemAsync("stored_claim_type");
+          console.log("Deleting claim:", storedReferenceNo);
 
-          setStoredPatientName("");
-          setStoredIllness("");
-          setStoredClaimType("");
+          // Validate reference number
+          if (!storedReferenceNo) {
+            hidePopup();
+            showPopup("Error", "Claim reference number not found.", "error");
+            return;
+          }
 
+          // Prepare API request data
+          const deleteClaimData = {
+            claimNo: storedReferenceNo,
+          };
+
+          console.log("Delete claim request data:", deleteClaimData);
+
+          // Call the Delete Claim API
+          const response = await fetch(
+            `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(deleteClaimData),
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Delete Claim API Error Response:", errorText);
+            throw new Error(
+              `HTTP error! status: ${response.status}, message: ${errorText}`
+            );
+          }
+
+          const result = await response.json();
+          console.log("Delete claim API response:", result);
+
+          // Clear stored data after successful deletion
+          try {
+            await SecureStore.deleteItemAsync("stored_patient_name");
+            await SecureStore.deleteItemAsync("stored_illness_description");
+            await SecureStore.deleteItemAsync("stored_claim_type");
+            await SecureStore.deleteItemAsync("stored_claim_seq_no");
+            await SecureStore.deleteItemAsync("edit_referenceNo");
+            await SecureStore.deleteItemAsync("edit_claimType");
+            await SecureStore.deleteItemAsync("edit_createdOn");
+            await SecureStore.deleteItemAsync("edit_enteredBy");
+            await SecureStore.deleteItemAsync("edit_relationship");
+            await SecureStore.deleteItemAsync("edit_illness");
+            await SecureStore.deleteItemAsync("edit_beneficiary_amount");
+            await SecureStore.deleteItemAsync("referenNo");
+
+            // Reset state variables
+            setStoredPatientName("");
+            setStoredIllness("");
+            setStoredClaimType("");
+            setStoredReferenceNo("");
+            setActualClaimAmount("0.00");
+          } catch (storageError) {
+            console.warn("Error clearing stored data:", storageError);
+          }
+
+          // Show success message and navigate to homepage
           hidePopup();
-          showPopup("Success", "Patient information deleted successfully.", "success");
+          showPopup(
+            "Success",
+            "Claim has been deleted successfully.",
+            "success",
+            false, // showConfirmButton = false
+            () => {
+              hidePopup();
+              // Navigate to homepage
+              setTimeout(() => {
+                navigation.navigate("home");
+              }, 500);
+            }
+          );
 
-          console.log("Patient information deleted successfully");
+          console.log("Claim deleted successfully");
         } catch (error) {
-          console.error("Error deleting patient information:", error);
+          console.error("Error deleting claim:", error);
+
           hidePopup();
-          showPopup("Error", "Failed to delete patient information. Please try again.", "error");
+          // Handle different types of errors
+          if (error.message.includes("404")) {
+            showPopup(
+              "Not Found",
+              "The claim could not be found in the system. It may have already been deleted.",
+              "error",
+              false,
+              () => {
+                hidePopup();
+                // Navigate to homepage even if claim not found
+                setTimeout(() => {
+                  navigation.navigate("Home");
+                }, 500);
+              }
+            );
+          } else if (error.message.includes("400")) {
+            showPopup(
+              "Invalid Request",
+              "The claim could not be deleted. Please check the claim details and try again.",
+              "error"
+            );
+          } else if (error.message.includes("500")) {
+            showPopup(
+              "Server Error",
+              "Server is currently unavailable. Please try again later.",
+              "error"
+            );
+          } else if (
+            error.message.includes("Network request failed") ||
+            error.message.includes("fetch")
+          ) {
+            showPopup(
+              "Network Error",
+              "Unable to connect to the server. Please check your internet connection and try again.",
+              "error"
+            );
+          } else {
+            showPopup(
+              "Delete Error",
+              `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+              "error"
+            );
+          }
         }
       }
     );
@@ -587,7 +750,10 @@ const UploadDocuments = ({ route }) => {
   const fetchClaimAmountFromAPI = async (referenceNo) => {
     try {
       setClaimAmountLoading(true);
-      console.log("Fetching claim amount from API for referenceNo:", referenceNo);
+      console.log(
+        "Fetching claim amount from API for referenceNo:",
+        referenceNo
+      );
 
       if (!referenceNo || referenceNo.trim() === "") {
         console.warn("Invalid referenceNo provided:", referenceNo);
@@ -629,7 +795,10 @@ const UploadDocuments = ({ route }) => {
           claimAmount = data.claimAmount.toString();
         } else if (data.amount !== undefined && data.amount !== null) {
           claimAmount = data.amount.toString();
-        } else if (data.totalAmount !== undefined && data.totalAmount !== null) {
+        } else if (
+          data.totalAmount !== undefined &&
+          data.totalAmount !== null
+        ) {
           claimAmount = data.totalAmount.toString();
         }
       } else if (typeof data === "number" || typeof data === "string") {
@@ -654,7 +823,11 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
-  // Fetch document types from API
+  const toSentenceCase = (str) => {
+    if (!str) return str;
+    return str.toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  };
+
   useEffect(() => {
     const fetchDocumentTypes = async () => {
       try {
@@ -670,7 +843,7 @@ const UploadDocuments = ({ route }) => {
         const data = await response.json();
         const transformedDocumentTypes = data.map((doc) => ({
           id: doc.docId,
-          label: doc.docDesc,
+          label: toSentenceCase(doc.docDesc), // Apply sentence case here
           icon: getIconForDocType(doc.docDesc),
         }));
 
@@ -683,12 +856,20 @@ const UploadDocuments = ({ route }) => {
           "error"
         );
 
-        // Fallback to hardcoded types if API fails
+        // Fallback to hardcoded types if API fails - also apply sentence case
         setDocumentTypes([
-          { id: "O01", label: "BILL", icon: "receipt-outline" },
-          { id: "O02", label: "PRESCRIPTION", icon: "medical-outline" },
-          { id: "O03", label: "DIAGNOSIS CARD", icon: "document-text-outline" },
-          { id: "O04", label: "OTHER", icon: "folder-outline" },
+          { id: "O01", label: toSentenceCase("BILL"), icon: "receipt-outline" },
+          {
+            id: "O02",
+            label: toSentenceCase("PRESCRIPTION"),
+            icon: "medical-outline",
+          },
+          {
+            id: "O03",
+            label: toSentenceCase("DIAGNOSIS CARD"),
+            icon: "document-text-outline",
+          },
+          { id: "O04", label: toSentenceCase("OTHER"), icon: "folder-outline" },
         ]);
       } finally {
         setLoading(false);
@@ -755,7 +936,9 @@ const UploadDocuments = ({ route }) => {
     useCallback(() => {
       const refreshClaimAmount = async () => {
         if (fromEditClaim) {
-          console.log("Screen focused from EditClaim, refreshing claim amount...");
+          console.log(
+            "Screen focused from EditClaim, refreshing claim amount..."
+          );
           const refNo = referenceNo || storedReferenceNo;
           if (refNo) {
             await fetchClaimAmountFromAPI(refNo);
@@ -909,7 +1092,6 @@ const UploadDocuments = ({ route }) => {
     setAmount(displayAmount);
   };
 
-
   const compressImage = async (imageUri) => {
     try {
       const fileInfo = await FileSystem.getInfoAsync(imageUri);
@@ -1057,16 +1239,16 @@ const UploadDocuments = ({ route }) => {
 
   // Check if file type is allowed (only jpg, jpeg, png)
   const isAllowedFileType = (mimeType, name) => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const allowedExtensions = [".jpg", ".jpeg", ".png"];
 
     if (allowedTypes.includes(mimeType)) {
       return true;
     }
 
     // Fallback check using file extension
-    const extension = name.toLowerCase().split('.').pop();
-    return ['jpg', 'jpeg', 'png'].includes(extension);
+    const extension = name.toLowerCase().split(".").pop();
+    return ["jpg", "jpeg", "png"].includes(extension);
   };
 
   const handleBrowseFiles = async () => {
@@ -1152,19 +1334,11 @@ const UploadDocuments = ({ route }) => {
         setAmount("");
         setDocumentDate(new Date());
 
-        showPopup(
-          "Success",
-          "Document uploaded successfully!",
-          "success"
-        );
+        showPopup("Success", "Document uploaded successfully!", "success");
       }
     } catch (error) {
       console.error("Error picking document:", error);
-      showPopup(
-        "Error",
-        "Failed to pick document",
-        "error"
-      );
+      showPopup("Error", "Failed to pick document", "error");
     }
   };
 
@@ -1270,11 +1444,7 @@ const UploadDocuments = ({ route }) => {
           }
         } catch (error) {
           console.error("Error taking photo:", error);
-          showPopup(
-            "Error",
-            "Failed to take photo",
-            "error"
-          );
+          showPopup("Error", "Failed to take photo", "error");
         }
       }
     );
@@ -1291,11 +1461,7 @@ const UploadDocuments = ({ route }) => {
           prev.filter((doc) => doc.id !== documentId)
         );
         hidePopup();
-        showPopup(
-          "Success",
-          "Document deleted successfully.",
-          "success"
-        );
+        showPopup("Success", "Document deleted successfully.", "success");
       }
     );
   };
@@ -1309,11 +1475,7 @@ const UploadDocuments = ({ route }) => {
           "warning"
         );
       } else {
-        showPopup(
-          "Validation Error",
-          "Please enter a valid amount",
-          "warning"
-        );
+        showPopup("Validation Error", "Please enter a valid amount", "warning");
       }
       return;
     }
@@ -1330,11 +1492,7 @@ const UploadDocuments = ({ route }) => {
     setEditingDocument(null);
     setEditAmount("");
     setEditDocumentType("");
-    showPopup(
-      "Success",
-      "Document details updated successfully.",
-      "success"
-    );
+    showPopup("Success", "Document details updated successfully.", "success");
   };
 
   const validateEditAmount = (amountString) => {
@@ -1626,13 +1784,9 @@ const UploadDocuments = ({ route }) => {
     return selectedDocumentType !== "O02" && selectedDocumentType !== "O03";
   };
 
-  const isEditAmountEditable = () => {
-    return editDocumentType !== "O02" && editDocumentType !== "O03";
-  };
-
   const getDocumentTypeLabel = (docId) => {
     const docType = documentTypes.find((type) => type.id === docId);
-    return docType ? docType.label : docId;
+    return docType ? docType.label : toSentenceCase(docId); // Apply sentence case to fallback too
   };
 
   if (loading) {
@@ -1661,13 +1815,11 @@ const UploadDocuments = ({ route }) => {
         <View style={styles.placeholder} />
       </View>
 
-
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Patient Info Display - Updated */}
         <View style={styles.patientInfoCard}>
           <View style={styles.patientInfoHeader}>
-            <Text style={styles.patientInfoTitle}>Patient Information</Text>
+            <Text style={styles.patientInfoTitle}>Claim Information</Text>
             <View style={styles.patientInfoActions}>
               <TouchableOpacity
                 style={styles.actionButton}
@@ -1717,12 +1869,12 @@ const UploadDocuments = ({ route }) => {
             </Text>
             {parseFloat(actualClaimAmount) > 0 && (
               <Text style={styles.claimAmountNote}>
-                Note: BILL document type is disabled because claim amount is greater than 0
+                Note: BILL document type is disabled because claim amount is
+                greater than 0
               </Text>
             )}
           </View>
         )}
-
 
         {/* Document Type Selection */}
         <View style={styles.section}>
@@ -1736,7 +1888,7 @@ const UploadDocuments = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                      styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1747,7 +1899,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                          styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1759,7 +1911,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                          styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1786,15 +1938,15 @@ const UploadDocuments = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                  ? "Enter amount"
-                  : "0.00"
+                ? "Enter amount"
+                : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1806,7 +1958,8 @@ const UploadDocuments = ({ route }) => {
             <Text style={styles.helpText}>
               Please select a document type first to enable amount input
             </Text>
-          ) : selectedDocumentType === "O02" || selectedDocumentType === "O03" ? (
+          ) : selectedDocumentType === "O02" ||
+            selectedDocumentType === "O03" ? (
             <Text style={styles.helpText}>
               Amount is automatically set to 0.00 for{" "}
               {getDocumentTypeLabel(selectedDocumentType)}
@@ -1816,7 +1969,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                  styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1926,7 +2079,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1945,7 +2098,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1960,7 +2113,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1979,7 +2132,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -2036,7 +2189,7 @@ const UploadDocuments = ({ route }) => {
         <TouchableOpacity
           style={[
             styles.addDocumentButton,
-            uploadedDocuments.length === 0 && styles.addDocumentButtonDisabled
+            uploadedDocuments.length === 0 && styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocumentButton}
           disabled={uploadedDocuments.length === 0}
@@ -2103,15 +2256,17 @@ const UploadDocuments = ({ route }) => {
                 styles.dropdownButton,
                 loadingMembers && styles.dropdownButtonDisabled,
               ]}
-              onPress={() => !loadingMembers && setDropdownVisible(!isDropdownVisible)}
+              onPress={() =>
+                !loadingMembers && setDropdownVisible(!isDropdownVisible)
+              }
               disabled={loadingMembers}
             >
               <Text style={styles.dropdownButtonText}>
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                    ? selectedMember.name
-                    : editPatientData.patientName || "Select Member"}
+                  ? selectedMember.name
+                  : editPatientData.patientName || "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2128,14 +2283,16 @@ const UploadDocuments = ({ route }) => {
                     key={member.id}
                     style={[
                       styles.dropdownOption,
-                      selectedMember?.id === member.id && styles.selectedDropdownOption,
+                      selectedMember?.id === member.id &&
+                        styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
                     <Text
                       style={[
                         styles.dropdownOptionText,
-                        selectedMember?.id === member.id && styles.selectedDropdownOptionText,
+                        selectedMember?.id === member.id &&
+                          styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -2169,7 +2326,10 @@ const UploadDocuments = ({ route }) => {
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSavePatientEdit} style={styles.saveBtn}>
+              <TouchableOpacity
+                onPress={handleSavePatientEdit}
+                style={styles.saveBtn}
+              >
                 <Text style={styles.saveText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -2232,12 +2392,12 @@ const styles = StyleSheet.create({
   // Loading Screen Styles
   loadingOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 30,
     minWidth: 200,
     minHeight: 150,
@@ -2249,32 +2409,32 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#16858D',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#6DD3D3',
+    borderColor: "#6DD3D3",
   },
   loadingIconInner: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#17ABB7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '600',
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
     marginBottom: 5,
   },
   loadingSubText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   patientInfoHeader: {
     flexDirection: "row",
@@ -2794,17 +2954,17 @@ const styles = StyleSheet.create({
   // Popup Styles
   popupOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
     backgroundColor: "white",
@@ -2886,7 +3046,8 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
-  }, editPatientModalContent: {
+  },
+  editPatientModalContent: {
     width: "90%",
     backgroundColor: "white",
     borderRadius: 15,
