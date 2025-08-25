@@ -662,12 +662,12 @@ const AddPolicy = () => {
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             onPress={() => navigateToHomeWithRefresh(true)}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color="#05445E" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <Text style={styles.title}>Manage Policy</Text>
         </View>
         {deletedPolicies.length > 0 && (
@@ -749,7 +749,9 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 20,
+    paddingTop: 0,
+    paddingLeft:20,
+    paddingRight:20,
   },
   // Custom Loading Styles
   loadingOverlay: {
@@ -1043,6 +1045,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#05445E",
     fontWeight: "bold",
-    marginLeft: 15, // Adjust spacing between arrow and title
+    // marginLeft: 15,
   },
 });

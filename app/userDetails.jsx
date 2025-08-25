@@ -347,26 +347,20 @@ export default function UserDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
   },
   content: {
     flex: 1,
-    width: "100%",
-    height: "100%",
   },
   headerBackground: {
     position: "absolute",
     width: "100%",
     height: height * 0.25,
     backgroundColor: "#FFFFFF",
-    top: -2,
   },
   backButton: {
     position: "absolute",
     left: width * 0.05,
-    top: height * 0.07,
+    top: height * 0.05,
     zIndex: 10,
   },
   profileSection: {

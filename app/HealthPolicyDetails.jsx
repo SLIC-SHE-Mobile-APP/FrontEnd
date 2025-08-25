@@ -127,7 +127,7 @@ const HealthPolicyDetails = () => {
     </View>
   );
 
-  // Memoize available height calculation - UPDATED: No longer need to account for navbar
+  // Memoize available height calculation
   const availableHeight = useMemo(() => {
     return screenHeight - insets.top - insets.bottom;
   }, [screenHeight, insets.top, insets.bottom]);
@@ -335,7 +335,6 @@ const HealthPolicyDetails = () => {
           return;
         }
 
-        // Fetch policy info and employee info in parallel
         // Both functions now return default objects instead of null on error
         const [policyData, employeeData] = await Promise.all([
           fetchPolicyInfo(stored.policyNumber),
@@ -476,15 +475,13 @@ const HealthPolicyDetails = () => {
       calculatedHeight = Math.max(calculatedHeight, config.minHeight);
       calculatedHeight = Math.min(calculatedHeight, config.maxHeight);
 
-      // Ensure it doesn't exceed 95% of available height
-      calculatedHeight = Math.min(calculatedHeight, availableHeight * 0.95);
+      // Ensure it doesn't exceed 90% of available height to leave room for safe areas
+      calculatedHeight = Math.min(calculatedHeight, availableHeight * 0.9);
 
       return calculatedHeight;
     },
     [availableHeight]
   );
-
-  // REMOVED: Navigation handler - no longer needed since navbar is removed
 
   const handleButtonPress = useCallback(
     (buttonLabel) => {
@@ -531,7 +528,6 @@ const HealthPolicyDetails = () => {
       employeeInfo,
     };
 
-    // Wrap each component in error boundary-like try-catch
     try {
       switch (currentPage) {
         case "Dependent Details":
@@ -573,8 +569,6 @@ const HealthPolicyDetails = () => {
     policyInfo,
     employeeInfo,
   ]);
-
-  // REMOVED: Navigation item renderer - no longer needed
 
   // Retry function for failed API calls
   const handleRetry = useCallback(() => {
@@ -693,7 +687,7 @@ const HealthPolicyDetails = () => {
         </View>
       </View>
 
-      {/* Scrollable Buttons Section - UPDATED: Now takes full remaining space */}
+      {/* Scrollable Buttons Section */}
       <View style={styles.buttonsContainer}>
         <View style={styles.buttonsWrapper}>
           <ScrollView
@@ -714,8 +708,6 @@ const HealthPolicyDetails = () => {
           </ScrollView>
         </View>
       </View>
-
-      {/* REMOVED: Bottom Navigation Bar */}
 
       {/* Modal for displaying pages */}
       <Modal
@@ -738,6 +730,8 @@ const HealthPolicyDetails = () => {
               {
                 height: getPageHeight(currentPage),
                 transform: [{ translateY: slideAnim }],
+                // Add bottom padding to account for safe area
+                paddingBottom: insets.bottom,
               },
             ]}
           >
@@ -776,7 +770,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    marginTop: 20,
     paddingHorizontal: 15,
   },
   headerRow: {
@@ -819,11 +812,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.38,
     marginBottom: 8,
   },
-  // UPDATED: Buttons container now takes full remaining space
   buttonsContainer: {
     flex: 1,
     marginTop: 20,
-    marginBottom: 20, // Reduced margin since no navbar
+    marginBottom: 20,
   },
   buttonsWrapper: {
     borderRadius: 30,
@@ -855,7 +847,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
-  overlayTouchable: {
+  overlayBackground: {
     flex: 1,
   },
   animatedModal: {
@@ -910,7 +902,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 20,
   },
-  // REMOVED: navbar styles - no longer needed
   // Custom Loading Styles
   loadingOverlay: {
     flex: 1,
