@@ -9,7 +9,7 @@ import { Dimensions, StatusBar } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
 
@@ -24,16 +24,18 @@ export default function RootLayout() {
     return null;
   }
 
+  // Dynamic background color based on theme
+  const backgroundColor = colorScheme === "dark" ? "#000000" : "#ffffff";
+
   return (
     <SafeAreaProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <StatusBar
           translucent
           backgroundColor='transparent'
-          barStyle='light-content'
+          barStyle={colorScheme === "dark" ? 'light-content' : 'dark-content'}
         />
-
-
+        <SafeAreaView style={{ flex: 1, backgroundColor }}>
           <Stack
             screenOptions={{
               headerShown: false,
@@ -42,36 +44,24 @@ export default function RootLayout() {
           >
             <Stack.Screen
               name="index"
-              options={{
-                headerShown: false,
-                navigationBarHidden: true,
-              }}
             />
             <Stack.Screen
               name="login"
-              options={{
-                headerShown: false,
-                navigationBarHidden: true,
-              }}
             />
             <Stack.Screen
               name="loginRequestOTP"
-              options={{
-                headerShown: false,
-                navigationBarHidden: true,
-              }}
             />
             <Stack.Screen name="home" />
             <Stack.Screen
-              name="notification"
-              options={{ title: "Notifications" }}
+              name="AddPolicy"
             />
             <Stack.Screen name="userDetails" />
             <Stack.Screen name="PendingRequirement" />
             <Stack.Screen name="PendingRequirement1" />
             <Stack.Screen name="+not-found" />
           </Stack>
+        </SafeAreaView>
       </ThemeProvider>
-    </SafeAreaProvider >
+    </SafeAreaProvider>
   );
 }

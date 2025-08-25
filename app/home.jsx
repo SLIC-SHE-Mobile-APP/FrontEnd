@@ -3,19 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import {
-  Alert,
-  Animated,
-  BackHandler,
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import {Alert,Animated,BackHandler,Dimensions,Image,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -1738,8 +1726,8 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   logoContainer: {
     display: "flex",
