@@ -247,16 +247,17 @@ const UploadDocumentsSaved = ({ route }) => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);0
-  const [editingDocument, setEditingDocument] = useState(null);0
-  const [editAmount, setEditAmount] = useState("");0
-  const [editDocumentType, setEditDocumentType] = useState("");0
-  const [documentTypes, setDocumentTypes] = useState([]);0
-  const [loading, setLoading] = useState(true);0
-  const [storedReferenceNo, setStoredReferenceNo] = useState("");0
-  const [storedNic, setStoredNic] = useState("");0
-  const [selectedDocId, setSelectedDocId] = useState("");0
-  const [storedDocAmount, setStoredDocAmount] = useState(0);0
+  const [showEditModal, setShowEditModal] = useState(false); 0
+  const [editingDocument, setEditingDocument] = useState(null); 0
+  const [editAmount, setEditAmount] = useState(""); 0
+  const [editDocumentType, setEditDocumentType] = useState(""); 0
+  const [documentTypes, setDocumentTypes] = useState([]); 0
+  const [loading, setLoading] = useState(true); 0
+  const [storedReferenceNo, setStoredReferenceNo] = useState(""); 0
+  const [storedNic, setStoredNic] = useState(""); 0
+  const [selectedDocId, setSelectedDocId] = useState(""); 0
+  const [storedDocAmount, setStoredDocAmount] = useState(0); 0
+  const [isUploading, setIsUploading] = useState(false);
 
   // Popup state
   const [popup, setPopup] = useState({
@@ -927,6 +928,11 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
   const handleAddDocument = async () => {
+    // Prevent multiple clicks
+    if (isUploading) {
+      return;
+    }
+
     if (uploadedDocuments.length === 0) {
       showPopup(
         "Validation Error",
@@ -970,6 +976,16 @@ const UploadDocumentsSaved = ({ route }) => {
     }
 
     try {
+      // Set uploading state to true
+      setIsUploading(true);
+
+      // Show loading popup
+      showPopup(
+        "Uploading",
+        "Please wait while we upload your documents...",
+        "info"
+      );
+
       const uploadPromises = uploadedDocuments.map((doc) =>
         uploadDocumentToAPI(doc)
       );
@@ -978,6 +994,7 @@ const UploadDocumentsSaved = ({ route }) => {
       const failedUploads = results.filter((result) => !result.success);
 
       if (failedUploads.length > 0) {
+        setIsUploading(false);
         hidePopup();
         showPopup(
           "Upload Error",
@@ -1003,12 +1020,14 @@ const UploadDocumentsSaved = ({ route }) => {
         false,
         () => {
           hidePopup();
+          // Navigate immediately without setTimeout
           navigation.setParams({ fromUploadDocuments: true });
           navigation.goBack();
         }
       );
     } catch (error) {
       console.error("Error during document upload:", error);
+      setIsUploading(false);
       hidePopup();
       showPopup(
         "Error",
@@ -1017,6 +1036,7 @@ const UploadDocumentsSaved = ({ route }) => {
       );
     }
   };
+
 
   const handleBackPress = () => {
     console.log("Back button pressed");
@@ -1438,10 +1458,19 @@ const UploadDocumentsSaved = ({ route }) => {
 
         {/* Add Document Button */}
         <TouchableOpacity
-          style={styles.addDocumentButton}
+          style={[
+            styles.addDocumentButton,
+            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonDisabled,
+          ]}
           onPress={handleAddDocument}
+          disabled={uploadedDocuments.length === 0 || isUploading}
         >
-          <Text style={styles.addDocumentButtonText}>Upload Document</Text>
+          <Text style={[
+            styles.addDocumentButtonText,
+            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonTextDisabled
+          ]}>
+            {isUploading ? "Uploading..." : "Upload Document"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
