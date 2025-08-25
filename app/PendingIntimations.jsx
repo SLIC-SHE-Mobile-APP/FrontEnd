@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   Animated,
@@ -84,13 +85,13 @@ const CustomPopup = ({
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
+      <Animated.View
         style={[
           styles.popupOverlay,
           { opacity: fadeAnim }
         ]}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
@@ -155,6 +156,14 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   const [error, setError] = useState(null);
   const [userId, setUserId] = useState(null);
   const [policyNo, setPolicyNo] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+
+
+  const filteredClaims = pendingClaims.filter(claim =>
+    claim.referenceNo.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
 
   // Enhanced popup states
   const [popup, setPopup] = useState({
@@ -588,19 +597,56 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
         </View>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by Claim Number..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearSearchButton}
+              onPress={() => setSearchQuery("")}
+            >
+              <Ionicons name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* List */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {pendingClaims.length === 0 ? (
+        {filteredClaims.length === 0 && searchQuery.length > 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={60} color="#00ADBB" />
+            <Text style={styles.emptyText}>No claims found for "{searchQuery}"</Text>
+            <TouchableOpacity
+              style={styles.clearSearchButtonLarge}
+              onPress={() => setSearchQuery("")}
+            >
+              <Text style={styles.clearSearchButtonText}>Clear Search</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredClaims.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="document-outline" size={60} color="#00ADBB" />
             <Text style={styles.emptyText}>No pending claims found.</Text>
           </View>
         ) : (
-          pendingClaims.map((claim) => (
+          // Fix 1: Replace line 566-569 with the complete claim card JSX:
+
+          filteredClaims.map((claim) => (
             <View key={claim.id} style={styles.claimCard}>
               <View style={styles.claimContent}>
                 <View style={styles.claimRow}>
-                  <Text style={styles.claimLabel}>Reference No :</Text>
+                  <Text style={styles.claimLabel}>Claim No :</Text>
                   <Text style={styles.claimValue}>{claim.referenceNo}</Text>
                 </View>
                 <View style={styles.claimRow}>
@@ -637,8 +683,10 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
               </View>
             </View>
           ))
+
         )}
       </ScrollView>
+
 
       {/* Enhanced Custom Popup */}
       <CustomPopup
@@ -913,6 +961,50 @@ const styles = StyleSheet.create({
   popupCancelButtonText: {
     color: "#666",
     fontSize: 16,
+    fontWeight: "600",
+  }, searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "transparent",
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(46, 125, 125, 0.1)",
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+    paddingVertical: 0,
+  },
+  clearSearchButton: {
+    padding: 5,
+    marginLeft: 10,
+  },
+  clearSearchButtonLarge: {
+    backgroundColor: "#4ECDC4",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 15,
+  },
+  clearSearchButtonText: {
+    color: "white",
+    fontSize: 14,
     fontWeight: "600",
   },
 });

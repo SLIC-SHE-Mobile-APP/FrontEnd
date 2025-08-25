@@ -23,7 +23,7 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
   // Add ref to track component mounting state
   const isMountedRef = useRef(true);
 
@@ -121,7 +121,7 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
         const response = await axios.get(
           `${API_BASE_URL}/UploadedDocumentCon/${claimData.seqNo}`
         );
-        
+
         // Only update state if component is still mounted
         if (isMountedRef.current) {
           if (Array.isArray(response.data)) {
@@ -216,7 +216,7 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
         <View style={styles.documentRow}>
           <Text style={styles.documentLabel}>Amount</Text>
           <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.docAmount}</Text>
+          <Text style={styles.documentValue}>{document.docAmount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</Text>
         </View>
       </View>
     </View>
@@ -224,14 +224,14 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
 
   // Memoize documents list to prevent re-renders
   const documentsList = useMemo(() => {
-    return documents.length > 0 
+    return documents.length > 0
       ? documents.map(renderDocumentCard)
       : (
-          <View style={styles.noDocumentsContainer}>
-            <Ionicons name="document-outline" size={48} color="#888" />
-            <Text style={styles.noDocumentsText}>No documents found.</Text>
-          </View>
-        );
+        <View style={styles.noDocumentsContainer}>
+          <Ionicons name="document-outline" size={48} color="#888" />
+          <Text style={styles.noDocumentsText}>No documents found.</Text>
+        </View>
+      );
   }, [documents, renderDocumentCard]);
 
   return (
@@ -240,7 +240,7 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
       <View style={styles.header}>
         <View style={{ width: 26 }} />
         <Text style={styles.headerTitle}>Claim History Documents</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleClose}
           style={styles.closeButton}
           activeOpacity={0.7}
@@ -302,7 +302,7 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
                       </Text>
                       {selectedImage.amount && (
                         <Text style={styles.modalImageAmount}>
-                          Amount: Rs {selectedImage.amount}
+                          Amount: Rs {selectedImage.amount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         </Text>
                       )}
                       <Text style={styles.modalImageSubtitle}>

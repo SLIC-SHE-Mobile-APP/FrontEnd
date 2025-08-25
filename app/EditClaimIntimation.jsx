@@ -150,6 +150,17 @@ const CustomPopup = ({
   );
 };
 
+const formatAmountWithCommas = (amount) => {
+  if (!amount || isNaN(parseFloat(amount))) {
+    return "0.00";
+  }
+  const numericAmount = parseFloat(amount);
+  return numericAmount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 const EditClaimIntimation = ({ route }) => {
   const navigation = useNavigation();
   const {
@@ -284,6 +295,7 @@ const EditClaimIntimation = ({ route }) => {
         illness: beneficiaryData.illness,
         relationship: beneficiaryData.relationship,
         claimSeqNo: claimDetails.referenceNo,
+        createdOn: claimDetails.createdOn,
       };
 
       console.log("Update intimation request data:", updateIntimationData);
@@ -589,7 +601,11 @@ const EditClaimIntimation = ({ route }) => {
     if (!amount || isNaN(parseFloat(amount))) {
       return "0.00";
     }
-    return parseFloat(amount).toFixed(2);
+    const numericAmount = parseFloat(amount);
+    return numericAmount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   // Helper function to update loading states
@@ -974,15 +990,10 @@ const EditClaimIntimation = ({ route }) => {
       }
 
       const formattedAmount = claimAmount.includes(".")
-        ? claimAmount
-        : `${claimAmount}.00`;
+        ? parseFloat(claimAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : parseFloat(claimAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-      setClaimDetails((prev) => ({
-        ...prev,
-        claimAmount: formattedAmount,
-      }));
-
-      return formattedAmount;
+      return parseFloat("0").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
       if (!error.message.includes("404")) {
@@ -1098,7 +1109,7 @@ const EditClaimIntimation = ({ route }) => {
           name: finalPatientName,
           relationship: finalRelationship,
           illness: finalIllness || "",
-          amount: claimAmount,
+          amount: formatAmount(claimAmount),
         };
 
         setBeneficiaries([beneficiary]);
