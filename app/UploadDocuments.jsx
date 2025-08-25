@@ -287,6 +287,8 @@ const UploadDocuments = ({ route }) => {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
 
   const fetchDependents = async () => {
     try {
@@ -1559,6 +1561,11 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleAddDocument = async () => {
+    // Prevent multiple clicks
+    if (isUploading) {
+      return;
+    }
+
     if (uploadedDocuments.length === 0) {
       showPopup(
         "Validation Error",
@@ -1602,6 +1609,16 @@ const UploadDocuments = ({ route }) => {
     }
 
     try {
+      // Set uploading state to true
+      setIsUploading(true);
+
+      // Show loading popup
+      showPopup(
+        "Uploading",
+        "Please wait while we upload your documents...",
+        "info"
+      );
+
       const uploadPromises = uploadedDocuments.map((doc) =>
         uploadDocumentToAPI(doc)
       );
@@ -1610,6 +1627,7 @@ const UploadDocuments = ({ route }) => {
       const failedUploads = results.filter((result) => !result.success);
 
       if (failedUploads.length > 0) {
+        setIsUploading(false);
         hidePopup();
         showPopup(
           "Upload Error",
@@ -1663,44 +1681,44 @@ const UploadDocuments = ({ route }) => {
         false,
         () => {
           hidePopup();
-          setTimeout(() => {
-            if (fromEditClaim) {
-              navigation.navigate("EditClaimIntimation", {
-                ...route.params,
-                fromUploadDocuments: true,
-                documentsUploaded: true,
-                refreshClaimAmount: true,
-              });
-            } else {
-              navigation.navigate("EditClaimIntimation", {
-                claim: claimData,
-                referenceNo: storedReferenceNo,
-                claimType: storedClaimType || patientData.claimType,
-                patientName: storedPatientName || patientData.patientName,
-                illness: storedIllness || patientData.illness,
-                claimId: claimId,
-                userNic: storedNic,
-                documentsUploaded: true,
-                submittedData: {
-                  patientData: {
-                    ...patientData,
-                    patientName: storedPatientName || patientData.patientName,
-                    illness: storedIllness || patientData.illness,
-                    claimType: storedClaimType || patientData.claimType,
-                    referenceNo: storedReferenceNo,
-                    claimId: claimId,
-                  },
-                  documents: uploadedDocuments,
-                  uploadResults: results,
-                  metadata: claimData.metadata,
+          // Navigate immediately without setTimeout
+          if (fromEditClaim) {
+            navigation.navigate("EditClaimIntimation", {
+              ...route.params,
+              fromUploadDocuments: true,
+              documentsUploaded: true,
+              refreshClaimAmount: true,
+            });
+          } else {
+            navigation.navigate("EditClaimIntimation", {
+              claim: claimData,
+              referenceNo: storedReferenceNo,
+              claimType: storedClaimType || patientData.claimType,
+              patientName: storedPatientName || patientData.patientName,
+              illness: storedIllness || patientData.illness,
+              claimId: claimId,
+              userNic: storedNic,
+              documentsUploaded: true,
+              submittedData: {
+                patientData: {
+                  ...patientData,
+                  patientName: storedPatientName || patientData.patientName,
+                  illness: storedIllness || patientData.illness,
+                  claimType: storedClaimType || patientData.claimType,
+                  referenceNo: storedReferenceNo,
+                  claimId: claimId,
                 },
-              });
-            }
-          }, 500);
+                documents: uploadedDocuments,
+                uploadResults: results,
+                metadata: claimData.metadata,
+              },
+            });
+          }
         }
       );
     } catch (error) {
       console.error("Error during document upload:", error);
+      setIsUploading(false);
       hidePopup();
       showPopup(
         "Error",
@@ -1711,6 +1729,11 @@ const UploadDocuments = ({ route }) => {
   };
 
   const handleAddDocumentButton = async () => {
+    // Prevent multiple clicks
+    if (isUploading) {
+      return;
+    }
+
     console.log("Reference Number:", storedReferenceNo);
     console.log("Patient Name:", storedPatientName || patientData.patientName);
     console.log("Claim Type:", storedClaimType);
@@ -1888,7 +1911,7 @@ const UploadDocuments = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                      styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1899,7 +1922,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                          styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1911,7 +1934,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                          styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1938,15 +1961,15 @@ const UploadDocuments = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.textInputError,
+              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+              styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                ? "Enter amount"
-                : "0.00"
+                  ? "Enter amount"
+                  : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1969,7 +1992,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                  styles.errorText,
+                styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -2079,7 +2102,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -2098,7 +2121,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -2113,7 +2136,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -2132,7 +2155,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -2189,16 +2212,16 @@ const UploadDocuments = ({ route }) => {
         <TouchableOpacity
           style={[
             styles.addDocumentButton,
-            uploadedDocuments.length === 0 && styles.addDocumentButtonDisabled,
+            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocumentButton}
-          disabled={uploadedDocuments.length === 0}
+          disabled={uploadedDocuments.length === 0 || isUploading}
         >
           <Text style={[
             styles.addDocumentButtonText,
-            uploadedDocuments.length === 0 && styles.addDocumentButtonTextDisabled
+            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonTextDisabled
           ]}>
-            Upload Document
+            {isUploading ? "Uploading..." : "Upload Document"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -2265,8 +2288,8 @@ const UploadDocuments = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : editPatientData.patientName || "Select Member"}
+                    ? selectedMember.name
+                    : editPatientData.patientName || "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2284,7 +2307,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2292,7 +2315,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
