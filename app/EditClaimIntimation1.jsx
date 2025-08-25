@@ -85,13 +85,13 @@ const CustomPopup = ({
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent={true}>
-      <Animated.View 
+      <Animated.View
         style={[
           styles.popupOverlay,
           { opacity: fadeAnim }
         ]}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
@@ -1240,9 +1240,9 @@ const EditClaimIntimation1 = ({ route }) => {
       patientData:
         beneficiaries.length > 0
           ? {
-              patientName: beneficiaries[0].name,
-              illness: beneficiaries[0].illness,
-            }
+            patientName: beneficiaries[0].name,
+            illness: beneficiaries[0].illness,
+          }
           : {},
     });
   };
@@ -1347,13 +1347,8 @@ const EditClaimIntimation1 = ({ route }) => {
     try {
       console.log("Updating intimation via API:", beneficiaryData);
 
-      // Get required data from SecureStore
-      const policyNumber = await SecureStore.getItemAsync(
-        "selected_policy_number"
-      );
-      const memberNumber = await SecureStore.getItemAsync(
-        "selected_member_number"
-      );
+      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
+      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
       const storedMobile = await SecureStore.getItemAsync("user_mobile");
       const storedNic = await SecureStore.getItemAsync("user_nic");
 
@@ -1361,17 +1356,18 @@ const EditClaimIntimation1 = ({ route }) => {
         throw new Error("Required user information not found in storage");
       }
 
-      // Prepare API request data
       const updateIntimationData = {
         policyNo: policyNumber,
         memId: memberNumber,
         contactNo: storedMobile,
         createdBy: storedNic,
-        indOut: "O", // Hardcoded as per requirement
+        indOut: "O",
         patientName: beneficiaryData.name,
         illness: beneficiaryData.illness,
         relationship: beneficiaryData.relationship,
         claimSeqNo: claimDetails.referenceNo,
+        createdOn: claimDetails.createdOn,
+        isUpdate: true,
       };
 
       console.log("Update intimation request data:", updateIntimationData);
@@ -1387,9 +1383,7 @@ const EditClaimIntimation1 = ({ route }) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Update Intimation API Error Response:", errorText);
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const result = await response.json();
@@ -1400,6 +1394,7 @@ const EditClaimIntimation1 = ({ route }) => {
       throw error;
     }
   };
+
 
   // Save beneficiary edit
   const handleSaveBeneficiaryEdit = async () => {
@@ -1606,7 +1601,7 @@ const EditClaimIntimation1 = ({ route }) => {
 
         // Store the updated beneficiary data
         await storeBeneficiaryData(updatedBeneficiaries);
-        
+
         hidePopup();
       }
     );
@@ -1659,7 +1654,7 @@ const EditClaimIntimation1 = ({ route }) => {
       const billExists = documents.some(
         (doc) => doc.type === "BILL" && doc.id !== selectedDocument?.id
       );
-  
+
       if (billExists) {
         showPopup(
           "Document Type Restriction",
@@ -1669,17 +1664,17 @@ const EditClaimIntimation1 = ({ route }) => {
         return;
       }
     }
-  
+
     setEditDocumentType(docType.docId);
-  
+
     // Update newDocument type with the description
     setNewDocument((prev) => ({
       ...prev,
       type: docType.docDesc,
       // Clear amount when switching to BILL type, set to 0.00 for others
-      amount: docType.docId === "O01" ? "" : "0.00"
+      amount: docType.docId === "O01" ? "" : "0.00"  // <-- Change this line from "" to ""
     }));
-  
+
     setEditDocTypeDropdownVisible(false);
   };
 
@@ -1705,26 +1700,32 @@ const EditClaimIntimation1 = ({ route }) => {
     if (editDocumentType !== "O01") {
       return;
     }
-  
+
+    // If the current value is "0.00" and user types something, clear it first
+    let inputText = text;
+    if (newDocument.amount === "0.00" && text.length === 1) {
+      inputText = text;
+    }
+
     // Remove any non-numeric characters except decimal point
-    const cleanedText = text.replace(/[^0-9.]/g, "");
-  
+    const cleanedText = inputText.replace(/[^0-9.]/g, "");
+
     // Ensure only one decimal point
     const parts = cleanedText.split(".");
     if (parts.length > 2) {
       return;
     }
-  
+
     // Format the amount
     let formattedAmount = cleanedText;
-  
+
     // If there's a decimal point, ensure only 2 decimal places
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
       }
     }
-  
+
     setNewDocument((prev) => ({
       ...prev,
       amount: formattedAmount,
@@ -2017,7 +2018,7 @@ const EditClaimIntimation1 = ({ route }) => {
           // Refresh claim amount after deleting document
           console.log("Document deleted, refreshing claim amount...");
           await refreshClaimAmount();
-          
+
           hidePopup();
         } catch (error) {
           console.error("Error deleting document:", error);
@@ -2048,8 +2049,8 @@ const EditClaimIntimation1 = ({ route }) => {
   // Handle submit - Updated with API integration
   const handleSubmitClaim = () => {
     showPopup(
-      "Submit Claim", 
-      "Are you sure you want to submit this claim?", 
+      "Submit Claim",
+      "Are you sure you want to submit this claim?",
       "info",
       true,
       async () => {
@@ -2068,8 +2069,8 @@ const EditClaimIntimation1 = ({ route }) => {
           // Show success message and navigate back
           hidePopup();
           showPopup(
-            "Success", 
-            "Claim submitted successfully!", 
+            "Success",
+            "Claim submitted successfully!",
             "success",
             false,
             () => {
@@ -2115,8 +2116,8 @@ const EditClaimIntimation1 = ({ route }) => {
   // Handle submit later
   const handleSubmitLater = () => {
     showPopup(
-      "Saved", 
-      "Claim saved for later submission.", 
+      "Saved",
+      "Claim saved for later submission.",
       "success",
       false,
       () => {
@@ -2168,8 +2169,8 @@ const EditClaimIntimation1 = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -2240,8 +2241,8 @@ const EditClaimIntimation1 = ({ route }) => {
           // Show success message and navigate back
           hidePopup();
           showPopup(
-            "Success", 
-            "Claim has been deleted successfully.", 
+            "Success",
+            "Claim has been deleted successfully.",
             "success",
             false,
             () => {
@@ -2589,8 +2590,8 @@ const EditClaimIntimation1 = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : "Select Member"}
+                    ? selectedMember.name
+                    : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2608,7 +2609,7 @@ const EditClaimIntimation1 = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2616,7 +2617,7 @@ const EditClaimIntimation1 = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -2694,10 +2695,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -2726,7 +2727,7 @@ const EditClaimIntimation1 = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -2736,7 +2737,7 @@ const EditClaimIntimation1 = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -2785,10 +2786,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   editDocumentType === "O01" &&
-                    (!newDocument.amount ||
-                      newDocument.amount.trim() === "" ||
-                      parseFloat(newDocument.amount) <= 0) &&
-                    styles.textInputError,
+                  (!newDocument.amount ||
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0) &&
+                  styles.textInputError,
                 ]}
                 placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
                 placeholderTextColor="#B0B0B0"
@@ -2796,6 +2797,15 @@ const EditClaimIntimation1 = ({ route }) => {
                 onChangeText={handleEditAmountChange}
                 keyboardType="decimal-pad"
                 editable={isEditAmountEditable()}
+                selectTextOnFocus={true}  // <-- Add this line
+                onFocus={() => {          // <-- Add this onFocus handler
+                  if (newDocument.amount === "0.00") {
+                    setNewDocument((prev) => ({
+                      ...prev,
+                      amount: "",
+                    }));
+                  }
+                }}
               />
 
               {/* Help text for amount field */}
@@ -2815,12 +2825,12 @@ const EditClaimIntimation1 = ({ route }) => {
                     (!newDocument.amount ||
                       newDocument.amount.trim() === "" ||
                       parseFloat(newDocument.amount) <= 0) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!newDocument.amount ||
-                  newDocument.amount.trim() === "" ||
-                  parseFloat(newDocument.amount) <= 0
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0
                     ? "Amount is required and must be greater than 0 for Bill type"
                     : "Amount is required for Bill type"}
                 </Text>

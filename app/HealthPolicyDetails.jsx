@@ -436,9 +436,9 @@ const HealthPolicyDetails = () => {
           contentBased: true,
         },
         "Saved Claims": {
-          minHeight: 400,
-          maxHeight: 530,
-          preferredRatio: 0.75,
+          minHeight: 650,
+          maxHeight: 457,
+          preferredRatio: 0.9,
           contentBased: true,
         },
         "Claim History": {

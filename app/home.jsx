@@ -1491,9 +1491,6 @@ export default function PolicyHome({ route }) {
                       Add New Policy
                     </Text>
                   </TouchableOpacity>
-                  <Text style={styles.noPoliciesHelp}>
-                    Need help? Contact us at 0112-357357
-                  </Text>
                 </View>
               ) : (
                 // Existing policy list
@@ -1503,9 +1500,9 @@ export default function PolicyHome({ route }) {
                       style={[
                         styles.policyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                          styles.selectedPolicyItem,
+                        styles.selectedPolicyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                          styles.disabledPolicyItem,
+                        styles.disabledPolicyItem,
                       ]}
                       onPress={() => {
                         // Only allow selection if it's not the currently selected policy
@@ -1516,53 +1513,28 @@ export default function PolicyHome({ route }) {
                       disabled={selectedPolicyNumber === policy.policyNumber}
                     >
                       <View style={styles.policyContent}>
-                        <Text style={styles.policyNumber}>
-                          <Text style={styles.policyLabel}>
-                            Policy Number:{" "}
-                          </Text>
-                          <Text style={styles.policyValue}>
-                            {policy.policyNumber}
-                          </Text>
-                        </Text>
-                        <Text style={styles.policyNumber}>
-                          <Text style={styles.policyLabel}>
-                            Member Number:{" "}
-                          </Text>
-                          <Text style={styles.policyValue}>
-                            {policy.policyID}
-                          </Text>
-                        </Text>
-                        <Text style={styles.policyNumber}>
-                          <Text style={styles.policyLabel}>
-                            Policy Period:{" "}
-                          </Text>
-                          <Text style={styles.policyValue}>
-                            {policy.policyPeriod}
-                          </Text>
-                        </Text>
+                        <View style={styles.policyRow}>
+                          <Text style={styles.policyLabel}>Policy Number</Text>
+                          <Text style={styles.policyValue}>{":  "+policy.policyNumber}</Text>
+                        </View>
+                        <View style={styles.policyRow}>
+                          <Text style={styles.policyLabel}>Member Number</Text>
+                          <Text style={styles.policyValue}>{":  "+policy.policyID}</Text>
+                        </View>
+                        <View style={styles.policyRow}>
+                          <Text style={styles.policyLabel}>Policy Period</Text>
+                          <Text style={styles.policyValue}>{":  "+policy.policyPeriod}</Text>
+                        </View>
                         {/* Add "Currently Selected" indicator */}
                         {selectedPolicyNumber === policy.policyNumber && (
                           <View style={styles.selectedIndicator}>
-                            <Icon
-                              name="check-circle"
-                              size={16}
-                              color="#16858D"
-                            />
-                            <Text style={styles.selectedText}>
-                              Currently Selected
-                            </Text>
+                            <Icon name="check-circle" size={16} color="#16858D" />
+                            <Text style={styles.selectedText}>Currently Selected</Text>
                           </View>
                         )}
                       </View>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() =>
-                        handleDeletePolicy(policy.id, policy.policyNumber)
-                      }
-                    >
-                      <Icon name="trash" size={25} color="#E12427" />
-                    </TouchableOpacity>
+                    
                   </View>
                 ))
               )}
@@ -2286,12 +2258,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  noPoliciesHelp: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-    fontStyle: "italic",
-  },
   policyLabel: {
     fontSize: 14,
     fontWeight: "bold",
@@ -2320,5 +2286,21 @@ const styles = StyleSheet.create({
     color: "#16858D",
     fontWeight: "500",
     marginLeft: 5,
+  },
+  policyRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  policyLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    width: 115, 
+  },
+  policyValue: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    color: '#333',
+    flex: 1,
   },
 });
