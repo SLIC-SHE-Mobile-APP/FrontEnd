@@ -1,15 +1,13 @@
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import {DarkTheme,DefaultTheme,ThemeProvider,} from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { Dimensions, StatusBar } from "react-native";
 import "react-native-reanimated";
+import { useEffect } from "react";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import sessionManager from "../utils/SessionManager.jsx"; // Import the session manager
 
 const { width, height } = Dimensions.get("window");
 
@@ -19,6 +17,37 @@ export default function RootLayout() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     // Actor: require('../assets/fonts/Actor-Regular.ttf'),  // Make sure to add the Actor font
   });
+
+  // Initialize session management when app starts
+  useEffect(() => {
+    const initializeSession = async () => {
+      console.log('🔐 RootLayout: Initializing session management...');
+      console.log('🔐 RootLayout: Fonts loaded:', loaded);
+      
+      try {
+        // Check if session is still valid when app starts
+        const isSessionValid = await sessionManager.checkSessionOnAppStart();
+        
+        if (!isSessionValid) {
+          console.log('🔐 RootLayout: Session invalid on app start, user will be redirected to login');
+        } else {
+          console.log('🔐 RootLayout: Session valid on app start');
+        }
+      } catch (error) {
+        console.error('🔐 RootLayout: Error initializing session:', error);
+      }
+    };
+
+    if (loaded) {
+      initializeSession();
+    }
+
+    // Cleanup function
+    return () => {
+      console.log('🔐 RootLayout: Cleaning up session manager...');
+      sessionManager.destroy();
+    };
+  }, [loaded]);
 
   if (!loaded) {
     return null;

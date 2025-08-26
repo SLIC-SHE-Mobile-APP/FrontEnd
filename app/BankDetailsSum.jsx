@@ -17,12 +17,12 @@ import {
   Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { API_BASE_URL } from '../constants/index.js';
+import { API_BASE_URL } from "../constants/index.js";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 // Custom Popup Component
-const CustomPopup = ({ visible, title, message, onConfirm, type = 'info' }) => {
+const CustomPopup = ({ visible, title, message, onConfirm, type = "info" }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
 
@@ -59,27 +59,27 @@ const CustomPopup = ({ visible, title, message, onConfirm, type = 'info' }) => {
 
   const getIconColor = () => {
     switch (type) {
-      case 'success':
-        return '#4CAF50';
-      case 'error':
-        return '#F44336';
-      case 'warning':
-        return '#FF9800';
+      case "success":
+        return "#4CAF50";
+      case "error":
+        return "#F44336";
+      case "warning":
+        return "#FF9800";
       default:
-        return '#4ECDC4';
+        return "#4ECDC4";
     }
   };
 
   const getIcon = () => {
     switch (type) {
-      case 'success':
-        return '✓';
-      case 'error':
-        return '✕';
-      case 'warning':
-        return '⚠';
+      case "success":
+        return "✓";
+      case "error":
+        return "✕";
+      case "warning":
+        return "⚠";
       default:
-        return 'ℹ';
+        return "ℹ";
     }
   };
 
@@ -92,13 +92,8 @@ const CustomPopup = ({ visible, title, message, onConfirm, type = 'info' }) => {
       animationType="none"
       statusBarTranslucent={true}
     >
-      <Animated.View 
-        style={[
-          styles.popupOverlay,
-          { opacity: fadeAnim }
-        ]}
-      >
-        <TouchableOpacity 
+      <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onConfirm}
@@ -111,13 +106,15 @@ const CustomPopup = ({ visible, title, message, onConfirm, type = 'info' }) => {
             },
           ]}
         >
-          <View style={[styles.iconContainer, { backgroundColor: getIconColor() }]}>
+          <View
+            style={[styles.iconContainer, { backgroundColor: getIconColor() }]}
+          >
             <Text style={styles.iconText}>{getIcon()}</Text>
           </View>
-          
+
           {title && <Text style={styles.popupTitle}>{title}</Text>}
           <Text style={styles.popupMessage}>{message}</Text>
-          
+
           <TouchableOpacity
             style={[styles.confirmButton, { backgroundColor: getIconColor() }]}
             onPress={onConfirm}
@@ -141,7 +138,7 @@ const BankDetailsSum = ({ onClose }) => {
   const [nicNumber, setNicNumber] = useState(null);
   const [mobileNumber, setMobileNumber] = useState(null);
   const [otpLoading, setOtpLoading] = useState(false);
-  
+
   // OTP Modal states
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otp, setOtp] = useState(["", "", "", ""]);
@@ -155,21 +152,21 @@ const BankDetailsSum = ({ onClose }) => {
   // Popup state
   const [popup, setPopup] = useState({
     visible: false,
-    title: '',
-    message: '',
-    type: 'info'
+    title: "",
+    message: "",
+    type: "info",
   });
 
   // References for OTP input fields
   const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
 
   // Function to show popup
-  const showPopup = (message, type = 'info', title = '') => {
+  const showPopup = (message, type = "info", title = "") => {
     setPopup({
       visible: true,
       title,
       message,
-      type
+      type,
     });
   };
 
@@ -177,9 +174,9 @@ const BankDetailsSum = ({ onClose }) => {
   const hidePopup = () => {
     setPopup({
       visible: false,
-      title: '',
-      message: '',
-      type: 'info'
+      title: "",
+      message: "",
+      type: "info",
     });
   };
 
@@ -230,7 +227,7 @@ const BankDetailsSum = ({ onClose }) => {
 
     const spin = rotateAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
+      outputRange: ["0deg", "360deg"],
     });
 
     return (
@@ -316,12 +313,12 @@ const BankDetailsSum = ({ onClose }) => {
         });
 
         setMemberNo(paddedMemberNumber);
-        
-        return { 
-          policyNo: storedPolicyNumber, 
+
+        return {
+          policyNo: storedPolicyNumber,
           memberNo: paddedMemberNumber,
           nicNumber: storedNicNumber,
-          mobileNumber: storedMobileNumber
+          mobileNumber: storedMobileNumber,
         };
       } else {
         console.warn("Policy number or member number not found in SecureStore");
@@ -351,7 +348,7 @@ const BankDetailsSum = ({ onClose }) => {
       });
 
       const response = await fetch(
-         `${API_BASE_URL}/BankDetails?policyNo=${policyNumber}&memberNo=${memberNumber}`
+        `${API_BASE_URL}/BankDetails?policyNo=${policyNumber}&memberNo=${memberNumber}`
       );
 
       if (!response.ok) {
@@ -414,7 +411,9 @@ const BankDetailsSum = ({ onClose }) => {
       }
     } catch (err) {
       console.error("Error fetching bank details:", err);
-      setError("Unable to load bank details. Please check your connection and try again.");
+      setError(
+        "Unable to load bank details. Please check your connection and try again."
+      );
       setBankDetails(null);
     } finally {
       setLoading(false);
@@ -423,8 +422,17 @@ const BankDetailsSum = ({ onClose }) => {
 
   // Send OTP via CheckAvailability API
   const sendOTP = async () => {
-    if (!nicNumber || nicNumber === "Not Available" || !mobileNumber || mobileNumber === "Not Available") {
-      showPopup("User credentials are not available. Cannot verify details.", 'error', 'Error');
+    if (
+      !nicNumber ||
+      nicNumber === "Not Available" ||
+      !mobileNumber ||
+      mobileNumber === "Not Available"
+    ) {
+      showPopup(
+        "User credentials are not available. Cannot verify details.",
+        "error",
+        "Error"
+      );
       return;
     }
 
@@ -437,7 +445,7 @@ const BankDetailsSum = ({ onClose }) => {
       });
 
       const response = await fetch(
-         `${API_BASE_URL}/LoginNicMnumber/CheckAvailability`,
+        `${API_BASE_URL}/LoginNicMnumber/CheckAvailability`,
         {
           method: "POST",
           headers: {
@@ -460,11 +468,19 @@ const BankDetailsSum = ({ onClose }) => {
         setCanResend(false);
         setOtp(["", "", "", ""]);
       } else {
-        showPopup(result.message || "Failed to send OTP. Please try again.", 'error', 'Error');
+        showPopup(
+          result.message || "Failed to send OTP. Please try again.",
+          "error",
+          "Error"
+        );
       }
     } catch (error) {
       console.error("API Error:", error);
-      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
+      showPopup(
+        error.message || "Something went wrong. Please try again.",
+        "error",
+        "Error"
+      );
     } finally {
       setOtpLoading(false);
     }
@@ -551,12 +567,18 @@ const BankDetailsSum = ({ onClose }) => {
   const verifyOTP = async () => {
     const otpCode = otp.join("");
     if (otpCode.length !== 4) {
-      showPopup("Please enter a valid 4-digit OTP", 'warning');
+      showPopup("Please enter a valid 4-digit OTP", "warning");
       return;
     }
 
     if (!mobileNumber || mobileNumber === "Not Available") {
-      showPopup("Missing mobile number. Please try again.", 'error', 'Error');
+      showPopup("Missing mobile number. Please try again.", "error", "Error");
+      return;
+    }
+
+    // Add validation for NIC number as well
+    if (!nicNumber || nicNumber === "Not Available") {
+      showPopup("Missing NIC number. Please try again.", "error", "Error");
       return;
     }
 
@@ -565,6 +587,7 @@ const BankDetailsSum = ({ onClose }) => {
     try {
       console.log("Validating OTP with:", {
         mobileNumber,
+        nicNumber, // Make sure this is logged
         otp: otpCode,
       });
 
@@ -576,6 +599,7 @@ const BankDetailsSum = ({ onClose }) => {
           body: JSON.stringify({
             mobileNumber: mobileNumber,
             otp: otpCode,
+            nicNumber: nicNumber, // ADD THIS LINE - it was missing!
           }),
         }
       );
@@ -587,19 +611,31 @@ const BankDetailsSum = ({ onClose }) => {
         // Close modal and show unmasked details
         setShowOtpModal(false);
         setShowMasked(false);
-        showPopup("OTP verified successfully!", 'success', 'Success');
+        showPopup(
+          "OTP verified successfully! Bank details are now visible.",
+          "success",
+          "Success"
+        );
       } else {
         if (result.errorType === "INVALID_OTP") {
-          showPopup("Invalid OTP. Please check and try again.", 'error');
+          showPopup("Invalid OTP. Please check and try again.", "error");
         } else if (result.errorType === "OTP_EXPIRED") {
-          showPopup("OTP has expired. Please request a new one.", 'warning');
+          showPopup("OTP has expired. Please request a new one.", "warning");
         } else {
-          showPopup(result.message || "OTP verification failed.", 'error', 'Error');
+          showPopup(
+            result.message || "OTP verification failed.",
+            "error",
+            "Error"
+          );
         }
       }
     } catch (error) {
       console.error("API Error:", error);
-      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
+      showPopup(
+        error.message || "Something went wrong. Please try again.",
+        "error",
+        "Error"
+      );
     } finally {
       setOtpVerifyLoading(false);
     }
@@ -609,8 +645,13 @@ const BankDetailsSum = ({ onClose }) => {
   const resendOTP = async () => {
     if (!canResend) return;
 
-    if (!nicNumber || nicNumber === "Not Available" || !mobileNumber || mobileNumber === "Not Available") {
-      showPopup("Missing user data. Please try again.", 'error', 'Error');
+    if (
+      !nicNumber ||
+      nicNumber === "Not Available" ||
+      !mobileNumber ||
+      mobileNumber === "Not Available"
+    ) {
+      showPopup("Missing user data. Please try again.", "error", "Error");
       return;
     }
 
@@ -648,13 +689,25 @@ const BankDetailsSum = ({ onClose }) => {
         setTimer(90);
         setCanResend(false);
 
-        showPopup(`OTP resent to ${maskContactInfo(mobileNumber)}`, 'success', 'Success');
+        showPopup(
+          `OTP resent to ${maskContactInfo(mobileNumber)}`,
+          "success",
+          "Success"
+        );
       } else {
-        showPopup(result.message || "Failed to resend OTP. Please try again.", 'error', 'Error');
+        showPopup(
+          result.message || "Failed to resend OTP. Please try again.",
+          "error",
+          "Error"
+        );
       }
     } catch (error) {
       console.error("API Error:", error);
-      showPopup(error.message || "Something went wrong. Please try again.", 'error', 'Error');
+      showPopup(
+        error.message || "Something went wrong. Please try again.",
+        "error",
+        "Error"
+      );
     } finally {
       setResendLoading(false);
     }
@@ -685,7 +738,11 @@ const BankDetailsSum = ({ onClose }) => {
 
   const handleViewDetails = () => {
     if (notFoundError) {
-      showPopup("Bank details are not available. Cannot verify.", 'warning', 'Information Not Available');
+      showPopup(
+        "Bank details are not available. Cannot verify.",
+        "warning",
+        "Information Not Available"
+      );
       return;
     }
 
@@ -699,7 +756,12 @@ const BankDetailsSum = ({ onClose }) => {
   };
 
   const handleRetry = () => {
-    if (policyNo && policyNo !== "Not Available" && memberNo && memberNo !== "Not Available") {
+    if (
+      policyNo &&
+      policyNo !== "Not Available" &&
+      memberNo &&
+      memberNo !== "Not Available"
+    ) {
       fetchBankDetails(policyNo, memberNo);
     } else {
       // Try to get stored data again
@@ -708,7 +770,11 @@ const BankDetailsSum = ({ onClose }) => {
         if (storedData && storedData.policyNo && storedData.memberNo) {
           await fetchBankDetails(storedData.policyNo, storedData.memberNo);
         } else {
-          showPopup("Required policy information is not available.", 'error', 'Missing Information');
+          showPopup(
+            "Required policy information is not available.",
+            "error",
+            "Missing Information"
+          );
         }
       };
       initializeData();
@@ -717,28 +783,31 @@ const BankDetailsSum = ({ onClose }) => {
 
   // Component to render field with icon for missing/not available data
   const renderFieldValue = (value, fieldName) => {
-    const isDataNotAvailable = !value || 
-                               value === "Not Available" || 
-                               value === "Bank Name Not Available" ||
-                               value === "Branch Name Not Available" ||
-                               value === "Account Number Not Available" ||
-                               value === "Mobile Number Not Available" ||
-                               value === "Bank Information Not Available" ||
-                               value === "Branch Information Not Available";
+    const isDataNotAvailable =
+      !value ||
+      value === "Not Available" ||
+      value === "Bank Name Not Available" ||
+      value === "Branch Name Not Available" ||
+      value === "Account Number Not Available" ||
+      value === "Mobile Number Not Available" ||
+      value === "Bank Information Not Available" ||
+      value === "Branch Information Not Available";
 
     if (isDataNotAvailable) {
       return (
         <View style={styles.missingDataContainer}>
-          <Ionicons name="information-circle-outline" size={16} color="#00ADBB" />
+          <Ionicons
+            name="information-circle-outline"
+            size={16}
+            color="#00ADBB"
+          />
           <Text style={styles.missingDataText}>Not Available</Text>
         </View>
       );
     }
 
     return (
-      <Text style={styles.value}>
-        {showMasked ? maskValue(value) : value}
-      </Text>
+      <Text style={styles.value}>{showMasked ? maskValue(value) : value}</Text>
     );
   };
 
@@ -747,15 +816,19 @@ const BankDetailsSum = ({ onClose }) => {
     <View style={styles.centerContent}>
       <Ionicons name="card-outline" size={60} color="#00ADBB" />
       <Text style={styles.emptyStateMessage}>
-        {notFoundError 
+        {notFoundError
           ? "Bank Details Not Found for this Policy."
-          : "BBank Details Not Found for this Policy."
-        }
+          : "BBank Details Not Found for this Policy."}
       </Text>
-      
+
       {error && !notFoundError && (
         <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-          <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
+          <Ionicons
+            name="refresh-outline"
+            size={16}
+            color="#FFFFFF"
+            style={styles.retryIcon}
+          />
           <Text style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
       )}
@@ -769,10 +842,16 @@ const BankDetailsSum = ({ onClose }) => {
           <Ionicons name="warning-outline" size={60} color="#00ADBB" />
           <Text style={styles.errorText}>Connection Error</Text>
           <Text style={styles.errorDetailText}>
-            Unable to load bank details. Please check your connection and try again.
+            Unable to load bank details. Please check your connection and try
+            again.
           </Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-            <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.retryIcon} />
+            <Ionicons
+              name="refresh-outline"
+              size={16}
+              color="#FFFFFF"
+              style={styles.retryIcon}
+            />
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -788,7 +867,11 @@ const BankDetailsSum = ({ onClose }) => {
         {/* Status Banner */}
         {notFoundError && (
           <View style={styles.statusBanner}>
-            <Ionicons name="information-circle-outline" size={20} color="#00ADBB" />
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color="#00ADBB"
+            />
             <Text style={styles.statusBannerText}>
               Some bank information may not be available
             </Text>
@@ -807,25 +890,26 @@ const BankDetailsSum = ({ onClose }) => {
             {renderFieldValue(bankDetails.branchName, "branchName")}
             {renderFieldValue(bankDetails.accountNumber, "accountNumber")}
             {renderFieldValue(bankDetails.mobileNumber, "mobileNumber")}
-            
-            <TouchableOpacity 
-              onPress={handleViewDetails} 
+
+            <TouchableOpacity
+              onPress={handleViewDetails}
               disabled={otpLoading}
               style={notFoundError ? styles.disabledButton : null}
             >
               {otpLoading ? (
                 <ActivityIndicator size="small" color="#13646D" />
               ) : (
-                <Text style={[
-                  styles.viewDetailsText,
-                  notFoundError && styles.disabledText
-                ]}>
-                  {notFoundError 
-                    ? "Details Not Available" 
-                    : showMasked 
-                      ? "View Details" 
-                      : "Hide Details"
-                  }
+                <Text
+                  style={[
+                    styles.viewDetailsText,
+                    notFoundError && styles.disabledText,
+                  ]}
+                >
+                  {notFoundError
+                    ? "Details Not Available"
+                    : showMasked
+                    ? "View Details"
+                    : "Hide Details"}
                 </Text>
               )}
             </TouchableOpacity>
@@ -879,101 +963,105 @@ const BankDetailsSum = ({ onClose }) => {
         onRequestClose={() => setShowOtpModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContent,
-              { transform: [{ translateY: slideAnim }] }
+              { transform: [{ translateY: slideAnim }] },
             ]}
           >
             <LinearGradient
               colors={["#CDEAED", "#6DD3D3"]}
               style={styles.modalGradient}
             >
-              <View style={{height: 400, maxHeight: '80%',}}>
-              {/* Modal Header */}
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>OTP Verification</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setShowOtpModal(false)}
-                >
-                  <Ionicons name="close" size={24} color="#13646D" />
-                </TouchableOpacity>
-              </View>
-
-              {/* OTP Content */}
-              <View style={styles.otpContent}>
-                <Text style={styles.otpSubtitle}>
-                  Enter the verification code sent to
-                </Text>
-                <Text style={styles.otpContactInfo}>
-                  {maskContactInfo(mobileNumber)}
-                </Text>
-
-                {/* OTP Input Container */}
-                <View style={styles.otpContainer}>
-                  {otp.map((digit, index) => (
-                    <TextInput
-                      key={index}
-                      ref={inputRefs[index]}
-                      style={[
-                        styles.otpInput,
-                        digit !== "" && styles.otpInputFilled,
-                      ]}
-                      value={digit}
-                      onChangeText={(text) => handleOtpChange(text, index)}
-                      onKeyPress={(e) => handleKeyPress(e, index)}
-                      keyboardType="number-pad"
-                      maxLength={1}
-                      selectTextOnFocus
-                      editable={!otpVerifyLoading}
-                    />
-                  ))}
+              <View style={{ height: 400, maxHeight: "80%" }}>
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>OTP Verification</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setShowOtpModal(false)}
+                  >
+                    <Ionicons name="close" size={24} color="#13646D" />
+                  </TouchableOpacity>
                 </View>
 
-                {/* Timer */}
-                <Text style={styles.timerText}>
-                  {canResend
-                    ? "You can now resend OTP"
-                    : `Resend OTP in ${formatTime(timer)}`}
-                </Text>
+                {/* OTP Content */}
+                <View style={styles.otpContent}>
+                  <Text style={styles.otpSubtitle}>
+                    Enter the verification code sent to
+                  </Text>
+                  <Text style={styles.otpContactInfo}>
+                    {maskContactInfo(mobileNumber)}
+                  </Text>
 
-                {/* Verify Button */}
-                <TouchableOpacity
-                  style={[styles.verifyButton, otpVerifyLoading && styles.buttonDisabled]}
-                  onPress={verifyOTP}
-                  disabled={otpVerifyLoading}
-                >
-                  {otpVerifyLoading ? (
-                    <ActivityIndicator color="#6DD3D3" size="small" />
-                  ) : (
-                    <Text style={styles.verifyButtonText}>Verify</Text>
-                  )}
-                </TouchableOpacity>
+                  {/* OTP Input Container */}
+                  <View style={styles.otpContainer}>
+                    {otp.map((digit, index) => (
+                      <TextInput
+                        key={index}
+                        ref={inputRefs[index]}
+                        style={[
+                          styles.otpInput,
+                          digit !== "" && styles.otpInputFilled,
+                        ]}
+                        value={digit}
+                        onChangeText={(text) => handleOtpChange(text, index)}
+                        onKeyPress={(e) => handleKeyPress(e, index)}
+                        keyboardType="number-pad"
+                        maxLength={1}
+                        selectTextOnFocus
+                        editable={!otpVerifyLoading}
+                      />
+                    ))}
+                  </View>
 
-                {/* Resend Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.resendButton,
-                    (!canResend || resendLoading) && styles.resendButtonDisabled,
-                  ]}
-                  onPress={resendOTP}
-                  disabled={!canResend || resendLoading}
-                >
-                  {resendLoading ? (
-                    <ActivityIndicator color="#13646D" size="small" />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.resendButtonText,
-                        !canResend && styles.resendButtonTextDisabled,
-                      ]}
-                    >
-                      Resend OTP
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+                  {/* Timer */}
+                  <Text style={styles.timerText}>
+                    {canResend
+                      ? "You can now resend OTP"
+                      : `Resend OTP in ${formatTime(timer)}`}
+                  </Text>
+
+                  {/* Verify Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.verifyButton,
+                      otpVerifyLoading && styles.buttonDisabled,
+                    ]}
+                    onPress={verifyOTP}
+                    disabled={otpVerifyLoading}
+                  >
+                    {otpVerifyLoading ? (
+                      <ActivityIndicator color="#6DD3D3" size="small" />
+                    ) : (
+                      <Text style={styles.verifyButtonText}>Verify</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Resend Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.resendButton,
+                      (!canResend || resendLoading) &&
+                        styles.resendButtonDisabled,
+                    ]}
+                    onPress={resendOTP}
+                    disabled={!canResend || resendLoading}
+                  >
+                    {resendLoading ? (
+                      <ActivityIndicator color="#13646D" size="small" />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.resendButtonText,
+                          !canResend && styles.resendButtonTextDisabled,
+                        ]}
+                      >
+                        Resend OTP
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </LinearGradient>
           </Animated.View>
@@ -1011,12 +1099,12 @@ const styles = StyleSheet.create({
   // Custom Loading Styles
   loadingOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 30,
     minWidth: 200,
     minHeight: 150,
@@ -1028,32 +1116,32 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#16858D',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#16858D",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#6DD3D3',
+    borderColor: "#6DD3D3",
   },
   loadingIconInner: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#17ABB7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#17ABB7",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '600',
+    color: "#333",
+    textAlign: "center",
+    fontWeight: "600",
     marginBottom: 5,
   },
   loadingSubText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#666",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   scrollContainer: {
     paddingBottom: 20,
@@ -1200,56 +1288,56 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
-    maxHeight: '90%',
-    width: '90%',
+    maxHeight: "90%",
+    width: "90%",
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   modalGradient: {
     padding: 20,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#13646D',
+    fontWeight: "bold",
+    color: "#13646D",
   },
   modalCloseButton: {
     padding: 4,
   },
   otpContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   otpSubtitle: {
     fontSize: 16,
-    color: '#13646D',
-    textAlign: 'center',
-    marginTop:65,
+    color: "#13646D",
+    textAlign: "center",
+    marginTop: 65,
     marginBottom: 6,
     opacity: 0.8,
   },
   otpContactInfo: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#13646D',
-    textAlign: 'center',
+    fontWeight: "600",
+    color: "#13646D",
+    textAlign: "center",
     marginBottom: 32,
   },
   otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '80%',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "80%",
     marginBottom: 24,
   },
   otpInput: {
@@ -1257,17 +1345,17 @@ const styles = StyleSheet.create({
     height: 55,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderColor: "rgba(255, 255, 255, 0.5)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     fontSize: 24,
-    textAlign: 'center',
-    color: '#13646D',
-    fontWeight: 'bold',
+    textAlign: "center",
+    color: "#13646D",
+    fontWeight: "bold",
   },
   otpInputFilled: {
-    borderColor: '#13646D',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
+    borderColor: "#13646D",
+    backgroundColor: "#fff",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1275,19 +1363,19 @@ const styles = StyleSheet.create({
   },
   timerText: {
     fontSize: 14,
-    color: '#13646D',
-    textAlign: 'center',
+    color: "#13646D",
+    textAlign: "center",
     marginBottom: 24,
     opacity: 0.8,
   },
   verifyButton: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 10,
     paddingVertical: 15,
     paddingHorizontal: 60,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
@@ -1297,9 +1385,9 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   verifyButtonText: {
-    color: '#13646D',
+    color: "#13646D",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   resendButton: {
     paddingVertical: 10,
@@ -1309,37 +1397,37 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   resendButtonText: {
-    color: '#13646D',
+    color: "#13646D",
     fontSize: 16,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
   resendButtonTextDisabled: {
-    color: 'rgba(19, 100, 109, 0.5)',
+    color: "rgba(19, 100, 109, 0.5)",
   },
   // Popup Styles
   popupOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   popupContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 30,
-    alignItems: 'center',
+    alignItems: "center",
     maxWidth: width * 0.85,
     minWidth: width * 0.7,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 10,
@@ -1353,26 +1441,26 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
   },
   iconText: {
     fontSize: 24,
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
   },
   popupTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   popupMessage: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     lineHeight: 22,
     marginBottom: 25,
   },
@@ -1383,10 +1471,10 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   confirmButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
 
