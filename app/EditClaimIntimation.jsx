@@ -2208,7 +2208,137 @@ const EditClaimIntimation = ({ route }) => {
                 </View>
               )}
 
-              <Modal
+              
+
+              {/* Document Date */}
+              <Text style={styles.documentFieldLabel}>Document Date</Text>
+              <TouchableOpacity
+                style={styles.documentDropdownButton}
+                onPress={showEditDatePickerModal}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {formatDate(editDocumentDate)}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#666" />
+              </TouchableOpacity>
+
+              {showEditDatePicker && (
+                <DateTimePicker
+                  testID="editDateTimePicker"
+                  value={editDocumentDate}
+                  mode="date"
+                  is24Hour={true}
+                  display="default"
+                  onChange={handleEditDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
+
+              {/* Document Amount */}
+              <Text style={styles.documentFieldLabel}>
+                Document Amount
+                {editDocumentType === "O01" && (
+                  <Text style={styles.requiredAsterisk}> *</Text>
+                )}
+              </Text>
+              <TextInput
+                style={[
+                  styles.documentModalInput,
+                  !isEditAmountEditable() && styles.textInputDisabled,
+                  editDocumentType === "O01" &&
+                  (!newDocument.amount ||
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0) &&
+                  styles.textInputError,
+                ]}
+                placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                placeholderTextColor="#B0B0B0"
+                value={newDocument.amount}
+                onChangeText={handleEditAmountChange}
+                keyboardType="decimal-pad"
+                editable={isEditAmountEditable()}
+              />
+
+              {/* Help text for amount field */}
+              {editDocumentType === "O02" || editDocumentType === "O03" ? (
+                <Text style={styles.helpText}>
+                  Amount is automatically set to 0.00 for{" "}
+                  {
+                    documentTypes.find(
+                      (type) => type.docId === editDocumentType
+                    )?.docDesc
+                  }
+                </Text>
+              ) : editDocumentType === "O01" ? (
+                <Text
+                  style={[
+                    styles.helpText,
+                    (!newDocument.amount ||
+                      newDocument.amount.trim() === "" ||
+                      parseFloat(newDocument.amount) <= 0) &&
+                    styles.errorText,
+                  ]}
+                >
+                  {!newDocument.amount ||
+                    newDocument.amount.trim() === "" ||
+                    parseFloat(newDocument.amount) <= 0
+                    ? "Amount is required and must be greater than 0 for Bill type"
+                    : "Amount is required for Bill type"}
+                </Text>
+              ) : editDocumentType === "O04" ? (
+                <Text style={styles.helpText}>
+                  Enter amount for Other document type
+                </Text>
+              ) : null}
+            </ScrollView>
+
+            <View style={styles.documentModalButtons}>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditDocumentModalVisible(false);
+                  setEditDocTypeDropdownVisible(false);
+                  setEditDocumentType("");
+                  setEditDocumentDate(new Date());
+                }}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveDocumentEdit}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={isImageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity
+            style={styles.imageModalClose}
+            onPress={() => setImageModalVisible(false)}
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          {selectedImageUri && (
+            <Image
+              source={{ uri: selectedImageUri }}
+              style={styles.enlargedImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+      <Modal
                 visible={isEditBeneficiaryModalVisible}
                 transparent
                 animationType="slide"
@@ -2339,135 +2469,6 @@ const EditClaimIntimation = ({ route }) => {
                   </View>
                 </View>
               </Modal>
-
-              {/* Document Date */}
-              <Text style={styles.documentFieldLabel}>Document Date</Text>
-              <TouchableOpacity
-                style={styles.documentDropdownButton}
-                onPress={showEditDatePickerModal}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {formatDate(editDocumentDate)}
-                </Text>
-                <Ionicons name="calendar-outline" size={20} color="#666" />
-              </TouchableOpacity>
-
-              {showEditDatePicker && (
-                <DateTimePicker
-                  testID="editDateTimePicker"
-                  value={editDocumentDate}
-                  mode="date"
-                  is24Hour={true}
-                  display="default"
-                  onChange={handleEditDateChange}
-                  maximumDate={new Date()}
-                />
-              )}
-
-              {/* Document Amount */}
-              <Text style={styles.documentFieldLabel}>
-                Document Amount
-                {editDocumentType === "O01" && (
-                  <Text style={styles.requiredAsterisk}> *</Text>
-                )}
-              </Text>
-              <TextInput
-                style={[
-                  styles.documentModalInput,
-                  !isEditAmountEditable() && styles.textInputDisabled,
-                  editDocumentType === "O01" &&
-                  (!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0) &&
-                  styles.textInputError,
-                ]}
-                placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
-                placeholderTextColor="#B0B0B0"
-                value={newDocument.amount}
-                onChangeText={handleEditAmountChange}
-                keyboardType="decimal-pad"
-                editable={isEditAmountEditable()}
-              />
-
-              {/* Help text for amount field */}
-              {editDocumentType === "O02" || editDocumentType === "O03" ? (
-                <Text style={styles.helpText}>
-                  Amount is automatically set to 0.00 for{" "}
-                  {
-                    documentTypes.find(
-                      (type) => type.docId === editDocumentType
-                    )?.docDesc
-                  }
-                </Text>
-              ) : editDocumentType === "O01" ? (
-                <Text
-                  style={[
-                    styles.helpText,
-                    (!newDocument.amount ||
-                      newDocument.amount.trim() === "" ||
-                      parseFloat(newDocument.amount) <= 0) &&
-                    styles.errorText,
-                  ]}
-                >
-                  {!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0
-                    ? "Amount is required and must be greater than 0 for Bill type"
-                    : "Amount is required for Bill type"}
-                </Text>
-              ) : editDocumentType === "O04" ? (
-                <Text style={styles.helpText}>
-                  Enter amount for Other document type
-                </Text>
-              ) : null}
-            </ScrollView>
-
-            <View style={styles.documentModalButtons}>
-              <TouchableOpacity
-                onPress={() => {
-                  setEditDocumentModalVisible(false);
-                  setEditDocTypeDropdownVisible(false);
-                  setEditDocumentType("");
-                  setEditDocumentDate(new Date());
-                }}
-                style={styles.cancelBtn}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSaveDocumentEdit}
-                style={styles.saveBtn}
-              >
-                <Text style={styles.saveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Image Preview Modal */}
-      <Modal
-        visible={isImageModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setImageModalVisible(false)}
-      >
-        <View style={styles.imageModalOverlay}>
-          <TouchableOpacity
-            style={styles.imageModalClose}
-            onPress={() => setImageModalVisible(false)}
-          >
-            <Ionicons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
-          {selectedImageUri && (
-            <Image
-              source={{ uri: selectedImageUri }}
-              style={styles.enlargedImage}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-      </Modal>
 
       {/* Custom Popup */}
       <CustomPopup
