@@ -2573,11 +2573,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   limitWarning: {
-    color: "#FF6B6B",
+    color: "#13646D",
     fontWeight: "500",
   },
   limitInfo: {
-    color: "#00C4CC",
+    color: "#13646D",
     fontWeight: "500",
   },
   documentTypeContainer: {
@@ -2638,7 +2638,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   requiredAsterisk: {
-    color: "#FF6B6B",
+    color: "#13646D",
     fontSize: 16,
   },
   textInput: {
@@ -2656,7 +2656,7 @@ const styles = StyleSheet.create({
     color: "#888",
   },
   textInputError: {
-    borderColor: "#FF6B6B",
+    borderColor: "white",
     borderWidth: 2,
   },
   helpText: {
@@ -2666,7 +2666,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   errorText: {
-    color: "#FF6B6B",
+    color: "#13646D",
     fontSize: 12,
     marginTop: 5,
     marginLeft: 5,
