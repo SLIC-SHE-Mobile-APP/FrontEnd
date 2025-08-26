@@ -230,6 +230,22 @@ const EditClaimIntimation1 = ({ route }) => {
     amount: "",
   });
 
+
+  const removeCommasFromAmount = (amount) => {
+    if (!amount) return "";
+    return amount.toString().replace(/,/g, "");
+  };
+
+  const toSentenceCase = (str) => {
+    if (!str) return str;
+    return str.toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  };
+
+  const getDocumentTypeLabel = (docId) => {
+    const docType = documentTypes.find((type) => type.docId === docId);
+    return docType ? toSentenceCase(docType.docDesc) : toSentenceCase(docId);
+  };
+
   // New document form
   const [newDocument, setNewDocument] = useState({
     type: "",
@@ -1649,7 +1665,6 @@ const EditClaimIntimation1 = ({ route }) => {
 
   // Helper functions for document modal
   const handleEditDocTypeSelect = (docType) => {
-    // Check if BILL type already exists and prevent selection
     if (docType.docId === "O01") {
       const billExists = documents.some(
         (doc) => doc.type === "BILL" && doc.id !== selectedDocument?.id
@@ -1667,12 +1682,11 @@ const EditClaimIntimation1 = ({ route }) => {
 
     setEditDocumentType(docType.docId);
 
-    // Update newDocument type with the description
     setNewDocument((prev) => ({
       ...prev,
       type: docType.docDesc,
-      // Clear amount when switching to BILL type, set to 0.00 for others
-      amount: docType.docId === "O01" ? "" : "0.00"  // <-- Change this line from "" to ""
+      // Set amount based on document type
+      amount: docType.docId === "O02" || docType.docId === "O03" ? "0.00" : prev.amount
     }));
 
     setEditDocTypeDropdownVisible(false);
@@ -1696,45 +1710,69 @@ const EditClaimIntimation1 = ({ route }) => {
   };
 
   const handleEditAmountChange = (text) => {
-    // Only allow editing if document type is BILL (O01)
-    if (editDocumentType !== "O01") {
-      return;
+    if (editDocumentType !== "O01" && editDocumentType !== "O04") {
+      return; // Only BILL and OTHER types are editable
     }
 
-    // If the current value is "0.00" and user types something, clear it first
-    let inputText = text;
-    if (newDocument.amount === "0.00" && text.length === 1) {
-      inputText = text;
-    }
-
-    // Remove any non-numeric characters except decimal point
-    const cleanedText = inputText.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
+    // Remove commas first to get clean number
+    const cleanedText = text.replace(/[^0-9.]/g, "");
     const parts = cleanedText.split(".");
+
     if (parts.length > 2) {
       return;
     }
 
-    // Format the amount
-    let formattedAmount = cleanedText;
+    // Check if integer part exceeds 9 digits
+    if (parts[0].length > 9) {
+      return;
+    }
 
-    // If there's a decimal point, ensure only 2 decimal places
+    let formattedAmount = cleanedText;
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
       }
     }
 
+    // Format with commas for display
+    const displayAmount = formatAmountWithCommas(formattedAmount);
     setNewDocument((prev) => ({
       ...prev,
-      amount: formattedAmount,
+      amount: formattedAmount, // Store clean amount without commas
     }));
   };
 
+
   const isEditAmountEditable = () => {
-    return editDocumentType === "O01";
+    return editDocumentType === "O01" || editDocumentType === "O04";
   };
+
+  const validateEditAmount = (amountString, docType) => {
+    if (docType === "O02" || docType === "O03") {
+      return true; // Always valid for these types
+    }
+
+    if (docType === "O01") {
+      if (!amountString || amountString.trim() === "") {
+        return false;
+      }
+      const cleanAmount = removeCommasFromAmount(amountString);
+      const amount = parseFloat(cleanAmount);
+      return !isNaN(amount) && amount > 0;
+    }
+
+    if (docType === "O04") {
+      if (!amountString || amountString.trim() === "") {
+        return false;
+      }
+      const cleanAmount = removeCommasFromAmount(amountString);
+      const amount = parseFloat(cleanAmount);
+      return !isNaN(amount) && amount >= 0;
+    }
+
+    return false;
+  };
+
 
   const updateDocumentAPI = async (documentData) => {
     try {
@@ -1824,71 +1862,72 @@ const EditClaimIntimation1 = ({ route }) => {
   // Save document edit with claim amount refresh
   const handleSaveDocumentEdit = async () => {
     try {
-      // Show loading state (optional)
-      // You can add a loading state here if needed
-
-      // Validate required fields
       if (!editDocumentType) {
-        showPopup("Validation Error", "Please select a document type.", "warning");
-        return;
-      }
-
-      if (
-        editDocumentType === "O01" &&
-        (!newDocument.amount || parseFloat(newDocument.amount) <= 0)
-      ) {
         showPopup(
           "Validation Error",
-          "Amount is required and must be greater than 0 for Bill type.",
+          "Please select a document type.",
           "warning"
         );
         return;
       }
 
-      // Get stored user NIC
-      const storedNic = await SecureStore.getItemAsync("user_nic");
-      if (!storedNic) {
-        showPopup("Error", "User information not found. Please login again.", "error");
+      // Updated validation using the new function
+      if (!validateEditAmount(newDocument.amount, editDocumentType)) {
+        if (editDocumentType === "O01") {
+          showPopup(
+            "Validation Error",
+            "Amount is required and must be greater than 0 for Bill type.",
+            "warning"
+          );
+        } else if (editDocumentType === "O04") {
+          showPopup(
+            "Validation Error",
+            "Amount is required for Other document type.",
+            "warning"
+          );
+        }
         return;
       }
 
-      // Parse clmMemSeqNo to get ClmMemSeqNo and DocSeq
+      // Rest of the function remains the same...
+      const storedNic = await SecureStore.getItemAsync("user_nic");
+      if (!storedNic) {
+        showPopup(
+          "Error",
+          "User information not found. Please login again.",
+          "error"
+        );
+        return;
+      }
+
       const { memId: clmMemSeqNo, seqNo: docSeq } = parseClmMemSeqNo(
         selectedDocument.clmMemSeqNo
       );
 
-      // Find the original document data to get imgContent
       const originalDocData = documents.find(
         (doc) => doc.id === selectedDocument.id
       );
 
-      // Prepare API request data with correct data types
+      // Remove commas from amount before sending to API
+      const cleanAmount = removeCommasFromAmount(newDocument.amount);
+
       const updateDocumentData = {
-        ClmSeqNo: claimDetails.referenceNo, // string
-        ClmMemSeqNo: parseInt(clmMemSeqNo), // int
-        DocSeq: parseInt(docSeq), // int
-        NewDocRef: editDocumentType, // string - This is the docId (O01, O02, etc.)
-        DocDate: formatDateForAPI(editDocumentDate), // string - Format: YYYY-MM-DD
-        ImgContent: originalDocData?.imgContent || "", // Will be converted to IFormFile
-        DocAmount: parseFloat(newDocument.amount || "0"), // decimal
-        CreatedBy: storedNic, // string
-        ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`, // string - Generate image name
+        ClmSeqNo: claimDetails.referenceNo,
+        ClmMemSeqNo: parseInt(clmMemSeqNo),
+        DocSeq: parseInt(docSeq),
+        NewDocRef: editDocumentType,
+        DocDate: formatDateForAPI(editDocumentDate),
+        ImgContent: originalDocData?.imgContent || "",
+        DocAmount: parseFloat(cleanAmount || "0"),
+        CreatedBy: storedNic,
+        ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
       };
 
-      console.log("Prepared update document data:", {
-        ...updateDocumentData,
-        ImgContent: updateDocumentData.ImgContent
-          ? "Base64 data present"
-          : "No image data",
-      });
-
-      // Call the update API
       await updateDocumentAPI(updateDocumentData);
 
-      // Update local state with formatted amount
       const updatedDocument = {
         ...newDocument,
-        amount: formatAmount(newDocument.amount), // Format amount
+        amount: formatAmount(newDocument.amount),
       };
 
       setDocuments((prev) =>
@@ -1899,28 +1938,23 @@ const EditClaimIntimation1 = ({ route }) => {
         )
       );
 
-      // Close modal and reset form
       setEditDocumentModalVisible(false);
       setNewDocument({ type: "", date: "", amount: "" });
       setEditDocumentType("");
       setEditDocumentDate(new Date());
 
-      // Show success message
       showPopup("Success", "Document updated successfully!", "success");
 
-      // Refresh documents from API to get latest data
       const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
       if (referenceNo) {
         await fetchDocuments(referenceNo);
       }
 
-      // Refresh claim amount after editing document
-      console.log("Document updated, refreshing claim amount...");
       await refreshClaimAmount();
     } catch (error) {
+      // Error handling remains the same...
       console.error("Error in handleSaveDocumentEdit:", error);
 
-      // Check if it's a 404 error (document not found)
       if (error.message.includes("404")) {
         showPopup(
           "Document Not Found",
@@ -1928,8 +1962,8 @@ const EditClaimIntimation1 = ({ route }) => {
           "error",
           true,
           async () => {
-            const referenceNo =
-              claimDetails.referenceNo || claim?.referenceNo;
+            hidePopup();
+            const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
             if (referenceNo) {
               await fetchDocuments(referenceNo);
             }
@@ -1937,7 +1971,6 @@ const EditClaimIntimation1 = ({ route }) => {
             setNewDocument({ type: "", date: "", amount: "" });
             setEditDocumentType("");
             setEditDocumentDate(new Date());
-            hidePopup();
           }
         );
       } else {
@@ -1947,10 +1980,10 @@ const EditClaimIntimation1 = ({ route }) => {
           "error",
           true,
           () => {
-            // Save locally without API call
+            hidePopup();
             const updatedDocument = {
               ...newDocument,
-              amount: formatAmount(newDocument.amount), // Format amount
+              amount: formatAmount(newDocument.amount),
             };
             setDocuments((prev) =>
               prev.map((item) =>
@@ -1963,12 +1996,12 @@ const EditClaimIntimation1 = ({ route }) => {
             setNewDocument({ type: "", date: "", amount: "" });
             setEditDocumentType("");
             setEditDocumentDate(new Date());
-            hidePopup();
           }
         );
       }
     }
   };
+
 
   // Delete document function with API integration and claim amount refresh
   const handleDeleteDocument = (documentId) => {
@@ -2777,7 +2810,7 @@ const EditClaimIntimation1 = ({ route }) => {
               {/* Document Amount */}
               <Text style={styles.documentFieldLabel}>
                 Document Amount
-                {editDocumentType === "O01" && (
+                {(editDocumentType === "O01" || editDocumentType === "O04") && (
                   <Text style={styles.requiredAsterisk}> *</Text>
                 )}
               </Text>
@@ -2785,58 +2818,58 @@ const EditClaimIntimation1 = ({ route }) => {
                 style={[
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
-                  editDocumentType === "O01" &&
-                  (!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0) &&
+                  (editDocumentType === "O01" || editDocumentType === "O04") &&
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
                   styles.textInputError,
                 ]}
-                placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                placeholder={
+                  !editDocumentType
+                    ? "Select document type first"
+                    : isEditAmountEditable()
+                      ? "Enter amount"
+                      : "0.00"
+                }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
                 onChangeText={handleEditAmountChange}
                 keyboardType="decimal-pad"
                 editable={isEditAmountEditable()}
-                selectTextOnFocus={true}  // <-- Add this line
-                onFocus={() => {          // <-- Add this onFocus handler
-                  if (newDocument.amount === "0.00") {
-                    setNewDocument((prev) => ({
-                      ...prev,
-                      amount: "",
-                    }));
-                  }
-                }}
               />
+
 
               {/* Help text for amount field */}
               {editDocumentType === "O02" || editDocumentType === "O03" ? (
                 <Text style={styles.helpText}>
                   Amount is automatically set to 0.00 for{" "}
-                  {
-                    documentTypes.find(
-                      (type) => type.docId === editDocumentType
-                    )?.docDesc
-                  }
+                  {getDocumentTypeLabel(editDocumentType)}
                 </Text>
               ) : editDocumentType === "O01" ? (
                 <Text
                   style={[
                     styles.helpText,
-                    (!newDocument.amount ||
-                      newDocument.amount.trim() === "" ||
-                      parseFloat(newDocument.amount) <= 0) &&
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
                     styles.errorText,
                   ]}
                 >
-                  {!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0
+                  {!validateEditAmount(newDocument.amount, editDocumentType)
                     ? "Amount is required and must be greater than 0 for Bill type"
                     : "Amount is required for Bill type"}
                 </Text>
               ) : editDocumentType === "O04" ? (
+                <Text
+                  style={[
+                    styles.helpText,
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
+                    styles.errorText,
+                  ]}
+                >
+                  {!validateEditAmount(newDocument.amount, editDocumentType)
+                    ? "Amount is required for Other document type"
+                    : "Enter amount for Other document type"}
+                </Text>
+              ) : !editDocumentType ? (
                 <Text style={styles.helpText}>
-                  Enter amount for Other document type
+                  Please select a document type first
                 </Text>
               ) : null}
             </ScrollView>
@@ -2855,9 +2888,20 @@ const EditClaimIntimation1 = ({ route }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveDocumentEdit}
-                style={styles.saveBtn}
+                style={[
+                  styles.saveBtn,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.saveBtnDisabled
+                ]}
+                disabled={!validateEditAmount(newDocument.amount, editDocumentType)}
               >
-                <Text style={styles.saveText}>Save</Text>
+                <Text style={[
+                  styles.saveText,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.saveTextDisabled
+                ]}>
+                  Save
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3648,6 +3692,11 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
+  },saveBtnDisabled: {
+    backgroundColor: "#B0B0B0",
+  },
+  saveTextDisabled: {
+    color: "#666",
   },
 });
 
