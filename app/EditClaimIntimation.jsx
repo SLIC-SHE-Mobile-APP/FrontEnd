@@ -195,6 +195,20 @@ const EditClaimIntimation = ({ route }) => {
     amount: "",
   });
 
+  const removeCommasFromAmount = (amount) => {
+    if (!amount) return "";
+    return amount.toString().replace(/,/g, "");
+  };
+
+  const toSentenceCase = (str) => {
+    if (!str) return str;
+    return str.toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  };
+
+  const getDocumentTypeLabel = (docId) => {
+    const docType = documentTypes.find((type) => type.docId === docId);
+    return docType ? toSentenceCase(docType.docDesc) : toSentenceCase(docId);
+  };
 
   const fetchDependents = async () => {
     try {
@@ -1406,17 +1420,13 @@ const EditClaimIntimation = ({ route }) => {
     setNewDocument((prev) => ({
       ...prev,
       type: docType.docDesc,
+      // Set amount based on document type
+      amount: docType.docId === "O02" || docType.docId === "O03" ? "0.00" : prev.amount
     }));
-
-    if (docType.docId !== "O01") {
-      setNewDocument((prev) => ({
-        ...prev,
-        amount: "0.00",
-      }));
-    }
 
     setEditDocTypeDropdownVisible(false);
   };
+
 
   const handleEditDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || editDocumentDate;
@@ -1435,32 +1445,69 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   const handleEditAmountChange = (text) => {
-    if (editDocumentType !== "O01") {
-      return;
+    if (editDocumentType !== "O01" && editDocumentType !== "O04") {
+      return; // Only BILL and OTHER types are editable
     }
 
+    // Remove commas first to get clean number
     const cleanedText = text.replace(/[^0-9.]/g, "");
     const parts = cleanedText.split(".");
+
     if (parts.length > 2) {
       return;
     }
 
-    let formattedAmount = cleanedText;
+    // Check if integer part exceeds 9 digits
+    if (parts[0].length > 9) {
+      return;
+    }
 
+    let formattedAmount = cleanedText;
     if (parts.length === 2) {
       if (parts[1].length > 2) {
         formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
       }
     }
 
+    // Format with commas for display
+    const displayAmount = formatAmountWithCommas(formattedAmount);
     setNewDocument((prev) => ({
       ...prev,
-      amount: formattedAmount,
+      amount: formattedAmount, // Store clean amount without commas
     }));
   };
 
+
+
   const isEditAmountEditable = () => {
-    return editDocumentType === "O01";
+    return editDocumentType === "O01" || editDocumentType === "O04";
+  };
+
+
+  const validateEditAmount = (amountString, docType) => {
+    if (docType === "O02" || docType === "O03") {
+      return true; // Always valid for these types
+    }
+
+    if (docType === "O01") {
+      if (!amountString || amountString.trim() === "") {
+        return false;
+      }
+      const cleanAmount = removeCommasFromAmount(amountString);
+      const amount = parseFloat(cleanAmount);
+      return !isNaN(amount) && amount > 0;
+    }
+
+    if (docType === "O04") {
+      if (!amountString || amountString.trim() === "") {
+        return false;
+      }
+      const cleanAmount = removeCommasFromAmount(amountString);
+      const amount = parseFloat(cleanAmount);
+      return !isNaN(amount) && amount >= 0;
+    }
+
+    return false;
   };
 
   const updateDocumentAPI = async (documentData) => {
@@ -1548,18 +1595,25 @@ const EditClaimIntimation = ({ route }) => {
         return;
       }
 
-      if (
-        editDocumentType === "O01" &&
-        (!newDocument.amount || parseFloat(newDocument.amount) <= 0)
-      ) {
-        showPopup(
-          "Validation Error",
-          "Amount is required and must be greater than 0 for Bill type.",
-          "warning"
-        );
+      // Updated validation using the new function
+      if (!validateEditAmount(newDocument.amount, editDocumentType)) {
+        if (editDocumentType === "O01") {
+          showPopup(
+            "Validation Error",
+            "Amount is required and must be greater than 0 for Bill type.",
+            "warning"
+          );
+        } else if (editDocumentType === "O04") {
+          showPopup(
+            "Validation Error",
+            "Amount is required for Other document type.",
+            "warning"
+          );
+        }
         return;
       }
 
+      // Rest of the function remains the same...
       const storedNic = await SecureStore.getItemAsync("user_nic");
       if (!storedNic) {
         showPopup(
@@ -1578,6 +1632,9 @@ const EditClaimIntimation = ({ route }) => {
         (doc) => doc.id === selectedDocument.id
       );
 
+      // Remove commas from amount before sending to API
+      const cleanAmount = removeCommasFromAmount(newDocument.amount);
+
       const updateDocumentData = {
         ClmSeqNo: claimDetails.referenceNo,
         ClmMemSeqNo: parseInt(clmMemSeqNo),
@@ -1585,7 +1642,7 @@ const EditClaimIntimation = ({ route }) => {
         NewDocRef: editDocumentType,
         DocDate: formatDateForAPI(editDocumentDate),
         ImgContent: originalDocData?.imgContent || "",
-        DocAmount: parseFloat(newDocument.amount || "0"),
+        DocAmount: parseFloat(cleanAmount || "0"),
         CreatedBy: storedNic,
         ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
       };
@@ -1619,6 +1676,7 @@ const EditClaimIntimation = ({ route }) => {
 
       await refreshClaimAmount();
     } catch (error) {
+      // Error handling remains the same...
       console.error("Error in handleSaveDocumentEdit:", error);
 
       if (error.message.includes("404")) {
@@ -2208,7 +2266,7 @@ const EditClaimIntimation = ({ route }) => {
                 </View>
               )}
 
-              
+
 
               {/* Document Date */}
               <Text style={styles.documentFieldLabel}>Document Date</Text>
@@ -2237,7 +2295,7 @@ const EditClaimIntimation = ({ route }) => {
               {/* Document Amount */}
               <Text style={styles.documentFieldLabel}>
                 Document Amount
-                {editDocumentType === "O01" && (
+                {(editDocumentType === "O01" || editDocumentType === "O04") && (
                   <Text style={styles.requiredAsterisk}> *</Text>
                 )}
               </Text>
@@ -2245,13 +2303,17 @@ const EditClaimIntimation = ({ route }) => {
                 style={[
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
-                  editDocumentType === "O01" &&
-                  (!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0) &&
+                  (editDocumentType === "O01" || editDocumentType === "O04") &&
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
                   styles.textInputError,
                 ]}
-                placeholder={isEditAmountEditable() ? "Enter amount" : "0.00"}
+                placeholder={
+                  !editDocumentType
+                    ? "Select document type first"
+                    : isEditAmountEditable()
+                      ? "Enter amount"
+                      : "0.00"
+                }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
                 onChangeText={handleEditAmountChange}
@@ -2263,31 +2325,35 @@ const EditClaimIntimation = ({ route }) => {
               {editDocumentType === "O02" || editDocumentType === "O03" ? (
                 <Text style={styles.helpText}>
                   Amount is automatically set to 0.00 for{" "}
-                  {
-                    documentTypes.find(
-                      (type) => type.docId === editDocumentType
-                    )?.docDesc
-                  }
+                  {getDocumentTypeLabel(editDocumentType)}
                 </Text>
               ) : editDocumentType === "O01" ? (
                 <Text
                   style={[
                     styles.helpText,
-                    (!newDocument.amount ||
-                      newDocument.amount.trim() === "" ||
-                      parseFloat(newDocument.amount) <= 0) &&
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
                     styles.errorText,
                   ]}
                 >
-                  {!newDocument.amount ||
-                    newDocument.amount.trim() === "" ||
-                    parseFloat(newDocument.amount) <= 0
+                  {!validateEditAmount(newDocument.amount, editDocumentType)
                     ? "Amount is required and must be greater than 0 for Bill type"
                     : "Amount is required for Bill type"}
                 </Text>
               ) : editDocumentType === "O04" ? (
+                <Text
+                  style={[
+                    styles.helpText,
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
+                    styles.errorText,
+                  ]}
+                >
+                  {!validateEditAmount(newDocument.amount, editDocumentType)
+                    ? "Amount is required for Other document type"
+                    : "Enter amount for Other document type"}
+                </Text>
+              ) : !editDocumentType ? (
                 <Text style={styles.helpText}>
-                  Enter amount for Other document type
+                  Please select a document type first
                 </Text>
               ) : null}
             </ScrollView>
@@ -2306,9 +2372,20 @@ const EditClaimIntimation = ({ route }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveDocumentEdit}
-                style={styles.saveBtn}
+                style={[
+                  styles.saveBtn,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.saveBtnDisabled
+                ]}
+                disabled={!validateEditAmount(newDocument.amount, editDocumentType)}
               >
-                <Text style={styles.saveText}>Save</Text>
+                <Text style={[
+                  styles.saveText,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.saveTextDisabled
+                ]}>
+                  Save
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2339,136 +2416,136 @@ const EditClaimIntimation = ({ route }) => {
         </View>
       </Modal>
       <Modal
-                visible={isEditBeneficiaryModalVisible}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setEditBeneficiaryModalVisible(false)}
+        visible={isEditBeneficiaryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditBeneficiaryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.documentModalContent}>
+            <ScrollView
+              contentContainerStyle={styles.documentModalScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.modalTitle}>Edit Beneficiary</Text>
+
+              {/* Patient Name Dropdown */}
+              <Text style={styles.documentFieldLabel}>Patient Name</Text>
+              <TouchableOpacity
+                style={[
+                  styles.documentDropdownButton,
+                  loadingMembers && styles.dropdownButtonDisabled,
+                ]}
+                onPress={() =>
+                  !loadingMembers && setDropdownVisible(!isDropdownVisible)
+                }
+                disabled={loadingMembers}
               >
-                <View style={styles.modalOverlay}>
-                  <View style={styles.documentModalContent}>
-                    <ScrollView
-                      contentContainerStyle={styles.documentModalScrollContent}
-                      showsVerticalScrollIndicator={false}
-                      keyboardShouldPersistTaps="handled"
+                <Text style={styles.dropdownButtonText}>
+                  {loadingMembers
+                    ? "Loading members..."
+                    : selectedMember
+                      ? selectedMember.name
+                      : newBeneficiary.name || "Select Patient"}
+                </Text>
+                <Ionicons
+                  name={isDropdownVisible ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color={loadingMembers ? "#ccc" : "#666"}
+                />
+              </TouchableOpacity>
+
+              {/* Member Dropdown Options */}
+              {isDropdownVisible && !loadingMembers && (
+                <View style={styles.documentDropdownOptions}>
+                  {memberOptions.map((member) => (
+                    <TouchableOpacity
+                      key={member.id}
+                      style={[
+                        styles.documentDropdownOption,
+                        selectedMember?.id === member.id && styles.selectedDropdownOption,
+                      ]}
+                      onPress={() => handleMemberSelect(member)}
                     >
-                      <Text style={styles.modalTitle}>Edit Beneficiary</Text>
-
-                      {/* Patient Name Dropdown */}
-                      <Text style={styles.documentFieldLabel}>Patient Name</Text>
-                      <TouchableOpacity
+                      <Text
                         style={[
-                          styles.documentDropdownButton,
-                          loadingMembers && styles.dropdownButtonDisabled,
+                          styles.dropdownOptionText,
+                          selectedMember?.id === member.id && styles.selectedDropdownOptionText,
                         ]}
-                        onPress={() =>
-                          !loadingMembers && setDropdownVisible(!isDropdownVisible)
-                        }
-                        disabled={loadingMembers}
                       >
-                        <Text style={styles.dropdownButtonText}>
-                          {loadingMembers
-                            ? "Loading members..."
-                            : selectedMember
-                              ? selectedMember.name
-                              : newBeneficiary.name || "Select Patient"}
-                        </Text>
-                        <Ionicons
-                          name={isDropdownVisible ? "chevron-up" : "chevron-down"}
-                          size={20}
-                          color={loadingMembers ? "#ccc" : "#666"}
-                        />
-                      </TouchableOpacity>
-
-                      {/* Member Dropdown Options */}
-                      {isDropdownVisible && !loadingMembers && (
-                        <View style={styles.documentDropdownOptions}>
-                          {memberOptions.map((member) => (
-                            <TouchableOpacity
-                              key={member.id}
-                              style={[
-                                styles.documentDropdownOption,
-                                selectedMember?.id === member.id && styles.selectedDropdownOption,
-                              ]}
-                              onPress={() => handleMemberSelect(member)}
-                            >
-                              <Text
-                                style={[
-                                  styles.dropdownOptionText,
-                                  selectedMember?.id === member.id && styles.selectedDropdownOptionText,
-                                ]}
-                              >
-                                {member.name} ({member.relationship})
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-
-                      {/* Relationship (Read-only) */}
-                      <Text style={styles.documentFieldLabel}>Relationship</Text>
-                      <TextInput
-                        style={[styles.documentModalInput, styles.textInputDisabled]}
-                        value={newBeneficiary.relationship}
-                        editable={false}
-                        placeholder="Relationship will auto-fill"
-                      />
-
-                      {/* Illness */}
-                      <Text style={styles.documentFieldLabel}>
-                        Illness<Text style={styles.requiredAsterisk}> *</Text>
+                        {member.name} ({member.relationship})
                       </Text>
-                      <TextInput
-                        style={[
-                          styles.documentModalInput,
-                          (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") &&
-                          styles.textInputError,
-                        ]}
-                        placeholder="Enter illness description"
-                        value={newBeneficiary.illness}
-                        onChangeText={(text) =>
-                          setNewBeneficiary((prev) => ({ ...prev, illness: text }))
-                        }
-                        multiline
-                        numberOfLines={3}
-                      />
-
-                      {/* Amount (Read-only) */}
-                      <Text style={styles.documentFieldLabel}>Claim Amount</Text>
-                      <TextInput
-                        style={[styles.documentModalInput, styles.textInputDisabled]}
-                        value={newBeneficiary.amount}
-                        editable={false}
-                        placeholder="Amount will be calculated automatically"
-                      />
-                    </ScrollView>
-
-                    <View style={styles.documentModalButtons}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditBeneficiaryModalVisible(false);
-                          setDropdownVisible(false);
-                          setSelectedMember(null);
-                          setNewBeneficiary({
-                            name: "",
-                            relationship: "",
-                            illness: "",
-                            amount: "",
-                          });
-                        }}
-                        style={styles.cancelBtn}
-                      >
-                        <Text style={styles.cancelText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleSaveBeneficiaryEdit}
-                        style={styles.saveBtn}
-                      >
-                        <Text style={styles.saveText}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </Modal>
+              )}
+
+              {/* Relationship (Read-only) */}
+              <Text style={styles.documentFieldLabel}>Relationship</Text>
+              <TextInput
+                style={[styles.documentModalInput, styles.textInputDisabled]}
+                value={newBeneficiary.relationship}
+                editable={false}
+                placeholder="Relationship will auto-fill"
+              />
+
+              {/* Illness */}
+              <Text style={styles.documentFieldLabel}>
+                Illness<Text style={styles.requiredAsterisk}> *</Text>
+              </Text>
+              <TextInput
+                style={[
+                  styles.documentModalInput,
+                  (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") &&
+                  styles.textInputError,
+                ]}
+                placeholder="Enter illness description"
+                value={newBeneficiary.illness}
+                onChangeText={(text) =>
+                  setNewBeneficiary((prev) => ({ ...prev, illness: text }))
+                }
+                multiline
+                numberOfLines={3}
+              />
+
+              {/* Amount (Read-only) */}
+              <Text style={styles.documentFieldLabel}>Claim Amount</Text>
+              <TextInput
+                style={[styles.documentModalInput, styles.textInputDisabled]}
+                value={newBeneficiary.amount}
+                editable={false}
+                placeholder="Amount will be calculated automatically"
+              />
+            </ScrollView>
+
+            <View style={styles.documentModalButtons}>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditBeneficiaryModalVisible(false);
+                  setDropdownVisible(false);
+                  setSelectedMember(null);
+                  setNewBeneficiary({
+                    name: "",
+                    relationship: "",
+                    illness: "",
+                    amount: "",
+                  });
+                }}
+                style={styles.cancelBtn}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveBeneficiaryEdit}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Custom Popup */}
       <CustomPopup
@@ -3149,6 +3226,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 45,
     height: 45,
+  },saveBtnDisabled: {
+    backgroundColor: "#B0B0B0",
+  },
+  saveTextDisabled: {
+    color: "#666",
   },
 });
 
