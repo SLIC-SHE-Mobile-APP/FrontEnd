@@ -306,7 +306,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     <View key={index} style={styles.claimCard}>
       <View style={styles.cardContent}>
         {[
-          ['Reference No', claim.seqNo],
+          ['Claim No', claim.seqNo],
           ['Patient Name', claim.patientName],
           ['Relationship', claim.relationship],
           ['Status', claim.status],
