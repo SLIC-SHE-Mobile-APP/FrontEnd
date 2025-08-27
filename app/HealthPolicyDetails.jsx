@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation,useFocusEffect  } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Modal,
   ScrollView,
@@ -359,6 +360,32 @@ const HealthPolicyDetails = () => {
     initializeData();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        // If modal is visible, close it first
+        if (modalVisible) {
+          handleCloseModal();
+          return true; // Prevent default behavior
+        }
+        
+        // Check if we can go back in navigation stack
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return true; // Prevent default behavior
+        }
+        
+        // If no previous screen, allow default behavior (minimize app instead of closing)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [modalVisible, navigation, handleCloseModal])
+  );
+
   // Generate policy display info based on loaded data with better fallbacks
   const policyDisplayInfo = useMemo(() => {
     if (!storedData) return ["Loading policy information..."];
@@ -502,6 +529,26 @@ const HealthPolicyDetails = () => {
     },
     [slideAnim]
   );
+
+
+  const handleHeaderBackPress = useCallback(() => {
+    // If modal is visible, close it first
+    if (modalVisible) {
+      handleCloseModal();
+      return;
+    }
+
+    // Check if we can navigate back
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If no previous screen, navigate to home or handle gracefully
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }], // Replace 'Home' with your actual home screen name
+      });
+    }
+  }, [navigation, modalVisible, handleCloseModal]);
 
   const handleCloseModal = useCallback(() => {
     // Animate slide out to bottom
@@ -668,7 +715,7 @@ const HealthPolicyDetails = () => {
         {/* Back Icon + Title */}
         <View style={styles.headerRow}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={handleHeaderBackPress}
             style={styles.backIcon}
           >
             <Ionicons name="arrow-back" size={24} color="#13646D" />
