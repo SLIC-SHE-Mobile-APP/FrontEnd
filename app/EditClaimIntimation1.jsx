@@ -1602,44 +1602,6 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
-  // Delete beneficiary
-  const handleDeleteBeneficiary = (id) => {
-    showPopup(
-      "Confirm Delete",
-      "Are you sure you want to delete this beneficiary?",
-      "warning",
-      true,
-      async () => {
-        const updatedBeneficiaries = beneficiaries.filter(
-          (item) => item.id !== id
-        );
-        setBeneficiaries(updatedBeneficiaries);
-
-        // Store the updated beneficiary data
-        await storeBeneficiaryData(updatedBeneficiaries);
-
-        hidePopup();
-      }
-    );
-  };
-
-  // Add document
-  const handleAddDocument = () => {
-    if (newDocument.type && newDocument.date) {
-      setDocuments((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          ...newDocument,
-          amount: formatAmount(newDocument.amount), // Format amount
-          hasImage: false, // New documents don't have images initially
-        },
-      ]);
-      setNewDocument({ type: "", date: "", amount: "" });
-      setAddDocumentModalVisible(false);
-    }
-  };
-
   // Edit document
   const handleEditDocument = (document) => {
     setSelectedDocument(document);
@@ -2002,8 +1964,6 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
-
-  // Delete document function with API integration and claim amount refresh
   const handleDeleteDocument = (documentId) => {
     // Find the document to get its details
     const documentToDelete = documents.find((doc) => doc.id === documentId);
