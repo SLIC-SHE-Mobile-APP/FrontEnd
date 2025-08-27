@@ -3,9 +3,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
+  Dimensions,
   Image,
   Modal,
   Platform,
@@ -15,7 +17,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -1237,6 +1238,40 @@ const EditClaimIntimation1 = ({ route }) => {
     return unsubscribe;
   }, [navigation]);
 
+  // Handle hardware back button
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Check if we can go back in navigation stack
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return true; // Prevent default behavior
+        }
+
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [navigation])
+  );
+
+  // Enhanced back button handler
+  const handleBackPress = React.useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // Navigate to home screen or handle gracefully
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }], // Replace 'Home' with your actual home screen name
+      });
+    }
+  }, [navigation]);
+
   // Navigate to UploadDocuments page
   const handleNavigateToUploadDocuments = () => {
     // Store current beneficiary data before navigation
@@ -1425,10 +1460,7 @@ const EditClaimIntimation1 = ({ route }) => {
         return;
       }
 
-      if (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") {
-        showPopup("Validation Error", "Illness field is required.", "warning");
-        return;
-      }
+
 
       console.log("Saving beneficiary edit with API integration...");
 
@@ -2169,6 +2201,21 @@ const EditClaimIntimation1 = ({ route }) => {
     );
   };
 
+  const isSubmitEnabled = () => {
+    if (beneficiaries.length === 0) {
+      return false;
+    }
+
+    const firstBeneficiary = beneficiaries[0];
+    if (!firstBeneficiary || !firstBeneficiary.amount) {
+      return false;
+    }
+
+    const cleanAmount = removeCommasFromAmount(firstBeneficiary.amount);
+    const amount = parseFloat(cleanAmount);
+    return !isNaN(amount) && amount > 0;
+  };
+
   // Delete claim function with API integration
   const handleDeleteClaim = async () => {
     showPopup(
@@ -2307,7 +2354,7 @@ const EditClaimIntimation1 = ({ route }) => {
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
@@ -2476,10 +2523,19 @@ const EditClaimIntimation1 = ({ route }) => {
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[
+              styles.submitButton,
+              !isSubmitEnabled() && styles.submitButtonDisabled
+            ]}
             onPress={handleSubmitClaim}
+            disabled={!isSubmitEnabled()}
           >
-            <Text style={styles.submitButtonText}>Submit Claim</Text>
+            <Text style={[
+              styles.submitButtonText,
+              !isSubmitEnabled() && styles.submitButtonTextDisabled
+            ]}>
+              Submit Claim
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -3652,11 +3708,19 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
     fontWeight: "600",
-  },saveBtnDisabled: {
+  }, saveBtnDisabled: {
     backgroundColor: "#B0B0B0",
   },
   saveTextDisabled: {
     color: "#666",
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#E0E0E0",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonTextDisabled: {
+    color: "#999999",
   },
 });
 

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -10,6 +10,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Image,
   Modal,
@@ -382,6 +383,26 @@ const UploadDocumentsSaved = ({ route }) => {
 
     loadStoredValues();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Check if we can go back in navigation stack
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return true; // Prevent default behavior
+        }
+
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [navigation])
+  );
 
   const formatDateForAPI = (date) => {
     const day = date.getDate().toString().padStart(2, "0");
@@ -1038,14 +1059,24 @@ const UploadDocumentsSaved = ({ route }) => {
   };
 
 
-  const handleBackPress = () => {
+  const handleBackPress = React.useCallback(() => {
     console.log("Back button pressed");
     try {
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+       
+        navigation.navigate('Home'); 
+      }
     } catch (error) {
       console.error("Navigation error:", error);
+      
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }], 
+      });
     }
-  };
+  }, [navigation]);
 
   const handleImagePress = (image) => {
     setSelectedImage(image);

@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ import {
   View,
   Alert,
   Animated,
+  BackHandler,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -591,10 +592,36 @@ export default function PolicyMemberDetails() {
     initializeData();
   }, []);
 
-  const handleBackPress = () => {
-    router.back();
-  };
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Check if we can go back in router
+        if (router.canGoBack()) {
+          router.back();
+          return true; // Prevent default behavior
+        }
+        
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
 
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [router])
+  );
+
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Navigate to home screen or handle gracefully
+      router.replace("/(tabs)/home"); // Replace with your actual home route
+    }
+  }, [router]);
+
+  
   const handleRetry = () => {
     setError(null);
     setIsOfflineMode(false);

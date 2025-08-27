@@ -1,11 +1,12 @@
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Image,
   StyleSheet,
@@ -218,13 +219,10 @@ export default function UserDetailsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Clear saved credentials
               await clearSavedCredentials();
-              // Navigate to login screen
               router.replace("/loginRequestOTP");
             } catch (error) {
               console.error("Error during logout:", error);
-              // Navigate to login screen even if clearing fails
               router.replace("/loginRequestOTP");
             }
           },
@@ -235,10 +233,8 @@ export default function UserDetailsScreen() {
   };
 
   useEffect(() => {
-    // Fetch employee info when component mounts
     fetchEmployeeInfo();
 
-    // Start the fade-in animation after loading is complete
     if (!isLoading) {
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -247,6 +243,32 @@ export default function UserDetailsScreen() {
       }).start();
     }
   }, [isLoading]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (router.canGoBack()) {
+          router.back();
+          return true; 
+        }
+        
+        return false;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [])
+  );
+
+
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/home"); 
+    }
+  }, []);
 
   const menuItems = [
     {
@@ -304,7 +326,7 @@ export default function UserDetailsScreen() {
         <View style={styles.headerBackground} />
 
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleBackPress}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
