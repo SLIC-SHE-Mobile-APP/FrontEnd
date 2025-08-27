@@ -1376,7 +1376,6 @@ const UploadDocuments = ({ route }) => {
         setAmount("");
         setDocumentDate(new Date());
 
-        showPopup("Success", "Document uploaded successfully!", "success");
       }
     } catch (error) {
       console.error("Error picking document:", error);
@@ -1651,13 +1650,6 @@ const UploadDocuments = ({ route }) => {
     try {
       // Set uploading state to true
       setIsUploading(true);
-
-      // Show loading popup
-      showPopup(
-        "Uploading",
-        "Please wait while we upload your documents...",
-        "info"
-      );
 
       const uploadPromises = uploadedDocuments.map((doc) =>
         uploadDocumentToAPI(doc)

@@ -4,20 +4,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  BackHandler,
-  Dimensions,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import {Animated,BackHandler,Dimensions,Image,Modal,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
@@ -155,9 +142,9 @@ const formatAmountWithCommas = (amount) => {
     return "0.00";
   }
   const numericAmount = parseFloat(amount);
-  return numericAmount.toLocaleString('en-US', {
+  return numericAmount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   });
 };
 
@@ -186,7 +173,8 @@ const EditClaimIntimation = ({ route }) => {
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [isEditBeneficiaryModalVisible, setEditBeneficiaryModalVisible] = useState(false);
+  const [isEditBeneficiaryModalVisible, setEditBeneficiaryModalVisible] =
+    useState(false);
   const [selectedBeneficiary, setSelectedBeneficiary] = useState(null);
   const [newBeneficiary, setNewBeneficiary] = useState({
     name: "",
@@ -215,8 +203,12 @@ const EditClaimIntimation = ({ route }) => {
       setLoadingMembers(true);
       console.log("Fetching dependents data...");
 
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
 
       if (!policyNumber || !memberNumber) {
         console.log("Policy number or member number not found in SecureStore");
@@ -245,7 +237,10 @@ const EditClaimIntimation = ({ route }) => {
       const transformedMembers = dependentsData.map((dependent, index) => ({
         id: index + 1,
         name: dependent.dependentName,
-        relationship: dependent.relationship === "Employee" ? "Self" : dependent.relationship,
+        relationship:
+          dependent.relationship === "Employee"
+            ? "Self"
+            : dependent.relationship,
         memberCode: dependent.memberCode,
         birthDay: dependent.depndentBirthDay,
         effectiveDate: dependent.effectiveDate,
@@ -255,8 +250,14 @@ const EditClaimIntimation = ({ route }) => {
       console.log("Transformed member options:", transformedMembers);
     } catch (error) {
       console.error("Error fetching dependents:", error);
-      showPopup("Error", "Failed to load member information. Please try again.", "error");
-      setMemberOptions([{ id: 1, name: "Unknown Member", relationship: "Self" }]);
+      showPopup(
+        "Error",
+        "Failed to load member information. Please try again.",
+        "error"
+      );
+      setMemberOptions([
+        { id: 1, name: "Unknown Member", relationship: "Self" },
+      ]);
     } finally {
       setLoadingMembers(false);
     }
@@ -290,8 +291,12 @@ const EditClaimIntimation = ({ route }) => {
     try {
       console.log("Updating intimation via API:", beneficiaryData);
 
-      const policyNumber = await SecureStore.getItemAsync("selected_policy_number");
-      const memberNumber = await SecureStore.getItemAsync("selected_member_number");
+      const policyNumber = await SecureStore.getItemAsync(
+        "selected_policy_number"
+      );
+      const memberNumber = await SecureStore.getItemAsync(
+        "selected_member_number"
+      );
       const storedMobile = await SecureStore.getItemAsync("user_mobile");
       const storedNic = await SecureStore.getItemAsync("user_nic");
 
@@ -325,7 +330,9 @@ const EditClaimIntimation = ({ route }) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Update Intimation API Error Response:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
       }
 
       const result = await response.json();
@@ -340,7 +347,11 @@ const EditClaimIntimation = ({ route }) => {
   const handleSaveBeneficiaryEdit = async () => {
     try {
       if (!newBeneficiary.name || !newBeneficiary.relationship) {
-        showPopup("Validation Error", "Patient name and relationship are required.", "warning");
+        showPopup(
+          "Validation Error",
+          "Patient name and relationship are required.",
+          "warning"
+        );
         return;
       }
 
@@ -379,7 +390,11 @@ const EditClaimIntimation = ({ route }) => {
         amount: "",
       });
 
-      showPopup("Success", "Beneficiary information updated successfully!", "success");
+      showPopup(
+        "Success",
+        "Beneficiary information updated successfully!",
+        "success"
+      );
 
       console.log("Beneficiary edit saved successfully with API integration");
     } catch (error) {
@@ -428,7 +443,7 @@ const EditClaimIntimation = ({ route }) => {
   const handleDeleteClaim = async () => {
     showPopup(
       "Delete Claim",
-      "Are you sure you want to delete this claim? This action cannot be undone.",
+      "Are you sure you want to delete this claim?",
       "confirm",
       true,
       async () => {
@@ -446,18 +461,23 @@ const EditClaimIntimation = ({ route }) => {
 
           console.log("Delete claim request data:", deleteClaimData);
 
-          const response = await fetch(`${API_BASE_URL}/DeleteClaim/DeleteClaim`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(deleteClaimData),
-          });
+          const response = await fetch(
+            `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(deleteClaimData),
+            }
+          );
 
           if (!response.ok) {
             const errorText = await response.text();
             console.error("Delete Claim API Error Response:", errorText);
-            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            throw new Error(
+              `HTTP error! status: ${response.status}, message: ${errorText}`
+            );
           }
 
           const result = await response.json();
@@ -616,9 +636,9 @@ const EditClaimIntimation = ({ route }) => {
       return "0.00";
     }
     const numericAmount = parseFloat(amount);
-    return numericAmount.toLocaleString('en-US', {
+    return numericAmount.toLocaleString("en-US", {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     });
   };
 
@@ -747,7 +767,7 @@ const EditClaimIntimation = ({ route }) => {
       const day = date.getDate().toString().padStart(2, "0");
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const year = date.getFullYear();
-      return `${day}/${month}/${'20' + year}`;
+      return `${day}/${month}/${"20" + year}`;
     } catch (error) {
       console.error("Error formatting date:", error);
       return dateString;
@@ -1003,11 +1023,13 @@ const EditClaimIntimation = ({ route }) => {
         claimAmount = data.toString();
       }
 
-      const formattedAmount = claimAmount.includes(".")
-        ? parseFloat(claimAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : parseFloat(claimAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      // FIXED: Return the properly formatted amount instead of always returning "0.00"
+      const formattedAmount = parseFloat(claimAmount).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
 
-      return parseFloat("0").toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });;
+      return formattedAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
       if (!error.message.includes("404")) {
@@ -1280,7 +1302,6 @@ const EditClaimIntimation = ({ route }) => {
     initializeComponent();
   }, []);
 
-
   // Hardware back button handler
   useEffect(() => {
     const backAction = () => {
@@ -1421,12 +1442,14 @@ const EditClaimIntimation = ({ route }) => {
       ...prev,
       type: docType.docDesc,
       // Set amount based on document type
-      amount: docType.docId === "O02" || docType.docId === "O03" ? "0.00" : prev.amount
+      amount:
+        docType.docId === "O02" || docType.docId === "O03"
+          ? "0.00"
+          : prev.amount,
     }));
 
     setEditDocTypeDropdownVisible(false);
   };
-
 
   const handleEditDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || editDocumentDate;
@@ -1477,12 +1500,9 @@ const EditClaimIntimation = ({ route }) => {
     }));
   };
 
-
-
   const isEditAmountEditable = () => {
     return editDocumentType === "O01" || editDocumentType === "O04";
   };
-
 
   const validateEditAmount = (amountString, docType) => {
     if (docType === "O02" || docType === "O03") {
@@ -1922,8 +1942,8 @@ const EditClaimIntimation = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-              ? "View"
-              : "No Image"}
+            ? "View"
+            : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -1944,10 +1964,9 @@ const EditClaimIntimation = ({ route }) => {
         <TouchableOpacity onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>SHE Claim Intimation </Text>
+        <Text style={styles.headerTitle}>SHE Claim Intimation New</Text>
         <View style={{ width: 24 }} />
       </View>
-
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Claim Details Section */}
         <View style={styles.claimDetailsSection}>
@@ -1986,7 +2005,6 @@ const EditClaimIntimation = ({ route }) => {
             <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
           </View>
         </View>
-
 
         {/* Beneficiaries Title */}
         <View style={styles.beneficiariesTitleContainer}>
@@ -2125,7 +2143,6 @@ const EditClaimIntimation = ({ route }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
       {/* Add Document Modal */}
       <Modal
         visible={isAddDocumentModalVisible}
@@ -2178,7 +2195,6 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </View>
       </Modal>
-
       {/* Edit Document Modal */}
       <Modal
         visible={isEditDocumentModalVisible}
@@ -2212,10 +2228,10 @@ const EditClaimIntimation = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                      ? documentTypes.find(
+                    ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                      : "Select Document Type"}
+                    : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -2243,7 +2259,7 @@ const EditClaimIntimation = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                          styles.selectedDropdownOption,
+                            styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -2253,7 +2269,7 @@ const EditClaimIntimation = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                            styles.selectedDropdownOptionText,
+                              styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -2265,8 +2281,6 @@ const EditClaimIntimation = ({ route }) => {
                   })}
                 </View>
               )}
-
-
 
               {/* Document Date */}
               <Text style={styles.documentFieldLabel}>Document Date</Text>
@@ -2304,15 +2318,15 @@ const EditClaimIntimation = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                  !validateEditAmount(newDocument.amount, editDocumentType) &&
-                  styles.textInputError,
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
+                    styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                      ? "Enter amount"
-                      : "0.00"
+                    ? "Enter amount"
+                    : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -2332,7 +2346,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.errorText,
+                      styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -2344,7 +2358,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.errorText,
+                      styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -2375,15 +2389,19 @@ const EditClaimIntimation = ({ route }) => {
                 style={[
                   styles.saveBtn,
                   !validateEditAmount(newDocument.amount, editDocumentType) &&
-                  styles.saveBtnDisabled
+                    styles.saveBtnDisabled,
                 ]}
-                disabled={!validateEditAmount(newDocument.amount, editDocumentType)}
+                disabled={
+                  !validateEditAmount(newDocument.amount, editDocumentType)
+                }
               >
-                <Text style={[
-                  styles.saveText,
-                  !validateEditAmount(newDocument.amount, editDocumentType) &&
-                  styles.saveTextDisabled
-                ]}>
+                <Text
+                  style={[
+                    styles.saveText,
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
+                      styles.saveTextDisabled,
+                  ]}
+                >
                   Save
                 </Text>
               </TouchableOpacity>
@@ -2391,7 +2409,6 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </View>
       </Modal>
-
       {/* Image Preview Modal */}
       <Modal
         visible={isImageModalVisible}
@@ -2415,6 +2432,7 @@ const EditClaimIntimation = ({ route }) => {
           )}
         </View>
       </Modal>
+
       <Modal
         visible={isEditBeneficiaryModalVisible}
         transparent
@@ -2422,115 +2440,81 @@ const EditClaimIntimation = ({ route }) => {
         onRequestClose={() => setEditBeneficiaryModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.documentModalContent}>
-            <ScrollView
-              contentContainerStyle={styles.documentModalScrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+          <View style={styles.beneficiaryModalContent}>
+            <Text style={styles.modalTitle}>Edit Beneficiary</Text>
+
+            {/* Member Name Dropdown */}
+            <Text style={styles.fieldLabel}>Member Name</Text>
+            <TouchableOpacity
+              style={[
+                styles.dropdownButton,
+                loadingMembers && styles.dropdownButtonDisabled,
+              ]}
+              onPress={() =>
+                !loadingMembers && setDropdownVisible(!isDropdownVisible)
+              }
+              disabled={loadingMembers}
             >
-              <Text style={styles.modalTitle}>Edit Beneficiary</Text>
-
-              {/* Patient Name Dropdown */}
-              <Text style={styles.documentFieldLabel}>Patient Name</Text>
-              <TouchableOpacity
-                style={[
-                  styles.documentDropdownButton,
-                  loadingMembers && styles.dropdownButtonDisabled,
-                ]}
-                onPress={() =>
-                  !loadingMembers && setDropdownVisible(!isDropdownVisible)
-                }
-                disabled={loadingMembers}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {loadingMembers
-                    ? "Loading members..."
-                    : selectedMember
-                      ? selectedMember.name
-                      : newBeneficiary.name || "Select Patient"}
-                </Text>
-                <Ionicons
-                  name={isDropdownVisible ? "chevron-up" : "chevron-down"}
-                  size={20}
-                  color={loadingMembers ? "#ccc" : "#666"}
-                />
-              </TouchableOpacity>
-
-              {/* Member Dropdown Options */}
-              {isDropdownVisible && !loadingMembers && (
-                <View style={styles.documentDropdownOptions}>
-                  {memberOptions.map((member) => (
-                    <TouchableOpacity
-                      key={member.id}
-                      style={[
-                        styles.documentDropdownOption,
-                        selectedMember?.id === member.id && styles.selectedDropdownOption,
-                      ]}
-                      onPress={() => handleMemberSelect(member)}
-                    >
-                      <Text
-                        style={[
-                          styles.dropdownOptionText,
-                          selectedMember?.id === member.id && styles.selectedDropdownOptionText,
-                        ]}
-                      >
-                        {member.name} ({member.relationship})
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Relationship (Read-only) */}
-              <Text style={styles.documentFieldLabel}>Relationship</Text>
-              <TextInput
-                style={[styles.documentModalInput, styles.textInputDisabled]}
-                value={newBeneficiary.relationship}
-                editable={false}
-                placeholder="Relationship will auto-fill"
-              />
-
-              {/* Illness */}
-              <Text style={styles.documentFieldLabel}>
-                Illness<Text style={styles.requiredAsterisk}> *</Text>
+              <Text style={styles.dropdownButtonText}>
+                {loadingMembers
+                  ? "Loading members..."
+                  : selectedMember
+                  ? selectedMember.name
+                  : "Select Member"}
               </Text>
-              <TextInput
-                style={[
-                  styles.documentModalInput,
-                  (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") &&
-                  styles.textInputError,
-                ]}
-                placeholder="Enter illness description"
-                value={newBeneficiary.illness}
-                onChangeText={(text) =>
-                  setNewBeneficiary((prev) => ({ ...prev, illness: text }))
-                }
-                multiline
-                numberOfLines={3}
+              <Ionicons
+                name={isDropdownVisible ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={loadingMembers ? "#ccc" : "#666"}
               />
+            </TouchableOpacity>
 
-              {/* Amount (Read-only) */}
-              <Text style={styles.documentFieldLabel}>Claim Amount</Text>
-              <TextInput
-                style={[styles.documentModalInput, styles.textInputDisabled]}
-                value={newBeneficiary.amount}
-                editable={false}
-                placeholder="Amount will be calculated automatically"
-              />
-            </ScrollView>
+            {/* Dropdown Options */}
+            {isDropdownVisible && !loadingMembers && (
+              <View style={styles.dropdownOptions}>
+                {memberOptions.map((member) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.dropdownOption,
+                      selectedMember?.id === member.id &&
+                        styles.selectedDropdownOption,
+                    ]}
+                    onPress={() => handleMemberSelect(member)}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        selectedMember?.id === member.id &&
+                          styles.selectedDropdownOptionText,
+                      ]}
+                    >
+                      {member.name} ({member.relationship})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
-            <View style={styles.documentModalButtons}>
+            {/* Illness Field */}
+            <Text style={styles.fieldLabel}>Illness</Text>
+            <TextInput
+              style={styles.beneficiaryModalInput}
+              value={newBeneficiary.illness}
+              onChangeText={(value) =>
+                setNewBeneficiary((prev) => ({ ...prev, illness: value }))
+              }
+              placeholder="Enter illness"
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.beneficiaryModalButtons}>
               <TouchableOpacity
                 onPress={() => {
                   setEditBeneficiaryModalVisible(false);
                   setDropdownVisible(false);
                   setSelectedMember(null);
-                  setNewBeneficiary({
-                    name: "",
-                    relationship: "",
-                    illness: "",
-                    amount: "",
-                  });
                 }}
                 style={styles.cancelBtn}
               >
@@ -2546,7 +2530,6 @@ const EditClaimIntimation = ({ route }) => {
           </View>
         </View>
       </Modal>
-
       {/* Custom Popup */}
       <CustomPopup
         visible={popup.visible}
@@ -3226,11 +3209,77 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 45,
     height: 45,
-  },saveBtnDisabled: {
+  },
+  saveBtnDisabled: {
     backgroundColor: "#B0B0B0",
   },
   saveTextDisabled: {
     color: "#666",
+  },
+  beneficiaryModalContent: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
+    elevation: 5,
+    maxHeight: "75%",
+    minHeight: "40%",
+  },
+  beneficiaryModalInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 15,
+    fontSize: 14,
+    minHeight: 60, // Larger for multiline illness input
+    textAlignVertical: "top",
+  },
+  beneficiaryModalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 15,
+    paddingTop: 10,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#2E7D7D",
+    marginBottom: 8,
+    marginTop: 10,
+  },
+  dropdownButton: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    minHeight: 45,
+  },
+  dropdownOptions: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    marginBottom: 15,
+    maxHeight: 200,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  dropdownOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
   },
 });
 
