@@ -106,7 +106,7 @@ const LoadingScreen = () => (
   </View>
 );
 
-// Custom Popup Component
+// Fixed CustomPopup Component
 const CustomPopup = ({
   visible,
   title,
@@ -203,7 +203,7 @@ const CustomPopup = ({
                 style={[styles.popupButton, styles.popupConfirmButton]}
                 onPress={() => {
                   if (onConfirm) {
-                    onConfirm(); // This calls the camera function
+                    onConfirm(); // This calls the confirm function (e.g., delete)
                   }
                 }}
               >
@@ -218,8 +218,17 @@ const CustomPopup = ({
                   : styles.popupOkButton,
               ]}
               onPress={() => {
-                // Always close popup, do NOT call onConfirm for NO button
-                onClose();
+                if (showConfirmButton) {
+                  // This is the "No" button - just close the popup
+                  onClose();
+                } else {
+                  // This is the single "Ok" button - call onConfirm if it exists, otherwise onClose
+                  if (onConfirm) {
+                    onConfirm(); // This will run navigation logic for success popups
+                  } else {
+                    onClose(); // Fallback to just closing
+                  }
+                }
               }}
             >
               <Text
@@ -229,7 +238,7 @@ const CustomPopup = ({
                     : styles.popupOkButtonText,
                 ]}
               >
-                {showConfirmButton ? "NO" : "YES"}
+                {showConfirmButton ? "No" : "Ok"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -288,7 +297,6 @@ const UploadDocuments = ({ route }) => {
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-
 
   const fetchDependents = async () => {
     try {
@@ -554,6 +562,7 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
+  // Fixed success popup in handleDeletePatientInfo
   const handleDeletePatientInfo = () => {
     showPopup(
       "Delete Claim",
@@ -627,19 +636,48 @@ const UploadDocuments = ({ route }) => {
             console.warn("Error clearing stored data:", storageError);
           }
 
-          // Show success message and navigate to homepage
+          // Hide current popup first
           hidePopup();
+
+          // Show success popup with navigation in the onConfirm callback
           showPopup(
             "Success",
             "Claim has been deleted successfully.",
             "success",
-            false, // showConfirmButton = false
+            false, // showConfirmButton = false (single OK button)
             () => {
+              // This function runs when user clicks OK button
               hidePopup();
-              // Navigate to homepage
-              setTimeout(() => {
-                navigation.navigate("home");
-              }, 500);
+
+              // Navigate to home page
+              try {
+                // Check which home screen name exists in your navigation
+                const routeNames = navigation.getState()?.routeNames || [];
+
+                if (routeNames.includes("Home")) {
+                  navigation.navigate("Home");
+                } else if (routeNames.includes("home")) {
+                  navigation.navigate("home");
+                } else if (routeNames.includes("HomeScreen")) {
+                  navigation.navigate("HomeScreen");
+                } else if (routeNames.includes("Dashboard")) {
+                  navigation.navigate("Dashboard");
+                } else {
+                  // Fallback: reset to the first screen
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: routeNames[0] || "Home" }],
+                  });
+                }
+
+                console.log(
+                  "Successfully navigated to home page after deletion"
+                );
+              } catch (navError) {
+                console.error("Navigation error after deletion:", navError);
+                // Ultimate fallback
+                navigation.popToTop();
+              }
             }
           );
 
@@ -658,9 +696,11 @@ const UploadDocuments = ({ route }) => {
               () => {
                 hidePopup();
                 // Navigate to homepage even if claim not found
-                setTimeout(() => {
+                try {
                   navigation.navigate("Home");
-                }, 500);
+                } catch (navError) {
+                  navigation.popToTop();
+                }
               }
             );
           } else if (error.message.includes("400")) {
@@ -1911,7 +1951,7 @@ const UploadDocuments = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                      styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1922,7 +1962,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                          styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1934,7 +1974,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                          styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1961,15 +2001,15 @@ const UploadDocuments = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                  ? "Enter amount"
-                  : "0.00"
+                ? "Enter amount"
+                : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1992,7 +2032,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                  styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -2102,7 +2142,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -2121,7 +2161,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -2136,7 +2176,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -2155,7 +2195,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -2212,15 +2252,19 @@ const UploadDocuments = ({ route }) => {
         <TouchableOpacity
           style={[
             styles.addDocumentButton,
-            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonDisabled,
+            (uploadedDocuments.length === 0 || isUploading) &&
+              styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocumentButton}
           disabled={uploadedDocuments.length === 0 || isUploading}
         >
-          <Text style={[
-            styles.addDocumentButtonText,
-            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonTextDisabled
-          ]}>
+          <Text
+            style={[
+              styles.addDocumentButtonText,
+              (uploadedDocuments.length === 0 || isUploading) &&
+                styles.addDocumentButtonTextDisabled,
+            ]}
+          >
             {isUploading ? "Uploading..." : "Upload Document"}
           </Text>
         </TouchableOpacity>
@@ -2288,8 +2332,8 @@ const UploadDocuments = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                    ? selectedMember.name
-                    : editPatientData.patientName || "Select Member"}
+                  ? selectedMember.name
+                  : editPatientData.patientName || "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2307,7 +2351,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                      styles.selectedDropdownOption,
+                        styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2315,7 +2359,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                        styles.selectedDropdownOptionText,
+                          styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -2367,7 +2411,7 @@ const UploadDocuments = ({ route }) => {
         message={popup.message}
         type={popup.type}
         showConfirmButton={popup.showConfirmButton}
-        onClose={popup.onConfirm || hidePopup}
+        onClose={hidePopup} // Always use hidePopup for onClose
         onConfirm={popup.onConfirm}
       />
     </LinearGradient>

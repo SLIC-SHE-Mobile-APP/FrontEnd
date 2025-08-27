@@ -1,22 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  Keyboard,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Modal,
-  Dimensions,
-  Clipboard,
+import {ActivityIndicator,Animated,Image,Keyboard,Linking,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,Modal,Dimensions,
 } from "react-native";
 import {
   SafeAreaProvider,
@@ -24,7 +9,6 @@ import {
 } from "react-native-safe-area-context";
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '../constants/index.js';
-// Removed expo-blur dependency
 
 const { width, height } = Dimensions.get('window');
 
@@ -188,34 +172,6 @@ function OTPVerificationContent() {
     });
   };
 
-  // Function to clear all stored data
-  const clearAllStoredData = async () => {
-    try {
-      console.log("Clearing all stored data...");
-      
-      // Clear policy-related data
-      await SecureStore.deleteItemAsync("selected_policy_number");
-      await SecureStore.deleteItemAsync("selected_member_number");
-      await SecureStore.deleteItemAsync("selected_policy_id");
-      await SecureStore.deleteItemAsync("selected_policy_period");
-      await SecureStore.deleteItemAsync("selected_policy_type");
-      await SecureStore.deleteItemAsync("selected_policy_data");
-      
-      // Clear member-related data
-      await SecureStore.deleteItemAsync("selected_member_complete");
-      await SecureStore.deleteItemAsync("selected_member_name");
-      
-      // Clear user data (optional - you might want to keep this for login)
-      await SecureStore.deleteItemAsync("userData");
-      await SecureStore.deleteItemAsync("user_mobile");
-      await SecureStore.deleteItemAsync("user_nic");
-      
-      console.log("All stored data cleared successfully");
-    } catch (error) {
-      console.error("Error clearing stored data:", error);
-    }
-  };
-
   // Alternative function to clear only policy and member data (keeping user login data)
   const clearPolicyAndMemberData = async () => {
     try {
@@ -236,47 +192,6 @@ function OTPVerificationContent() {
       console.log("Policy and member data cleared successfully");
     } catch (error) {
       console.error("Error clearing policy and member data:", error);
-    }
-  };
-
-  // Load user data from SecureStore as backup
-  const loadUserData = async () => {
-    try {
-      // Try to get individual values first (more secure approach)
-      const storedMobile = await SecureStore.getItemAsync('user_mobile');
-      const storedNic = await SecureStore.getItemAsync('user_nic');
-      
-      if (storedMobile && storedNic) {
-        console.log("Loaded user data from SecureStore:", {
-          mobileNumber: storedMobile,
-          nicNumber: storedNic
-        });
-
-        // Use SecureStore data if navigation params are empty
-        if (!nicNumber && storedNic) {
-          setNicNumber(storedNic);
-        }
-        if (!mobileNumber && storedMobile) {
-          setMobileNumber(storedMobile);
-        }
-      } else {
-        // Fallback to combined userData if individual items don't exist
-        const userData = await SecureStore.getItemAsync("userData");
-        if (userData) {
-          const parsedData = JSON.parse(userData);
-          console.log("Loaded combined user data from SecureStore:", parsedData);
-
-          // Use SecureStore data if navigation params are empty
-          if (!nicNumber && parsedData.nicNumber) {
-            setNicNumber(parsedData.nicNumber);
-          }
-          if (!mobileNumber && parsedData.mobileNumber) {
-            setMobileNumber(parsedData.mobileNumber);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error loading user data from SecureStore:", error);
     }
   };
 
