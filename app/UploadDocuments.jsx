@@ -1506,7 +1506,7 @@ const UploadDocuments = ({ route }) => {
     // Show Yes/No confirmation popup before opening camera
     showPopup(
       "Take Photo",
-      "Do you want to open the camera to take a photo?",
+      "Any document without Submitted to SLICGL on [Date],[Policy No],[MemberID] will be rejected by SLICGL",
       "info",
       true, // showConfirmButton = true
       async () => {
