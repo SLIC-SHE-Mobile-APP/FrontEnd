@@ -1,15 +1,41 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image,BackHandler } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 
 const PrivacyPolicy = () => {
   const router = useRouter();
 
-  const handleBackPress = () => {
-    router.back();
-  };
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Check if we can go back in router
+        if (router.canGoBack()) {
+          router.back();
+          return true; // Prevent default behavior
+        }
+        
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [])
+  );
+
+  // Enhanced back button handler
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Navigate to home screen or handle gracefully
+      router.replace("/(tabs)/home"); // Replace with your actual home route
+    }
+  }, []);
 
   return (
     <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
