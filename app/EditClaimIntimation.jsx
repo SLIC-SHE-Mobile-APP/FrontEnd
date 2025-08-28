@@ -531,13 +531,6 @@ const EditClaimIntimation = ({ route }) => {
     setPopup((prev) => ({ ...prev, visible: false }));
   };
 
-  // Add a new function to handle the complete back press flow
-  const handleCompleteBackPress = () => {
-    // First, save the claim (you might want to add actual save logic here)
-    // Then navigate to home
-    navigation.navigate("home");
-  };
-
   const handleDeleteClaim = async () => {
     showPopup(
       "Delete Claim",

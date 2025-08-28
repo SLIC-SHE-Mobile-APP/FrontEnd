@@ -659,10 +659,8 @@ export default function PolicyHome({ route }) {
 
   const handlePolicySelection = async (policy) => {
     try {
-      // Show loading state
       setIsLoadingPolicySelection(true);
 
-      // 1. Clear all existing data first
       await clearAllData();
 
       await SecureStore.setItemAsync(
@@ -674,12 +672,10 @@ export default function PolicyHome({ route }) {
         policy.memNumber.toString()
       );
 
-      // Store NIC number in SecureStore
       if (policy.nicNumber) {
         await SecureStore.setItemAsync("user_nic", policy.nicNumber);
       }
 
-      // Store additional policy data
       await SecureStore.setItemAsync(
         "selected_policy_id",
         policy.policyID.toString()
@@ -690,13 +686,11 @@ export default function PolicyHome({ route }) {
       );
       await SecureStore.setItemAsync("selected_policy_type", policy.type);
 
-      // Store the full policy data as JSON string
       await SecureStore.setItemAsync(
         "selected_policy_data",
         JSON.stringify(policy)
       );
 
-      // 3. Update policy-related state
       setSelectedPolicyNumber(policy.policyNumber);
       setPolicyDetails({
         policyID: policy.policyID,
@@ -707,7 +701,6 @@ export default function PolicyHome({ route }) {
       });
       setIsFirstTime(false);
 
-      // 4. Close the policy selection modal first
       Animated.timing(policySelectSlideAnim, {
         toValue: screenHeight,
         duration: 300,
@@ -716,7 +709,6 @@ export default function PolicyHome({ route }) {
         setShowPolicySelection(false);
       });
 
-      // 5. Fetch all fresh data for the new policy simultaneously
       await Promise.all([
         fetchEmployeeInfo(),
         fetchPolicyInfo(),
