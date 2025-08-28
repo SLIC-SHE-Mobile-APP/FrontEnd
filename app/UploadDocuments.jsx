@@ -10,6 +10,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Image,
   Modal,
@@ -31,6 +32,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const LoadingIcon = () => {
   const [rotateAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(1));
+
 
   useEffect(() => {
     const createRotateAnimation = () => {
@@ -992,6 +994,34 @@ const UploadDocuments = ({ route }) => {
     }, [fromEditClaim, referenceNo, storedReferenceNo])
   );
 
+
+  // Handle hardware back button
+useFocusEffect(
+  React.useCallback(() => {
+    const onBackPress = () => {
+   
+      if (navigation.canGoBack()) {
+        if (fromEditClaim) {
+          navigation.navigate("EditClaimIntimation", {
+            ...(route?.params || {}),
+            fromUploadDocuments: true,
+            refreshClaimAmount: true,
+          });
+        } else {
+          navigation.goBack();
+        }
+        return true; 
+      }
+      
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => subscription.remove();
+  }, [navigation, fromEditClaim, route?.params])
+);
+
   const formatDateForAPI = (date) => {
     const day = date.getDate().toString().padStart(2, "0");
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -1779,23 +1809,40 @@ const UploadDocuments = ({ route }) => {
     await handleAddDocument();
   };
 
-  const handleBackPress = () => {
+  const handleBackPress = React.useCallback(() => {
     console.log("Back button pressed");
     try {
-      if (fromEditClaim) {
-        navigation.navigate("EditClaimIntimation", {
-          ...route.params,
-          fromUploadDocuments: true,
-          refreshClaimAmount: true,
-        });
+      if (navigation.canGoBack()) {
+        if (fromEditClaim) {
+          navigation.navigate("EditClaimIntimation", {
+            ...(route?.params || {}),
+            fromUploadDocuments: true,
+            refreshClaimAmount: true,
+          });
+        } else {
+          navigation.goBack();
+        }
       } else {
-        navigation.goBack();
+        
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }]       
+        });
       }
     } catch (error) {
       console.error("Navigation error:", error);
-      navigation.goBack();
+      // Fallback navigation
+      try {
+        navigation.goBack();
+      } catch (fallbackError) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }], 
+        });
+      }
     }
-  };
+  }, [navigation, fromEditClaim, route?.params]);
+
 
   const handleImagePress = (image) => {
     setSelectedImage(image);
@@ -1943,7 +1990,7 @@ const UploadDocuments = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                      styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1954,7 +2001,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                          styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1966,7 +2013,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                          styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1993,15 +2040,15 @@ const UploadDocuments = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.textInputError,
+              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+              styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                ? "Enter amount"
-                : "0.00"
+                  ? "Enter amount"
+                  : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -2024,7 +2071,7 @@ const UploadDocuments = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                  styles.errorText,
+                styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -2134,7 +2181,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -2153,7 +2200,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -2168,7 +2215,7 @@ const UploadDocuments = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -2187,7 +2234,7 @@ const UploadDocuments = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -2245,7 +2292,7 @@ const UploadDocuments = ({ route }) => {
           style={[
             styles.addDocumentButton,
             (uploadedDocuments.length === 0 || isUploading) &&
-              styles.addDocumentButtonDisabled,
+            styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocumentButton}
           disabled={uploadedDocuments.length === 0 || isUploading}
@@ -2254,7 +2301,7 @@ const UploadDocuments = ({ route }) => {
             style={[
               styles.addDocumentButtonText,
               (uploadedDocuments.length === 0 || isUploading) &&
-                styles.addDocumentButtonTextDisabled,
+              styles.addDocumentButtonTextDisabled,
             ]}
           >
             {isUploading ? "Uploading..." : "Upload Document"}
@@ -2324,8 +2371,8 @@ const UploadDocuments = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : editPatientData.patientName || "Select Member"}
+                    ? selectedMember.name
+                    : editPatientData.patientName || "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2343,7 +2390,7 @@ const UploadDocuments = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2351,7 +2398,7 @@ const UploadDocuments = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
