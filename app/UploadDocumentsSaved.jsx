@@ -1000,13 +1000,6 @@ const UploadDocumentsSaved = ({ route }) => {
       // Set uploading state to true
       setIsUploading(true);
 
-      // Show loading popup
-      showPopup(
-        "Uploading",
-        "Please wait while we upload your documents...",
-        "info"
-      );
-
       const uploadPromises = uploadedDocuments.map((doc) =>
         uploadDocumentToAPI(doc)
       );
