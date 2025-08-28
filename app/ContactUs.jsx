@@ -1,15 +1,37 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, BackHandler } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 
 const ContactUs = () => {
   const router = useRouter();
 
-  const handleBackPress = () => {
-    router.back();
-  };
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+
+        if (router.canGoBack()) {
+          router.back();
+          return true;
+        }
+        return false;
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [])
+  );
+
+  // Enhanced back button handler
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+
+      router.replace("/(tabs)/home");
+    }
+  }, []);
 
   return (
     <LinearGradient colors={["#ebebeb", "#6DD3D3"]} style={styles.container}>
@@ -24,8 +46,8 @@ const ContactUs = () => {
       {/* Content */}
       <View style={styles.content}>
         <View style={styles.notFoundContainer}>
-          <Image 
-            source={require('../assets/images/notfound.png')} 
+          <Image
+            source={require('../assets/images/notfound.png')}
             style={styles.notFoundImage}
             resizeMode="contain"
           />

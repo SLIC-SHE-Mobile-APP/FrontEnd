@@ -1,11 +1,12 @@
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Image,
   StyleSheet,
@@ -205,7 +206,7 @@ export default function ViewProfile() {
     } catch (error) {
       console.error("Error fetching employee info:", error);
 
-      // Fallback handling
+ 
       try {
         const storedNic = await SecureStore.getItemAsync("user_nic");
         const gender = getGenderFromNIC(storedNic);
@@ -230,11 +231,11 @@ export default function ViewProfile() {
   };
 
   useEffect(() => {
-    // Fetch employee info when component mounts
+    
     fetchEmployeeInfo();
   }, []);
 
-  // Start fade-in animation only after loading is complete
+ 
   useEffect(() => {
     if (!isLoading) {
       Animated.timing(fadeAnim, {
@@ -245,6 +246,37 @@ export default function ViewProfile() {
     }
   }, [isLoading]);
 
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+      
+        if (router.canGoBack()) {
+          router.back();
+          return true; 
+        }
+        
+        
+        return false;
+      };
+
+      
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [])
+  );
+
+
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+     
+      router.replace("/(tabs)/home"); 
+    }
+  }, []);
+
   const handleInputChange = (field, value) => {
     setProfileData((prev) => ({
       ...prev,
@@ -252,7 +284,7 @@ export default function ViewProfile() {
     }));
   };
 
-  // Show loading screen while fetching data
+ 
   if (isLoading) {
     return (
       <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.container}>
@@ -266,7 +298,7 @@ export default function ViewProfile() {
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={handleBackPress}>
             <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
           </TouchableOpacity>
         </View>
