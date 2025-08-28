@@ -2084,6 +2084,19 @@ const EditClaimIntimation = ({ route }) => {
     );
   };
 
+
+  const isSubmitDisabled = () => {
+    if (beneficiaries.length === 0) {
+      return true;
+    }
+
+    return beneficiaries.some(beneficiary => {
+      const amount = removeCommasFromAmount(beneficiary.amount);
+      const numericAmount = parseFloat(amount);
+      return !amount || amount.trim() === "" || isNaN(numericAmount) || numericAmount <= 0;
+    });
+  };
+
   const fetchPatientDetails = async (referenceNo) => {
     try {
       console.log("Fetching patient details for referenceNo:", referenceNo);
@@ -2206,8 +2219,8 @@ const EditClaimIntimation = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -2393,12 +2406,20 @@ const EditClaimIntimation = ({ route }) => {
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmitClaim}
+            style={[
+              styles.submitButton,
+              isSubmitDisabled() && styles.submitButtonDisabled
+            ]}
+            onPress={isSubmitDisabled() ? null : handleSubmitClaim}
+            disabled={isSubmitDisabled()}
           >
-            <Text style={styles.submitButtonText}>Submit Claim</Text>
+            <Text style={[
+              styles.submitButtonText,
+              isSubmitDisabled() && styles.submitButtonTextDisabled
+            ]}>
+              Submit Claim
+            </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.submitLaterButton}
             onPress={handleSubmitLater}
@@ -2492,10 +2513,10 @@ const EditClaimIntimation = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -2523,7 +2544,7 @@ const EditClaimIntimation = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -2533,7 +2554,7 @@ const EditClaimIntimation = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -2582,15 +2603,15 @@ const EditClaimIntimation = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                    !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.textInputError,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                    ? "Enter amount"
-                    : "0.00"
+                      ? "Enter amount"
+                      : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -2610,7 +2631,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -2622,7 +2643,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -2653,7 +2674,7 @@ const EditClaimIntimation = ({ route }) => {
                 style={[
                   styles.saveBtn,
                   !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.saveBtnDisabled,
+                  styles.saveBtnDisabled,
                 ]}
                 disabled={
                   !validateEditAmount(newDocument.amount, editDocumentType)
@@ -2663,7 +2684,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.saveText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.saveTextDisabled,
+                    styles.saveTextDisabled,
                   ]}
                 >
                   Save
@@ -2723,8 +2744,8 @@ const EditClaimIntimation = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : "Select Member"}
+                    ? selectedMember.name
+                    : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2742,7 +2763,7 @@ const EditClaimIntimation = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2750,7 +2771,7 @@ const EditClaimIntimation = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -3544,6 +3565,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#B0B0B0",
+    opacity: 0.6,
+  },
+  submitButtonTextDisabled: {
+    color: "#666",
   },
 });
 
