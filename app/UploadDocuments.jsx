@@ -33,7 +33,6 @@ const LoadingIcon = () => {
   const [rotateAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(1));
 
-
   useEffect(() => {
     const createRotateAnimation = () => {
       return Animated.loop(
@@ -790,7 +789,6 @@ const UploadDocuments = ({ route }) => {
     setPopup((prev) => ({ ...prev, visible: false }));
   };
 
-  // FETCH CLAIM AMOUNT FROM API
   const fetchClaimAmountFromAPI = async (referenceNo) => {
     try {
       setClaimAmountLoading(true);
@@ -805,16 +803,18 @@ const UploadDocuments = ({ route }) => {
         return "0.00";
       }
 
-      const requestBody = {
-        seqNo: referenceNo.trim(),
-      };
+      const requestBody = { seqNo: referenceNo.trim() };
 
+      // Add timestamp and cache-busting headers to force fresh data
       const response = await fetch(
-        `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
+        `${API_BASE_URL}/ClaimAmount/GetClaimAmount?t=${Date.now()}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
           },
           body: JSON.stringify(requestBody),
         }
@@ -852,9 +852,8 @@ const UploadDocuments = ({ route }) => {
       const formattedAmount = claimAmount.includes(".")
         ? claimAmount
         : `${claimAmount}.00`;
-
-      // Format with commas for display
       const displayAmount = formatAmountWithCommas(formattedAmount);
+
       console.log("Formatted claim amount with commas:", displayAmount);
       setActualClaimAmount(displayAmount);
       return displayAmount;
@@ -923,7 +922,6 @@ const UploadDocuments = ({ route }) => {
     fetchDocumentTypes();
   }, []);
 
-  // LOAD STORED VALUES AND FETCH CLAIM AMOUNT
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
@@ -941,31 +939,65 @@ const UploadDocuments = ({ route }) => {
           "stored_illness_description"
         );
 
-        // Determine the reference number to use
         const finalReferenceNo = referenceNo || referenceNoFromStore || "";
 
         setStoredReferenceNo(finalReferenceNo);
         setStoredNic(nic || "");
-        setStoredPatientName(patientName || storedPatientNameFromStore || "");
-        setStoredClaimType(claimType || storedClaimTypeFromStore || "");
-        setStoredIllness(illness || storedIllnessFromStore || "");
 
-        console.log("Loaded stored values:", {
-          referenceNo: finalReferenceNo,
-          nic,
-          patientName: patientName || storedPatientNameFromStore,
-          claimType: claimType || storedClaimTypeFromStore,
-          illness: illness || storedIllnessFromStore,
-          fromEditClaim: fromEditClaim,
-          passedCurrentClaimAmount: currentClaimAmount,
-        });
-
-        // FETCH ACTUAL CLAIM AMOUNT FROM API
+        // ALWAYS fetch fresh data from API when component loads
         if (finalReferenceNo) {
-          await fetchClaimAmountFromAPI(finalReferenceNo);
+          console.log(
+            "Loading with forced API refresh for referenceNo:",
+            finalReferenceNo
+          );
+
+          // Fetch both APIs in parallel for fresh data
+          const [patientDetails, claimAmount] = await Promise.all([
+            fetchPatientDetails(finalReferenceNo),
+            fetchClaimAmountFromAPI(finalReferenceNo),
+          ]);
+
+          // Use API data if available, otherwise fall back to stored data
+          const finalPatientName =
+            patientDetails.patient_Name ||
+            patientName ||
+            storedPatientNameFromStore ||
+            "";
+          const finalIllness =
+            patientDetails.illness || illness || storedIllnessFromStore || "";
+
+          setStoredPatientName(finalPatientName);
+          setStoredIllness(finalIllness);
+
+          // Update stored values with fresh API data
+          if (patientDetails.patient_Name) {
+            await SecureStore.setItemAsync(
+              "stored_patient_name",
+              patientDetails.patient_Name
+            );
+          }
+          if (patientDetails.illness) {
+            await SecureStore.setItemAsync(
+              "stored_illness_description",
+              patientDetails.illness
+            );
+          }
         } else {
+          // No reference number, use passed props or stored data
+          setStoredPatientName(patientName || storedPatientNameFromStore || "");
+          setStoredIllness(illness || storedIllnessFromStore || "");
           setActualClaimAmount("0.00");
         }
+
+        setStoredClaimType(claimType || storedClaimTypeFromStore || "");
+
+        console.log("Loaded stored values with API refresh:", {
+          referenceNo: finalReferenceNo,
+          patientName: storedPatientName,
+          claimType: claimType || storedClaimTypeFromStore,
+          illness: storedIllness,
+          actualClaimAmount,
+        });
       } catch (error) {
         console.error("Error loading stored values:", error);
         setActualClaimAmount("0.00");
@@ -975,52 +1007,80 @@ const UploadDocuments = ({ route }) => {
     loadStoredValues();
   }, [patientName, claimType, illness, referenceNo]);
 
-  // USE FOCUS EFFECT TO REFRESH CLAIM AMOUNT WHEN SCREEN IS FOCUSED
   useFocusEffect(
     useCallback(() => {
       const refreshClaimAmount = async () => {
-        if (fromEditClaim) {
-          console.log(
-            "Screen focused from EditClaim, refreshing claim amount..."
-          );
-          const refNo = referenceNo || storedReferenceNo;
-          if (refNo) {
-            await fetchClaimAmountFromAPI(refNo);
+        console.log("Screen focused, checking if refresh needed...");
+
+        // Always refresh when coming from EditClaim or when screen is focused
+        const refNo = referenceNo || storedReferenceNo;
+        if (refNo) {
+          console.log("Forcing refresh of both APIs for referenceNo:", refNo);
+
+          // Fetch both APIs to ensure fresh data
+          const [patientDetails, claimAmount] = await Promise.all([
+            fetchPatientDetails(refNo),
+            fetchClaimAmountFromAPI(refNo),
+          ]);
+
+          // Update patient details if we got fresh data
+          if (patientDetails.patient_Name || patientDetails.illness) {
+            setStoredPatientName(
+              patientDetails.patient_Name || storedPatientName
+            );
+            setStoredIllness(patientDetails.illness || storedIllness);
+
+            // Update stored values
+            if (patientDetails.patient_Name) {
+              await SecureStore.setItemAsync(
+                "stored_patient_name",
+                patientDetails.patient_Name
+              );
+            }
+            if (patientDetails.illness) {
+              await SecureStore.setItemAsync(
+                "stored_illness_description",
+                patientDetails.illness
+              );
+            }
           }
+
+          console.log("APIs refreshed successfully");
         }
       };
 
       refreshClaimAmount();
-    }, [fromEditClaim, referenceNo, storedReferenceNo])
+    }, [referenceNo, storedReferenceNo, fromEditClaim])
   );
 
-
   // Handle hardware back button
-useFocusEffect(
-  React.useCallback(() => {
-    const onBackPress = () => {
-   
-      if (navigation.canGoBack()) {
-        if (fromEditClaim) {
-          navigation.navigate("EditClaimIntimation", {
-            ...(route?.params || {}),
-            fromUploadDocuments: true,
-            refreshClaimAmount: true,
-          });
-        } else {
-          navigation.goBack();
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (navigation.canGoBack()) {
+          if (fromEditClaim) {
+            navigation.navigate("EditClaimIntimation", {
+              ...(route?.params || {}),
+              fromUploadDocuments: true,
+              refreshClaimAmount: true,
+            });
+          } else {
+            navigation.goBack();
+          }
+          return true;
         }
-        return true; 
-      }
-      
-      return false;
-    };
 
-    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return false;
+      };
 
-    return () => subscription.remove();
-  }, [navigation, fromEditClaim, route?.params])
-);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [navigation, fromEditClaim, route?.params])
+  );
 
   const formatDateForAPI = (date) => {
     const day = date.getDate().toString().padStart(2, "0");
@@ -1405,7 +1465,6 @@ useFocusEffect(
         setSelectedDocumentType("");
         setAmount("");
         setDocumentDate(new Date());
-
       }
     } catch (error) {
       console.error("Error picking document:", error);
@@ -1537,67 +1596,55 @@ useFocusEffect(
     );
   };
 
-  const handleSaveEdit = () => {
-    if (!validateEditAmount(editAmount)) {
-      if (editDocumentType === "O01") {
-        showPopup(
-          "Validation Error",
-          "Please enter a valid amount greater than 0 for Bill type",
-          "warning"
-        );
-      } else {
-        showPopup("Validation Error", "Please enter a valid amount", "warning");
-      }
-      return;
-    }
+  const fetchPatientDetails = async (referenceNo) => {
+    try {
+      console.log("Fetching patient details for referenceNo:", referenceNo);
 
-    setUploadedDocuments((prev) =>
-      prev.map((doc) =>
-        doc.id === editingDocument.id
-          ? { ...doc, amount: formatAmountForDisplay(editAmount) }
-          : doc
-      )
-    );
-
-    setShowEditModal(false);
-    setEditingDocument(null);
-    setEditAmount("");
-    setEditDocumentType("");
-    showPopup("Success", "Document details updated successfully.", "success");
-  };
-
-  const validateEditAmount = (amountString) => {
-    if (editDocumentType === "O02" || editDocumentType === "O03") {
-      return true;
-    }
-
-    if (editDocumentType === "O01") {
-      if (!amountString || amountString.trim() === "") {
-        return false;
+      if (!referenceNo || referenceNo.trim() === "") {
+        console.warn("Invalid referenceNo provided:", referenceNo);
+        return { patient_Name: "", relationship: "", illness: "" };
       }
 
-      // Remove commas before parsing
-      const cleanAmount = removeCommasFromAmount(amountString);
-      const amount = parseFloat(cleanAmount);
-      if (isNaN(amount) || amount <= 0) {
-        return false;
+      const requestBody = { seqNo: referenceNo.trim() };
+
+      // Add timestamp and cache-busting headers to force fresh data
+      const response = await fetch(
+        `${API_BASE_URL}/ClaimAmount/GetPatientDetails?t=${Date.now()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(
+            "No patient details found for referenceNo:",
+            referenceNo
+          );
+          return { patient_Name: "", relationship: "", illness: "" };
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return true;
-    }
+      const data = await response.json();
+      console.log("Patient Details API Response:", data);
 
-    if (!amountString || amountString.trim() === "") {
-      return false;
+      return {
+        patient_Name: data.patient_Name || "",
+        relationship: data.relationship || "",
+        illness: data.illness || "",
+      };
+    } catch (error) {
+      console.error("Error fetching patient details:", error);
+      return { patient_Name: "", relationship: "", illness: "" };
     }
-
-    // Remove commas before parsing
-    const cleanAmount = removeCommasFromAmount(amountString);
-    const amount = parseFloat(cleanAmount);
-    if (isNaN(amount) || amount < 0) {
-      return false;
-    }
-
-    return true;
   };
 
   const uploadDocumentToAPI = async (document) => {
@@ -1806,43 +1853,252 @@ useFocusEffect(
     console.log("Current Claim Amount:", actualClaimAmount);
     console.log("=====================================");
 
-    await handleAddDocument();
+    // Validation checks
+    if (uploadedDocuments.length === 0) {
+      showPopup(
+        "Validation Error",
+        "Please upload at least one document",
+        "warning"
+      );
+      return;
+    }
+
+    if (!storedReferenceNo || !storedNic) {
+      showPopup(
+        "Error",
+        "Missing required information. Please ensure you have a valid reference number and user identification.",
+        "error"
+      );
+      return;
+    }
+
+    const invalidDocuments = uploadedDocuments.filter((doc) => {
+      if (!doc.documentType) {
+        return true;
+      }
+
+      if (doc.documentType === "O01") {
+        const amount = parseFloat(removeCommasFromAmount(doc.amount));
+        if (isNaN(amount) || amount <= 0) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    if (invalidDocuments.length > 0) {
+      showPopup(
+        "Validation Error",
+        "Some uploaded documents have invalid information. Please check and re-upload if necessary.",
+        "warning"
+      );
+      return;
+    }
+
+    try {
+      // Set uploading state to true
+      setIsUploading(true);
+
+      const uploadPromises = uploadedDocuments.map((doc) =>
+        uploadDocumentToAPI(doc)
+      );
+      const results = await Promise.all(uploadPromises);
+
+      const failedUploads = results.filter((result) => !result.success);
+
+      if (failedUploads.length > 0) {
+        setIsUploading(false);
+        hidePopup();
+        showPopup(
+          "Upload Error",
+          `Failed to upload ${failedUploads.length} document(s). Please try again.`,
+          "error"
+        );
+        return;
+      }
+
+      const claimData = {
+        referenceNo: storedReferenceNo,
+        enteredBy: storedPatientName || patientData.patientName || "Unknown",
+        status: "Submission for Approval Pending",
+        claimType: storedClaimType || patientData.claimType || "Unknown",
+        createdOn: new Date().toLocaleDateString("en-GB"),
+        beneficiaries: [
+          {
+            id: "1",
+            name: storedPatientName || patientData.patientName || "Unknown",
+            relationship: "Self",
+            illness: storedIllness || patientData.illness || "",
+            amount: "0.00",
+          },
+        ],
+        documents: uploadedDocuments.map((doc) => ({
+          id: doc.id,
+          type: getDocumentTypeLabel(doc.documentType),
+          date: doc.date,
+          amount: doc.amount,
+          documentType: doc.documentType,
+          uri: doc.uri,
+          imgContent: null,
+        })),
+        metadata: {
+          userNic: storedNic,
+          totalDocuments: uploadedDocuments.length,
+          uploadTimestamp: new Date().toISOString(),
+        },
+      };
+
+      console.log(
+        "All documents uploaded successfully. Passing data:",
+        claimData
+      );
+
+      hidePopup();
+      showPopup(
+        "Success",
+        "All documents uploaded successfully!",
+        "success",
+        false,
+        () => {
+          hidePopup();
+          // Navigate with enhanced refresh parameters
+          if (fromEditClaim) {
+            navigation.navigate("EditClaimIntimation", {
+              ...route.params,
+              fromUploadDocuments: true,
+              documentsUploaded: true,
+              refreshClaimAmount: true,
+              refreshPatientDetails: true,
+              forceRefresh: true,
+              refreshTimestamp: Date.now(),
+              uploadedDocumentsCount: uploadedDocuments.length,
+              lastUploadTime: new Date().toISOString(),
+            });
+          } else {
+            navigation.navigate("EditClaimIntimation", {
+              claim: claimData,
+              referenceNo: storedReferenceNo,
+              claimType: storedClaimType || patientData.claimType,
+              patientName: storedPatientName || patientData.patientName,
+              illness: storedIllness || patientData.illness,
+              claimId: claimId,
+              userNic: storedNic,
+              documentsUploaded: true,
+              refreshClaimAmount: true,
+              refreshPatientDetails: true,
+              forceRefresh: true,
+              refreshTimestamp: Date.now(),
+              uploadedDocumentsCount: uploadedDocuments.length,
+              lastUploadTime: new Date().toISOString(),
+              submittedData: {
+                patientData: {
+                  ...patientData,
+                  patientName: storedPatientName || patientData.patientName,
+                  illness: storedIllness || patientData.illness,
+                  claimType: storedClaimType || patientData.claimType,
+                  referenceNo: storedReferenceNo,
+                  claimId: claimId,
+                },
+                documents: uploadedDocuments,
+                uploadResults: results,
+                metadata: claimData.metadata,
+              },
+            });
+          }
+        }
+      );
+    } catch (error) {
+      console.error("Error during document upload:", error);
+      setIsUploading(false);
+      hidePopup();
+
+      // Enhanced error handling
+      if (error.message.includes("Network request failed")) {
+        showPopup(
+          "Network Error",
+          "Unable to connect to the server. Please check your internet connection and try again.",
+          "error"
+        );
+      } else if (error.message.includes("400")) {
+        showPopup(
+          "Invalid Request",
+          "Some document information is invalid. Please check your documents and try again.",
+          "error"
+        );
+      } else if (error.message.includes("401")) {
+        showPopup(
+          "Authentication Error",
+          "Your session has expired. Please logout and login again.",
+          "error"
+        );
+      } else if (error.message.includes("403")) {
+        showPopup(
+          "Permission Error",
+          "You don't have permission to upload documents for this claim.",
+          "error"
+        );
+      } else if (error.message.includes("413")) {
+        showPopup(
+          "File Too Large",
+          "One or more files are too large. Please compress your images and try again.",
+          "error"
+        );
+      } else if (error.message.includes("500")) {
+        showPopup(
+          "Server Error",
+          "Server is currently unavailable. Please try again later.",
+          "error"
+        );
+      } else {
+        showPopup(
+          "Upload Error",
+          `An unexpected error occurred while uploading documents: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+          "error"
+        );
+      }
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleBackPress = React.useCallback(() => {
-    console.log("Back button pressed");
+    console.log(
+      "Back button pressed, preparing to refresh EditClaimIntimation"
+    );
     try {
       if (navigation.canGoBack()) {
         if (fromEditClaim) {
+          // Pass explicit refresh flags to trigger API refresh
           navigation.navigate("EditClaimIntimation", {
             ...(route?.params || {}),
             fromUploadDocuments: true,
             refreshClaimAmount: true,
+            refreshPatientDetails: true,
+            forceRefresh: true,
+            refreshTimestamp: Date.now(),
           });
         } else {
           navigation.goBack();
         }
       } else {
-        
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }]       
+          routes: [{ name: "Home" }],
         });
       }
     } catch (error) {
       console.error("Navigation error:", error);
-      // Fallback navigation
       try {
         navigation.goBack();
       } catch (fallbackError) {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }], 
+          routes: [{ name: "Home" }],
         });
       }
     }
   }, [navigation, fromEditClaim, route?.params]);
-
 
   const handleImagePress = (image) => {
     setSelectedImage(image);
@@ -1990,7 +2246,7 @@ useFocusEffect(
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                      styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -2001,7 +2257,7 @@ useFocusEffect(
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                          styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -2013,7 +2269,7 @@ useFocusEffect(
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                          styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -2040,15 +2296,15 @@ useFocusEffect(
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                  ? "Enter amount"
-                  : "0.00"
+                ? "Enter amount"
+                : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -2071,7 +2327,7 @@ useFocusEffect(
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                  styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -2181,7 +2437,7 @@ useFocusEffect(
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -2200,7 +2456,7 @@ useFocusEffect(
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -2215,7 +2471,7 @@ useFocusEffect(
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -2234,7 +2490,7 @@ useFocusEffect(
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -2292,7 +2548,7 @@ useFocusEffect(
           style={[
             styles.addDocumentButton,
             (uploadedDocuments.length === 0 || isUploading) &&
-            styles.addDocumentButtonDisabled,
+              styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocumentButton}
           disabled={uploadedDocuments.length === 0 || isUploading}
@@ -2301,7 +2557,7 @@ useFocusEffect(
             style={[
               styles.addDocumentButtonText,
               (uploadedDocuments.length === 0 || isUploading) &&
-              styles.addDocumentButtonTextDisabled,
+                styles.addDocumentButtonTextDisabled,
             ]}
           >
             {isUploading ? "Uploading..." : "Upload Document"}
@@ -2371,8 +2627,8 @@ useFocusEffect(
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                    ? selectedMember.name
-                    : editPatientData.patientName || "Select Member"}
+                  ? selectedMember.name
+                  : editPatientData.patientName || "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2390,7 +2646,7 @@ useFocusEffect(
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                      styles.selectedDropdownOption,
+                        styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2398,7 +2654,7 @@ useFocusEffect(
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                        styles.selectedDropdownOptionText,
+                          styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})

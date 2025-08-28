@@ -4,7 +4,20 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
-import {Animated,BackHandler,Dimensions,Image,Modal,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
+import {
+  Animated,
+  BackHandler,
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
@@ -182,6 +195,7 @@ const EditClaimIntimation = ({ route }) => {
     illness: "",
     amount: "",
   });
+  const [claimAmountLoading, setClaimAmountLoading] = useState(false);
 
   const removeCommasFromAmount = (amount) => {
     if (!amount) return "";
@@ -263,7 +277,7 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // 3. Add these functions for beneficiary editing:
+  // 3. Add these functions for beneficiary editing
   const handleEditBeneficiary = (beneficiary) => {
     setSelectedBeneficiary(beneficiary);
     const member = memberOptions.find((m) => m.name === beneficiary.name);
@@ -439,113 +453,6 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // 4. Add delete claim function:
-  const handleDeleteClaim = async () => {
-    showPopup(
-      "Delete Claim",
-      "Are you sure you want to delete this claim?",
-      "confirm",
-      true,
-      async () => {
-        try {
-          console.log("Deleting claim:", claimDetails.referenceNo);
-
-          if (!claimDetails.referenceNo) {
-            showPopup("Error", "Claim reference number not found.", "error");
-            return;
-          }
-
-          const deleteClaimData = {
-            claimNo: claimDetails.referenceNo,
-          };
-
-          console.log("Delete claim request data:", deleteClaimData);
-
-          const response = await fetch(
-            `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(deleteClaimData),
-            }
-          );
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Delete Claim API Error Response:", errorText);
-            throw new Error(
-              `HTTP error! status: ${response.status}, message: ${errorText}`
-            );
-          }
-
-          const result = await response.json();
-          console.log("Delete claim API response:", result);
-
-          try {
-            await SecureStore.deleteItemAsync("edit_referenceNo");
-            await SecureStore.deleteItemAsync("edit_claimType");
-            await SecureStore.deleteItemAsync("edit_createdOn");
-            await SecureStore.deleteItemAsync("edit_enteredBy");
-            await SecureStore.deleteItemAsync("edit_relationship");
-            await SecureStore.deleteItemAsync("edit_illness");
-            await SecureStore.deleteItemAsync("edit_beneficiary_amount");
-            await SecureStore.deleteItemAsync("referenNo");
-          } catch (storageError) {
-            console.warn("Error clearing stored data:", storageError);
-          }
-
-          hidePopup();
-          showPopup(
-            "Success",
-            "Claim has been deleted successfully.",
-            "success",
-            false,
-            () => {
-              hidePopup();
-              navigation.goBack();
-            }
-          );
-        } catch (error) {
-          console.error("Error deleting claim:", error);
-
-          hidePopup();
-          if (error.message.includes("404")) {
-            showPopup(
-              "Not Found",
-              "The claim could not be found in the system. It may have already been deleted.",
-              "error",
-              false,
-              () => {
-                hidePopup();
-                navigation.goBack();
-              }
-            );
-          } else if (error.message.includes("400")) {
-            showPopup(
-              "Invalid Request",
-              "The claim could not be deleted. Please check the claim details and try again.",
-              "error"
-            );
-          } else if (error.message.includes("500")) {
-            showPopup(
-              "Server Error",
-              "Server is currently unavailable. Please try again later.",
-              "error"
-            );
-          } else {
-            showPopup(
-              "Delete Error",
-              `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
-              "error"
-            );
-          }
-        }
-      }
-    );
-  };
-
   // Popup state
   const [popup, setPopup] = useState({
     visible: false,
@@ -630,12 +537,156 @@ const EditClaimIntimation = ({ route }) => {
     // Then navigate to home
     navigation.navigate("home");
   };
+
+  const handleDeleteClaim = async () => {
+    showPopup(
+      "Delete Claim",
+      "Are you sure you want to delete this claim?",
+      "confirm",
+      true,
+      async () => {
+        try {
+          console.log("Deleting claim:", claimDetails.referenceNo);
+
+          if (!claimDetails.referenceNo) {
+            showPopup("Error", "Claim reference number not found.", "error");
+            return;
+          }
+
+          const deleteClaimData = {
+            claimNo: claimDetails.referenceNo,
+          };
+
+          console.log("Delete claim request data:", deleteClaimData);
+
+          const response = await fetch(
+            `${API_BASE_URL}/DeleteClaim/DeleteClaim`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(deleteClaimData),
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Delete Claim API Error Response:", errorText);
+            throw new Error(
+              `HTTP error! status: ${response.status}, message: ${errorText}`
+            );
+          }
+
+          const result = await response.json();
+          console.log("Delete claim API response:", result);
+
+          // Clear stored data after successful deletion
+          try {
+            await SecureStore.deleteItemAsync("edit_referenceNo");
+            await SecureStore.deleteItemAsync("edit_claimType");
+            await SecureStore.deleteItemAsync("edit_createdOn");
+            await SecureStore.deleteItemAsync("edit_enteredBy");
+            await SecureStore.deleteItemAsync("edit_relationship");
+            await SecureStore.deleteItemAsync("edit_illness");
+            await SecureStore.deleteItemAsync("edit_beneficiary_amount");
+            await SecureStore.deleteItemAsync("referenNo");
+            await SecureStore.deleteItemAsync("stored_claim_seq_no");
+            await SecureStore.deleteItemAsync("stored_claim_type");
+            await SecureStore.deleteItemAsync("stored_patient_name");
+            await SecureStore.deleteItemAsync("stored_illness_description");
+            await SecureStore.deleteItemAsync("stored_relationship");
+            await SecureStore.deleteItemAsync("stored_claim_amount");
+
+            // Set refresh flag for home page
+            await SecureStore.setItemAsync("should_refresh_home", "true");
+          } catch (storageError) {
+            console.warn("Error clearing stored data:", storageError);
+          }
+
+          hidePopup();
+          hidePopup();
+          showPopup(
+            "Success",
+            "Claim has been deleted successfully.",
+            "success",
+            false,
+            null // Remove the onConfirm callback
+          );
+
+          // Auto-close after 2 seconds and navigate
+          setTimeout(() => {
+            hidePopup();
+            navigateToHome();
+          }, 2000);
+        } catch (error) {
+          console.error("Error deleting claim:", error);
+
+          hidePopup();
+          if (error.message.includes("404")) {
+            showPopup(
+              "Not Found",
+              "The claim could not be found in the system. It may have already been deleted.",
+              "error",
+              false,
+              () => {
+                hidePopup();
+                navigateToHome();
+              }
+            );
+          } else if (error.message.includes("400")) {
+            showPopup(
+              "Invalid Request",
+              "The claim could not be deleted. Please check the claim details and try again.",
+              "error"
+            );
+          } else if (error.message.includes("500")) {
+            showPopup(
+              "Server Error",
+              "Server is currently unavailable. Please try again later.",
+              "error"
+            );
+          } else {
+            showPopup(
+              "Delete Error",
+              `Failed to delete claim: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+              "error"
+            );
+          }
+        }
+      }
+    );
+  };
+  const navigateToHome = () => {
+    try {
+      // Reset navigation stack and go to home
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "home" }],
+      });
+    } catch (error) {
+      console.warn(
+        "Reset navigation failed, trying regular navigation:",
+        error
+      );
+      // Fallback to regular navigation
+      navigation.navigate("home");
+    }
+  };
   // Helper function to format amount to 2 decimal places
   const formatAmount = (amount) => {
-    if (!amount || isNaN(parseFloat(amount))) {
+    if (!amount) {
       return "0.00";
     }
-    const numericAmount = parseFloat(amount);
+
+    // Remove commas first before parsing
+    const cleanAmount = amount.toString().replace(/,/g, "");
+
+    if (isNaN(parseFloat(cleanAmount))) {
+      return "0.00";
+    }
+
+    const numericAmount = parseFloat(cleanAmount);
     return numericAmount.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -755,7 +806,7 @@ const EditClaimIntimation = ({ route }) => {
     <View style={styles.loadingOverlay}>
       <View style={styles.loadingContainer}>
         <LoadingIcon />
-        <Text style={styles.loadingText}>Loading....</Text>
+        <Text style={styles.loadingText}>Loading New Claim Details...</Text>
         <Text style={styles.loadingSubText}>Please wait a moment</Text>
       </View>
     </View>
@@ -918,6 +969,64 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
+  const refreshPatientDetails = async () => {
+    try {
+      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+      if (!referenceNo) return;
+
+      console.log("Refreshing patient details for referenceNo:", referenceNo);
+
+      // Force fetch fresh patient details from API
+      const patientDetails = await fetchPatientDetails(referenceNo);
+
+      if (
+        patientDetails.patient_Name ||
+        patientDetails.illness ||
+        patientDetails.relationship
+      ) {
+        // Update beneficiaries with fresh data
+        const claimAmount = await fetchClaimAmount(referenceNo);
+
+        const updatedBeneficiary = {
+          id: "1",
+          name: patientDetails.patient_Name || beneficiaries[0]?.name || "",
+          relationship:
+            patientDetails.relationship ||
+            beneficiaries[0]?.relationship ||
+            "Self",
+          illness: patientDetails.illness || beneficiaries[0]?.illness || "",
+          amount: formatAmount(claimAmount),
+        };
+
+        setBeneficiaries([updatedBeneficiary]);
+
+        // Update stored values with fresh API data
+        if (patientDetails.patient_Name) {
+          await SecureStore.setItemAsync(
+            "stored_patient_name",
+            patientDetails.patient_Name
+          );
+        }
+        if (patientDetails.illness) {
+          await SecureStore.setItemAsync(
+            "stored_illness_description",
+            patientDetails.illness
+          );
+        }
+        if (patientDetails.relationship) {
+          await SecureStore.setItemAsync(
+            "stored_relationship",
+            patientDetails.relationship
+          );
+        }
+
+        console.log("Patient details refreshed successfully");
+      }
+    } catch (error) {
+      console.error("Error refreshing patient details:", error);
+    }
+  };
+
   const loadDocumentImage = async (document) => {
     try {
       setImageLoadingStates((prev) => new Map(prev.set(document.id, true)));
@@ -985,14 +1094,20 @@ const EditClaimIntimation = ({ route }) => {
         referenceNo = fallbackReferenceNo;
       }
 
+      console.log("Fetching claim amount for referenceNo:", referenceNo);
+
       const requestBody = { seqNo: referenceNo.trim() };
 
+      // Add timestamp to prevent caching
       const response = await fetch(
-        `${API_BASE_URL}/ClaimAmount/GetClaimAmount`,
+        `${API_BASE_URL}/ClaimAmount/GetClaimAmount?t=${Date.now()}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
           },
           body: JSON.stringify(requestBody),
         }
@@ -1023,43 +1138,65 @@ const EditClaimIntimation = ({ route }) => {
         claimAmount = data.toString();
       }
 
-      // FIXED: Return the properly formatted amount instead of always returning "0.00"
       const formattedAmount = parseFloat(claimAmount).toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
 
+      console.log("Fetched claim amount:", formattedAmount);
       return formattedAmount;
     } catch (error) {
       console.error("Error fetching claim amount:", error);
-      if (!error.message.includes("404")) {
-        showPopup(
-          "Network Error",
-          `Unable to fetch claim amount. Using default amount. Error: ${error.message}`,
-          "error"
-        );
-      }
       return "0.00";
     }
   };
 
   const refreshClaimAmount = async () => {
     try {
-      if (!claimDetails.referenceNo) {
+      setClaimAmountLoading(true);
+
+      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+      if (!referenceNo) {
+        console.warn("No reference number available for claim amount refresh");
         return;
       }
 
-      const updatedAmount = await fetchClaimAmount(claimDetails.referenceNo);
+      console.log("Refreshing claim amount for referenceNo:", referenceNo);
 
+      // Force fetch from API regardless of current state
+      const updatedAmount = await fetchClaimAmount(referenceNo);
+
+      console.log("Updated claim amount:", updatedAmount);
+
+      // Update claimDetails state with the new amount
+      setClaimDetails((prev) => ({
+        ...prev,
+        claimAmount: updatedAmount,
+      }));
+
+      // Update beneficiaries with new amount
       if (beneficiaries.length > 0) {
         const updatedBeneficiaries = beneficiaries.map((beneficiary) => ({
           ...beneficiary,
           amount: updatedAmount,
         }));
         setBeneficiaries(updatedBeneficiaries);
+        console.log("Beneficiaries updated with new amount:", updatedAmount);
+      }
+
+      // Also update the stored claim amount if needed
+      try {
+        await SecureStore.setItemAsync(
+          "stored_claim_amount",
+          updatedAmount.toString()
+        );
+      } catch (storageError) {
+        console.warn("Could not store claim amount:", storageError);
       }
     } catch (error) {
       console.error("Error refreshing claim amount:", error);
+    } finally {
+      setClaimAmountLoading(false);
     }
   };
 
@@ -1133,22 +1270,58 @@ const EditClaimIntimation = ({ route }) => {
           SecureStore.getItemAsync("edit_illness"),
         ]);
 
-      const finalPatientName = storedPatientName || storedEnteredBy;
-      const finalIllness = storedIllness || storedEditIllness;
-      const finalRelationship = storedRelationship || storedEditRelationship;
+      // NEW: Fetch patient details from API if we have a reference number
+      let patientDetails = { patient_Name: "", relationship: "", illness: "" };
+      if (referenceNo) {
+        patientDetails = await fetchPatientDetails(referenceNo);
+      }
 
-      if (finalPatientName && finalRelationship) {
+      // Use API data first, then stored data, then props
+      const finalPatientName =
+        patientDetails.patient_Name ||
+        storedPatientName ||
+        storedEnteredBy ||
+        "";
+      const finalIllness =
+        patientDetails.illness || storedIllness || storedEditIllness || "";
+      const finalRelationship =
+        patientDetails.relationship ||
+        storedRelationship ||
+        storedEditRelationship ||
+        "Self";
+
+      if (finalPatientName) {
         const claimAmount = await fetchClaimAmount(referenceNo);
 
         const beneficiary = {
           id: "1",
           name: finalPatientName,
           relationship: finalRelationship,
-          illness: finalIllness || "",
+          illness: finalIllness,
           amount: formatAmount(claimAmount),
         };
 
         setBeneficiaries([beneficiary]);
+
+        // Update stored values with API data if we got new information
+        if (patientDetails.patient_Name) {
+          await SecureStore.setItemAsync(
+            "stored_patient_name",
+            patientDetails.patient_Name
+          );
+        }
+        if (patientDetails.illness) {
+          await SecureStore.setItemAsync(
+            "stored_illness_description",
+            patientDetails.illness
+          );
+        }
+        if (patientDetails.relationship) {
+          await SecureStore.setItemAsync(
+            "stored_relationship",
+            patientDetails.relationship
+          );
+        }
       } else {
         setBeneficiaries([]);
       }
@@ -1159,7 +1332,6 @@ const EditClaimIntimation = ({ route }) => {
       updateLoadingState("beneficiaryData", false);
     }
   };
-
   const fetchEmployeeInfo = async () => {
     try {
       setLoading(true);
@@ -1273,17 +1445,18 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   // Initialize component
+  // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
       try {
         const referenceNo = await retrieveClaimDetails();
 
         const loadingPromises = [
-          retrieveBeneficiaryData(referenceNo),
+          retrieveBeneficiaryData(referenceNo), // This will now fetch patient details from API
           fetchEmployeeInfo(),
           storeClaimDetails(),
           fetchDocumentTypes(),
-          fetchDependents(), // Add this line
+          fetchDependents(),
         ];
 
         if (referenceNo) {
@@ -1318,7 +1491,7 @@ const EditClaimIntimation = ({ route }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      const fetchDocumentsOnFocus = async () => {
+      const fetchDataOnFocus = async () => {
         if (!initialLoading) {
           let referenceNo = claimDetails.referenceNo || claim?.referenceNo;
 
@@ -1339,17 +1512,22 @@ const EditClaimIntimation = ({ route }) => {
             setDocumentsLoading(true);
 
             try {
-              await fetchDocuments(referenceNo);
-              await refreshClaimAmount();
+              // Always refresh all data when screen comes into focus
+              await Promise.all([
+                fetchDocuments(referenceNo),
+                refreshClaimAmount(),
+                refreshPatientDetails(),
+              ]);
             } catch (error) {
-              console.error("Error fetching documents on focus:", error);
+              console.error("Error fetching data on focus:", error);
+            } finally {
               setDocumentsLoading(false);
             }
           }
         }
       };
 
-      fetchDocumentsOnFocus();
+      fetchDataOnFocus();
     }, [claimDetails.referenceNo, claim?.referenceNo, initialLoading])
   );
 
@@ -1358,14 +1536,24 @@ const EditClaimIntimation = ({ route }) => {
       const routes = navigation.getState()?.routes;
       const currentRoute = routes[routes.length - 1];
 
-      if (currentRoute?.params?.fromUploadDocuments) {
-        await refreshClaimAmount();
-        navigation.setParams({ fromUploadDocuments: undefined });
+      // Always refresh when coming back from any screen
+      console.log("Screen focused, refreshing all data...");
+      await handleScreenRefresh();
+
+      // Clear any navigation parameters that might have triggered the refresh
+      if (
+        currentRoute?.params?.fromUploadDocuments ||
+        currentRoute?.params?.refreshClaimAmount
+      ) {
+        navigation.setParams({
+          fromUploadDocuments: undefined,
+          refreshClaimAmount: undefined,
+        });
       }
     });
 
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, claimDetails.referenceNo]);
 
   const handleNavigateToUploadDocuments = () => {
     const currentClaimAmount =
@@ -1804,6 +1992,31 @@ const EditClaimIntimation = ({ route }) => {
     );
   };
 
+  const handleScreenRefresh = async () => {
+    try {
+      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+      if (referenceNo) {
+        console.log("Refreshing screen data for referenceNo:", referenceNo);
+
+        setClaimAmountLoading(true);
+        setDocumentsLoading(true);
+
+        await Promise.all([
+          refreshClaimAmount(),
+          refreshPatientDetails(),
+          fetchDocuments(referenceNo),
+        ]);
+
+        console.log("Screen refresh completed");
+      }
+    } catch (error) {
+      console.error("Error refreshing screen data:", error);
+    } finally {
+      setClaimAmountLoading(false);
+      setDocumentsLoading(false);
+    }
+  };
+
   const handleSubmitClaim = () => {
     showPopup(
       "Submit Claim",
@@ -1869,6 +2082,57 @@ const EditClaimIntimation = ({ route }) => {
         }
       }
     );
+  };
+
+  const fetchPatientDetails = async (referenceNo) => {
+    try {
+      console.log("Fetching patient details for referenceNo:", referenceNo);
+
+      if (!referenceNo || referenceNo.trim() === "") {
+        console.warn("Invalid referenceNo provided:", referenceNo);
+        return { patient_Name: "", relationship: "", illness: "" };
+      }
+
+      const requestBody = { seqNo: referenceNo.trim() };
+
+      // Add timestamp to prevent caching
+      const response = await fetch(
+        `${API_BASE_URL}/ClaimAmount/GetPatientDetails?t=${Date.now()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(
+            "No patient details found for referenceNo:",
+            referenceNo
+          );
+          return { patient_Name: "", relationship: "", illness: "" };
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Patient Details API Response:", data);
+
+      return {
+        patient_Name: data.patient_Name || "",
+        relationship: data.relationship || "",
+        illness: data.illness || "",
+      };
+    } catch (error) {
+      console.error("Error fetching patient details:", error);
+      return { patient_Name: "", relationship: "", illness: "" };
+    }
   };
 
   const handleSubmitLater = () => {
