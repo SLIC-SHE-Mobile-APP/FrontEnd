@@ -4,20 +4,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  BackHandler,
-  Dimensions,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import {Animated,BackHandler,Dimensions,Image,Modal,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
@@ -2234,7 +2221,7 @@ const EditClaimIntimation = ({ route }) => {
         <TouchableOpacity onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="#2E7D7D" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>SHE Claim Intimation New</Text>
+        <Text style={styles.headerTitle}>SHE Claim Intimation</Text>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -2832,7 +2819,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 30,
-    marginTop: 20,
     paddingBottom: 20,
     backgroundColor: "transparent",
   },
