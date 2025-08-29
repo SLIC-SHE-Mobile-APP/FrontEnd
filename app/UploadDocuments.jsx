@@ -298,6 +298,7 @@ const UploadDocuments = ({ route }) => {
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [documentDateRange, setDocumentDateRange] = useState(null);
 
   const fetchDependents = async () => {
     try {
@@ -443,6 +444,24 @@ const UploadDocuments = ({ route }) => {
     } catch (error) {
       console.error("Error updating intimation via API:", error);
       throw error;
+    }
+  };
+
+  const getPolicyEndDate = async () => {
+    try {
+      const policyData = await SecureStore.getItemAsync("selected_policy_data");
+      if (policyData) {
+        const parsedData = JSON.parse(policyData);
+        // Check both possible date fields
+        const endDate = parsedData.policyEndDate || parsedData.endDate;
+        if (endDate) {
+          return new Date(endDate);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting policy end date:", error);
+      return null;
     }
   };
 
@@ -866,6 +885,68 @@ const UploadDocuments = ({ route }) => {
     }
   };
 
+  const isPolicyExpired = (policyEndDate, currentDate = new Date()) => {
+    if (!policyEndDate) return false;
+    return currentDate > policyEndDate;
+  };
+
+  const getDocumentDateRange = async () => {
+    try {
+      const policyEndDate = await getPolicyEndDate();
+      const currentDate = new Date();
+
+      if (!policyEndDate) {
+        // If no policy end date available, allow current date and 90 days back
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+        return {
+          minDate,
+          maxDate: currentDate,
+          isPolicyExpired: false,
+        };
+      }
+
+      const isExpired = isPolicyExpired(policyEndDate, currentDate);
+
+      if (isExpired) {
+        // Policy is expired - allow from policy end date to 90 days before policy end date
+        const maxDate = policyEndDate;
+        const minDate = new Date(policyEndDate);
+        minDate.setDate(policyEndDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: true,
+          policyEndDate,
+        };
+      } else {
+        // Policy is not expired - allow from current date to 90 days before current date
+        const maxDate = currentDate;
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: false,
+          policyEndDate,
+        };
+      }
+    } catch (error) {
+      console.error("Error calculating document date range:", error);
+      // Fallback to current date and 90 days back
+      const currentDate = new Date();
+      const minDate = new Date(currentDate);
+      minDate.setDate(currentDate.getDate() - 90);
+      return {
+        minDate,
+        maxDate: currentDate,
+        isPolicyExpired: false,
+      };
+    }
+  };
+
   const toSentenceCase = (str) => {
     if (!str) return str;
     return str.toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
@@ -1006,6 +1087,27 @@ const UploadDocuments = ({ route }) => {
 
     loadStoredValues();
   }, [patientName, claimType, illness, referenceNo]);
+
+  useEffect(() => {
+    const calculateDateRange = async () => {
+      const dateRange = await getDocumentDateRange();
+      setDocumentDateRange(dateRange);
+
+      // Set initial document date to max allowed date
+      if (dateRange.maxDate) {
+        setDocumentDate(dateRange.maxDate);
+      }
+
+      console.log("Document date range calculated:", {
+        minDate: dateRange.minDate?.toDateString(),
+        maxDate: dateRange.maxDate?.toDateString(),
+        isPolicyExpired: dateRange.isPolicyExpired,
+        policyEndDate: dateRange.policyEndDate?.toDateString(),
+      });
+    };
+
+    calculateDateRange();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -1179,6 +1281,31 @@ const UploadDocuments = ({ route }) => {
   const handleDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || documentDate;
     setShowDatePicker(Platform.OS === "ios");
+
+    if (documentDateRange) {
+      // Check if selected date is within allowed range
+      if (
+        currentDate < documentDateRange.minDate ||
+        currentDate > documentDateRange.maxDate
+      ) {
+        const formatDateForMessage = (date) => {
+          const day = date.getDate().toString().padStart(2, "0");
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+
+        showPopup(
+          "Invalid Date Selection",
+          `Please select a date between ${formatDateForMessage(
+            documentDateRange.minDate
+          )} and ${formatDateForMessage(documentDateRange.maxDate)}`,
+          "warning"
+        );
+        return;
+      }
+    }
+
     setDocumentDate(currentDate);
   };
 
@@ -1469,6 +1596,29 @@ const UploadDocuments = ({ route }) => {
     } catch (error) {
       console.error("Error picking document:", error);
       showPopup("Error", "Failed to pick document", "error");
+    }
+  };
+
+  const getDatePickerHelpText = () => {
+    if (!documentDateRange) return "Loading date range...";
+
+    const formatDateForHelp = (date) => {
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    if (documentDateRange.isPolicyExpired) {
+      return `Policy expired on ${formatDateForHelp(
+        documentDateRange.policyEndDate
+      )}. You can select dates from ${formatDateForHelp(
+        documentDateRange.minDate
+      )} to ${formatDateForHelp(documentDateRange.maxDate)}`;
+    } else {
+      return `You can select dates from ${formatDateForHelp(
+        documentDateRange.minDate
+      )} to ${formatDateForHelp(documentDateRange.maxDate)}`;
     }
   };
 
@@ -2350,7 +2500,10 @@ const UploadDocuments = ({ route }) => {
             <Ionicons name="calendar-outline" size={20} color="#00C4CC" />
           </TouchableOpacity>
 
-          {showDatePicker && (
+          {/* Help text showing allowed date range */}
+          <Text style={styles.helpText}>{getDatePickerHelpText()}</Text>
+
+          {showDatePicker && documentDateRange && (
             <DateTimePicker
               testID="dateTimePicker"
               value={documentDate}
@@ -2358,7 +2511,8 @@ const UploadDocuments = ({ route }) => {
               is24Hour={true}
               display="default"
               onChange={handleDateChange}
-              maximumDate={new Date()}
+              minimumDate={documentDateRange.minDate}
+              maximumDate={documentDateRange.maxDate}
             />
           )}
         </View>
