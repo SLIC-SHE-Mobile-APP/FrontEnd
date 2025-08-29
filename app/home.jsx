@@ -48,6 +48,8 @@ export default function PolicyHome({ route }) {
   const [isDropdownDisabled, setIsDropdownDisabled] = useState(false);
   const [isManualPolicySelection, setIsManualPolicySelection] = useState(false);
   const [isFromAddPolicy, setIsFromAddPolicy] = useState(false);
+  const [isPolicyExpiredBeyondGrace, setIsPolicyExpiredBeyondGrace] =
+    useState(false);
 
   // Add new loading state for policy selection
   const [isLoadingPolicySelection, setIsLoadingPolicySelection] =
@@ -153,6 +155,30 @@ export default function PolicyHome({ route }) {
       refreshPageData();
     }, [route?.params?.refreshPendingClaims])
   );
+
+  const checkPolicyExpiryStatus = (policyEndDate) => {
+    if (!policyEndDate) return false;
+
+    try {
+      const endDate = new Date(policyEndDate);
+      const currentDate = new Date();
+      const oneMonthAfterExpiry = new Date(endDate);
+      oneMonthAfterExpiry.setMonth(oneMonthAfterExpiry.getMonth() + 1);
+
+      // Policy is expired beyond grace period (1 month) if current date > end date + 1 month
+      const isExpiredBeyondGrace = currentDate > oneMonthAfterExpiry;
+
+      console.log("Policy End Date:", endDate);
+      console.log("Current Date:", currentDate);
+      console.log("One Month After Expiry:", oneMonthAfterExpiry);
+      console.log("Is Expired Beyond Grace:", isExpiredBeyondGrace);
+
+      return isExpiredBeyondGrace;
+    } catch (error) {
+      console.error("Error checking policy expiry:", error);
+      return false;
+    }
+  };
 
   const fetchPolicyInfo = async () => {
     try {
@@ -392,7 +418,6 @@ export default function PolicyHome({ route }) {
     return `${formatDate(start)} - ${formatDate(end)}`;
   };
 
-  // Function to retrieve stored policy data
   const getStoredPolicyData = async () => {
     try {
       const policyNumber = await SecureStore.getItemAsync(
@@ -404,10 +429,20 @@ export default function PolicyHome({ route }) {
       const policyData = await SecureStore.getItemAsync("selected_policy_data");
 
       if (policyNumber && memberNumber) {
+        const fullPolicyData = policyData ? JSON.parse(policyData) : null;
+
+        // Check policy expiry status
+        if (fullPolicyData && fullPolicyData.policyEndDate) {
+          const isExpired = checkPolicyExpiryStatus(
+            fullPolicyData.policyEndDate
+          );
+          setIsPolicyExpiredBeyondGrace(isExpired);
+        }
+
         return {
           policyNumber,
           memberNumber,
-          fullPolicyData: policyData ? JSON.parse(policyData) : null,
+          fullPolicyData,
         };
       }
 
@@ -519,13 +554,6 @@ export default function PolicyHome({ route }) {
         const isComingFromAddPolicy =
           isFromAddPolicy || fromAddPolicyFlag === "true";
 
-        console.log("fetchPolicies - isFromAddPolicy:", isFromAddPolicy);
-        console.log("fetchPolicies - fromAddPolicyFlag:", fromAddPolicyFlag);
-        console.log(
-          "fetchPolicies - isComingFromAddPolicy:",
-          isComingFromAddPolicy
-        );
-
         // FIXED: Always show policy selection modal if coming from AddPolicy back button
         if (isComingFromAddPolicy && transformedPolicies.length > 0) {
           console.log(
@@ -553,7 +581,6 @@ export default function PolicyHome({ route }) {
 
         // Original logic for other cases
         if (storedPolicyNumber && storedMemberNumber) {
-          console.log("Policy already selected, skipping modal");
           setSelectedPolicyNumber(storedPolicyNumber);
           setIsFirstTime(false);
 
@@ -616,6 +643,15 @@ export default function PolicyHome({ route }) {
 
         if (storedPolicyData) {
           if (storedPolicyData.fullPolicyData) {
+            console.log(
+              "Full policy data endDate:",
+              storedPolicyData.fullPolicyData.endDate
+            );
+            console.log(
+              "Full policy data policyEndDate:",
+              storedPolicyData.fullPolicyData.policyEndDate
+            );
+
             setPolicyDetails({
               policyID: storedPolicyData.fullPolicyData.policyID,
               policyNumber: storedPolicyData.fullPolicyData.policyNumber,
@@ -686,10 +722,20 @@ export default function PolicyHome({ route }) {
       );
       await SecureStore.setItemAsync("selected_policy_type", policy.type);
 
+      // Store the complete policy data including endDate
+      const policyDataToStore = {
+        ...policy,
+        policyEndDate: policy.endDate, // Ensure end date is stored
+      };
+
       await SecureStore.setItemAsync(
         "selected_policy_data",
-        JSON.stringify(policy)
+        JSON.stringify(policyDataToStore)
       );
+
+      // Check policy expiry status after storing
+      const isExpired = checkPolicyExpiryStatus(policy.endDate);
+      setIsPolicyExpiredBeyondGrace(isExpired);
 
       setSelectedPolicyNumber(policy.policyNumber);
       setPolicyDetails({
@@ -928,7 +974,16 @@ export default function PolicyHome({ route }) {
     if (normalizedType === "New Claim") {
       console.log("Opening New Claim modal");
 
-      // Removed member selection requirement - directly open New Claim modal
+      // Check if policy is expired beyond grace period
+      if (isPolicyExpiredBeyondGrace) {
+        Alert.alert(
+          "Policy Expired",
+          "Your policy has expired more than 1 month ago. New claims cannot be submitted.",
+          [{ text: "OK", style: "default" }]
+        );
+        return;
+      }
+
       setModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -938,7 +993,16 @@ export default function PolicyHome({ route }) {
     } else if (normalizedType === "Saved Claims") {
       console.log("Saved Claims pressed");
 
-      // Remove member selection requirement - directly open Saved Claims
+      // Check if policy is expired beyond grace period
+      if (isPolicyExpiredBeyondGrace) {
+        Alert.alert(
+          "Policy Expired",
+          "Your policy has expired more than 1 month ago. Saved claims cannot be accessed.",
+          [{ text: "OK", style: "default" }]
+        );
+        return;
+      }
+
       setShowPendingIntimations(true);
       Animated.timing(pendingIntimationsSlideAnim, {
         toValue: 0,
@@ -948,7 +1012,6 @@ export default function PolicyHome({ route }) {
     } else if (normalizedType === "Claim History") {
       console.log("Claim History pressed");
 
-      // Remove member selection requirement - directly open Claim History
       setShowClaimHistory(true);
       Animated.timing(claimHistorySlideAnim, {
         toValue: 0,
@@ -958,7 +1021,6 @@ export default function PolicyHome({ route }) {
     } else if (normalizedType === "Pending Requirement") {
       console.log("Pending Requirement pressed");
 
-      // Remove member selection requirement - directly open Pending Requirement
       setShowPendingRequirement(true);
       Animated.timing(pendingRequirementSlideAnim, {
         toValue: 0,
@@ -1097,22 +1159,39 @@ export default function PolicyHome({ route }) {
     }).start();
   };
 
-  const renderType = (label, imageSource, onPress) => (
-    <TouchableOpacity
-      style={styles.typeItem}
-      key={label}
-      onPress={() => onPress(label)}
-    >
-      <View style={styles.iconCircle}>
-        <Image
-          source={imageSource}
-          style={styles.typeIcon}
-          resizeMode="contain"
-        />
-      </View>
-      <Text style={styles.typeText}>{label}</Text>
-    </TouchableOpacity>
-  );
+  const renderType = (label, imageSource, onPress) => {
+    const normalizedLabel = label.replace(/\n/g, " ").trim();
+    const isDisabled =
+      isPolicyExpiredBeyondGrace &&
+      (normalizedLabel === "New Claim" || normalizedLabel === "Saved Claims");
+
+    return (
+      <TouchableOpacity
+        style={[styles.typeItem, isDisabled && styles.disabledTypeItem]}
+        key={label}
+        onPress={() => onPress(label)}
+        disabled={isDisabled}
+      >
+        <View
+          style={[styles.iconCircle, isDisabled && styles.disabledIconCircle]}
+        >
+          <Image
+            source={imageSource}
+            style={[styles.typeIcon, isDisabled && styles.disabledTypeIcon]}
+            resizeMode="contain"
+          />
+        </View>
+        <Text style={[styles.typeText, isDisabled && styles.disabledTypeText]}>
+          {label}
+        </Text>
+        {isDisabled && (
+          <View style={styles.expiredOverlay}>
+            <Text style={styles.expiredText}>Expired</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderNavItem = (iconName, label, onPress) => (
     <TouchableOpacity
@@ -1492,9 +1571,9 @@ export default function PolicyHome({ route }) {
                       style={[
                         styles.policyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                        styles.selectedPolicyItem,
+                          styles.selectedPolicyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                        styles.disabledPolicyItem,
+                          styles.disabledPolicyItem,
                       ]}
                       onPress={() => {
                         // Only allow selection if it's not the currently selected policy
@@ -1507,26 +1586,37 @@ export default function PolicyHome({ route }) {
                       <View style={styles.policyContent}>
                         <View style={styles.policyRow}>
                           <Text style={styles.policyLabel}>Policy Number</Text>
-                          <Text style={styles.policyValue}>{":  "+policy.policyNumber}</Text>
+                          <Text style={styles.policyValue}>
+                            {":  " + policy.policyNumber}
+                          </Text>
                         </View>
                         <View style={styles.policyRow}>
                           <Text style={styles.policyLabel}>Member Number</Text>
-                          <Text style={styles.policyValue}>{":  "+policy.policyID}</Text>
+                          <Text style={styles.policyValue}>
+                            {":  " + policy.policyID}
+                          </Text>
                         </View>
                         <View style={styles.policyRow}>
                           <Text style={styles.policyLabel}>Policy Period</Text>
-                          <Text style={styles.policyValue}>{":  "+policy.policyPeriod}</Text>
+                          <Text style={styles.policyValue}>
+                            {":  " + policy.policyPeriod}
+                          </Text>
                         </View>
                         {/* Add "Currently Selected" indicator */}
                         {selectedPolicyNumber === policy.policyNumber && (
                           <View style={styles.selectedIndicator}>
-                            <Icon name="check-circle" size={16} color="#16858D" />
-                            <Text style={styles.selectedText}>Currently Selected</Text>
+                            <Icon
+                              name="check-circle"
+                              size={16}
+                              color="#16858D"
+                            />
+                            <Text style={styles.selectedText}>
+                              Currently Selected
+                            </Text>
                           </View>
                         )}
                       </View>
                     </TouchableOpacity>
-                    
                   </View>
                 ))
               )}
@@ -2280,19 +2370,46 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   policyRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 4,
   },
   policyLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    width: 115, 
+    fontWeight: "bold",
+    color: "#333",
+    width: 115,
   },
   policyValue: {
     fontSize: 14,
-    fontWeight: 'normal',
-    color: '#333',
+    fontWeight: "normal",
+    color: "#333",
     flex: 1,
+  },
+  disabledTypeItem: {
+    opacity: 0.5,
+  },
+  disabledIconCircle: {
+    backgroundColor: "#cccccc",
+  },
+  disabledTypeIcon: {
+    opacity: 0.6,
+  },
+  disabledTypeText: {
+    color: "#999999",
+  },
+  expiredOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    backgroundColor: "#ff4444",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    transform: [{ translateX: 5 }, { translateY: -5 }],
+  },
+  expiredText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });
