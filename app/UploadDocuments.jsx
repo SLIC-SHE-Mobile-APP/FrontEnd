@@ -248,7 +248,7 @@ const UploadDocuments = ({ route }) => {
     claimType = "",
     currentClaimAmount = "0.00",
     fromEditClaim = false,
-    referenceNo = "",
+    claimNo = "",
   } = route?.params || {};
 
   const patientData = route?.params?.patientData || {};
@@ -265,7 +265,7 @@ const UploadDocuments = ({ route }) => {
   const [editDocumentType, setEditDocumentType] = useState("");
   const [documentTypes, setDocumentTypes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [storedReferenceNo, setStoredReferenceNo] = useState("");
+  const [storedClaimNo, setStoredClaimNo] = useState("");
   const [storedNic, setStoredNic] = useState("");
   const [selectedDocId, setSelectedDocId] = useState("");
   const [storedPatientName, setStoredPatientName] = useState("");
@@ -276,7 +276,7 @@ const UploadDocuments = ({ route }) => {
   const [isEditPatientModalVisible, setEditPatientModalVisible] =
     useState(false);
   const [editPatientData, setEditPatientData] = useState({
-    referenceNo: "",
+    claimNo: "",
     patientName: "",
     illness: "",
   });
@@ -404,7 +404,7 @@ const UploadDocuments = ({ route }) => {
         patientName: patientInfo.patientName,
         illness: patientInfo.illness,
         relationship: selectedMember?.relationship || "Self",
-        claimSeqNo: patientInfo.referenceNo,
+        claimSeqNo: patientInfo.claimNo,
       };
 
       console.log("Update intimation request data:", updateIntimationData);
@@ -454,7 +454,7 @@ const UploadDocuments = ({ route }) => {
 
   const handleEditPatientInfo = () => {
     setEditPatientData({
-      referenceNo: storedReferenceNo || referenceNo || "",
+      claimNo: storedClaimNo || claimNo || "",
       patientName: storedPatientName || patientName || "",
       illness: storedIllness || illness || "",
     });
@@ -520,7 +520,7 @@ const UploadDocuments = ({ route }) => {
       setDropdownVisible(false);
       setSelectedMember(null);
       setEditPatientData({
-        referenceNo: "",
+        claimNo: "",
         patientName: "",
         illness: "",
       });
@@ -579,18 +579,18 @@ const UploadDocuments = ({ route }) => {
       async () => {
         // This function only runs when "Yes" is clicked
         try {
-          console.log("Deleting claim:", storedReferenceNo);
+          console.log("Deleting claim:", storedClaimNo);
 
-          // Validate reference number
-          if (!storedReferenceNo) {
+          // Validate claim number
+          if (!storedClaimNo) {
             hidePopup();
-            showPopup("Error", "Claim reference number not found.", "error");
+            showPopup("Error", "Claim claim number not found.", "error");
             return;
           }
 
           // Prepare API request data
           const deleteClaimData = {
-            claimNo: storedReferenceNo,
+            claimNo: storedClaimNo,
           };
 
           console.log("Delete claim request data:", deleteClaimData);
@@ -624,7 +624,7 @@ const UploadDocuments = ({ route }) => {
             await SecureStore.deleteItemAsync("stored_illness_description");
             await SecureStore.deleteItemAsync("stored_claim_type");
             await SecureStore.deleteItemAsync("stored_claim_seq_no");
-            await SecureStore.deleteItemAsync("edit_referenceNo");
+            await SecureStore.deleteItemAsync("edit_claimNo");
             await SecureStore.deleteItemAsync("edit_claimType");
             await SecureStore.deleteItemAsync("edit_createdOn");
             await SecureStore.deleteItemAsync("edit_enteredBy");
@@ -637,7 +637,7 @@ const UploadDocuments = ({ route }) => {
             setStoredPatientName("");
             setStoredIllness("");
             setStoredClaimType("");
-            setStoredReferenceNo("");
+            setStoredClaimNo("");
             setActualClaimAmount("0.00");
           } catch (storageError) {
             console.warn("Error clearing stored data:", storageError);
@@ -795,21 +795,21 @@ const UploadDocuments = ({ route }) => {
     setPopup((prev) => ({ ...prev, visible: false }));
   };
 
-  const fetchClaimAmountFromAPI = async (referenceNo) => {
+  const fetchClaimAmountFromAPI = async (claimNo) => {
     try {
       setClaimAmountLoading(true);
       console.log(
-        "Fetching claim amount from API for referenceNo:",
-        referenceNo
+        "Fetching claim amount from API for claimNo:",
+        claimNo
       );
 
-      if (!referenceNo || referenceNo.trim() === "") {
-        console.warn("Invalid referenceNo provided:", referenceNo);
+      if (!claimNo || claimNo.trim() === "") {
+        console.warn("Invalid claimNo provided:", claimNo);
         setActualClaimAmount("0.00");
         return "0.00";
       }
 
-      const requestBody = { seqNo: referenceNo.trim() };
+      const requestBody = { seqNo: claimNo.trim() };
 
       // Add timestamp and cache-busting headers to force fresh data
       const response = await fetch(
@@ -828,7 +828,7 @@ const UploadDocuments = ({ route }) => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn("No claim amount found for referenceNo:", referenceNo);
+          console.warn("No claim amount found for claimNo:", claimNo);
           setActualClaimAmount("0.00");
           return "0.00";
         }
@@ -993,7 +993,7 @@ const UploadDocuments = ({ route }) => {
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
-        const referenceNoFromStore = await SecureStore.getItemAsync(
+        const claimNoFromStore = await SecureStore.getItemAsync(
           "stored_claim_seq_no"
         );
         const nic = await SecureStore.getItemAsync("user_nic");
@@ -1007,22 +1007,22 @@ const UploadDocuments = ({ route }) => {
           "stored_illness_description"
         );
 
-        const finalReferenceNo = referenceNo || referenceNoFromStore || "";
+        const finalClaimNo = claimNo || claimNoFromStore || "";
 
-        setStoredReferenceNo(finalReferenceNo);
+        setStoredClaimNo(finalClaimNo);
         setStoredNic(nic || "");
 
         // ALWAYS fetch fresh data from API when component loads
-        if (finalReferenceNo) {
+        if (finalClaimNo) {
           console.log(
-            "Loading with forced API refresh for referenceNo:",
-            finalReferenceNo
+            "Loading with forced API refresh for claimNo:",
+            finalClaimNo
           );
 
           // Fetch both APIs in parallel for fresh data
           const [patientDetails, claimAmount] = await Promise.all([
-            fetchPatientDetails(finalReferenceNo),
-            fetchClaimAmountFromAPI(finalReferenceNo),
+            fetchPatientDetails(finalClaimNo),
+            fetchClaimAmountFromAPI(finalClaimNo),
           ]);
 
           // Use API data if available, otherwise fall back to stored data
@@ -1051,7 +1051,7 @@ const UploadDocuments = ({ route }) => {
             );
           }
         } else {
-          // No reference number, use passed props or stored data
+          // No claim number, use passed props or stored data
           setStoredPatientName(patientName || storedPatientNameFromStore || "");
           setStoredIllness(illness || storedIllnessFromStore || "");
           setActualClaimAmount("0.00");
@@ -1060,7 +1060,7 @@ const UploadDocuments = ({ route }) => {
         setStoredClaimType(claimType || storedClaimTypeFromStore || "");
 
         console.log("Loaded stored values with API refresh:", {
-          referenceNo: finalReferenceNo,
+          claimNo: finalClaimNo,
           patientName: storedPatientName,
           claimType: claimType || storedClaimTypeFromStore,
           illness: storedIllness,
@@ -1073,7 +1073,7 @@ const UploadDocuments = ({ route }) => {
     };
 
     loadStoredValues();
-  }, [patientName, claimType, illness, referenceNo]);
+  }, [patientName, claimType, illness, claimNo]);
 
   useEffect(() => {
     const calculateDateRange = async () => {
@@ -1102,9 +1102,9 @@ const UploadDocuments = ({ route }) => {
         console.log("Screen focused, checking if refresh needed...");
 
         // Always refresh when coming from EditClaim or when screen is focused
-        const refNo = referenceNo || storedReferenceNo;
+        const refNo = claimNo || storedClaimNo;
         if (refNo) {
-          console.log("Forcing refresh of both APIs for referenceNo:", refNo);
+          console.log("Forcing refresh of both APIs for claimNo:", refNo);
 
           // Fetch both APIs to ensure fresh data
           const [patientDetails, claimAmount] = await Promise.all([
@@ -1139,7 +1139,7 @@ const UploadDocuments = ({ route }) => {
       };
 
       refreshClaimAmount();
-    }, [referenceNo, storedReferenceNo, fromEditClaim])
+    }, [claimNo, storedClaimNo, fromEditClaim])
   );
 
   // Handle hardware back button
@@ -1191,7 +1191,7 @@ const UploadDocuments = ({ route }) => {
       name: fileName,
     });
 
-    formData.append("ClmSeqNo", storedReferenceNo);
+    formData.append("ClmSeqNo", storedClaimNo);
     formData.append("DocType", document.documentType);
     formData.append("ImgName", fileName);
     formData.append(
@@ -1733,16 +1733,16 @@ const UploadDocuments = ({ route }) => {
     );
   };
 
-  const fetchPatientDetails = async (referenceNo) => {
+  const fetchPatientDetails = async (claimNo) => {
     try {
-      console.log("Fetching patient details for referenceNo:", referenceNo);
+      console.log("Fetching patient details for claimNo:", claimNo);
 
-      if (!referenceNo || referenceNo.trim() === "") {
-        console.warn("Invalid referenceNo provided:", referenceNo);
+      if (!claimNo || claimNo.trim() === "") {
+        console.warn("Invalid claimNo provided:", claimNo);
         return { patient_Name: "", relationship: "", illness: "" };
       }
 
-      const requestBody = { seqNo: referenceNo.trim() };
+      const requestBody = { seqNo: claimNo.trim() };
 
       // Add timestamp and cache-busting headers to force fresh data
       const response = await fetch(
@@ -1762,8 +1762,8 @@ const UploadDocuments = ({ route }) => {
       if (!response.ok) {
         if (response.status === 404) {
           console.warn(
-            "No patient details found for referenceNo:",
-            referenceNo
+            "No patient details found for claimNo:",
+            claimNo
           );
           return { patient_Name: "", relationship: "", illness: "" };
         }
@@ -1828,10 +1828,10 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    if (!storedReferenceNo || !storedNic) {
+    if (!storedClaimNo || !storedNic) {
       showPopup(
         "Error",
-        "Missing required information. Please ensure you have a valid reference number and user identification.",
+        "Missing required information. Please ensure you have a valid claim number and user identification.",
         "error"
       );
       return;
@@ -1884,7 +1884,7 @@ const UploadDocuments = ({ route }) => {
       }
 
       const claimData = {
-        referenceNo: storedReferenceNo,
+        claimNo: storedClaimNo,
         enteredBy: storedPatientName || patientData.patientName || "Unknown",
         status: "Submission for Approval Pending",
         claimType: storedClaimType || patientData.claimType || "Unknown",
@@ -1938,7 +1938,7 @@ const UploadDocuments = ({ route }) => {
           } else {
             navigation.navigate("EditClaimIntimation", {
               claim: claimData,
-              referenceNo: storedReferenceNo,
+              claimNo: storedClaimNo,
               claimType: storedClaimType || patientData.claimType,
               patientName: storedPatientName || patientData.patientName,
               illness: storedIllness || patientData.illness,
@@ -1951,7 +1951,7 @@ const UploadDocuments = ({ route }) => {
                   patientName: storedPatientName || patientData.patientName,
                   illness: storedIllness || patientData.illness,
                   claimType: storedClaimType || patientData.claimType,
-                  referenceNo: storedReferenceNo,
+                  claimNo: storedClaimNo,
                   claimId: claimId,
                 },
                 documents: uploadedDocuments,
@@ -1980,7 +1980,7 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    console.log("Reference Number:", storedReferenceNo);
+    console.log("Claim Number:", storedClaimNo);
     console.log("Patient Name:", storedPatientName || patientData.patientName);
     console.log("Claim Type:", storedClaimType);
     console.log("Illness:", storedIllness || patientData.illness);
@@ -2000,10 +2000,10 @@ const UploadDocuments = ({ route }) => {
       return;
     }
 
-    if (!storedReferenceNo || !storedNic) {
+    if (!storedClaimNo || !storedNic) {
       showPopup(
         "Error",
-        "Missing required information. Please ensure you have a valid reference number and user identification.",
+        "Missing required information. Please ensure you have a valid claim number and user identification.",
         "error"
       );
       return;
@@ -2056,7 +2056,7 @@ const UploadDocuments = ({ route }) => {
       }
 
       const claimData = {
-        referenceNo: storedReferenceNo,
+        claimNo: storedClaimNo,
         enteredBy: storedPatientName || patientData.patientName || "Unknown",
         status: "Submission for Approval Pending",
         claimType: storedClaimType || patientData.claimType || "Unknown",
@@ -2115,7 +2115,7 @@ const UploadDocuments = ({ route }) => {
           } else {
             navigation.navigate("EditClaimIntimation", {
               claim: claimData,
-              referenceNo: storedReferenceNo,
+              claimNo: storedClaimNo,
               claimType: storedClaimType || patientData.claimType,
               patientName: storedPatientName || patientData.patientName,
               illness: storedIllness || patientData.illness,
@@ -2134,7 +2134,7 @@ const UploadDocuments = ({ route }) => {
                   patientName: storedPatientName || patientData.patientName,
                   illness: storedIllness || patientData.illness,
                   claimType: storedClaimType || patientData.claimType,
-                  referenceNo: storedReferenceNo,
+                  claimNo: storedClaimNo,
                   claimId: claimId,
                 },
                 documents: uploadedDocuments,
@@ -2333,9 +2333,9 @@ const UploadDocuments = ({ route }) => {
 
           <View style={styles.patientInfoContent}>
             <View style={styles.patientInfoRow}>
-              <Text style={styles.patientInfoLabel}>Reference No:</Text>
+              <Text style={styles.patientInfoLabel}>Claim No:</Text>
               <Text style={styles.patientInfoValue}>
-                {storedReferenceNo || referenceNo || "N/A"}
+                {storedClaimNo || claimNo || "N/A"}
               </Text>
             </View>
 

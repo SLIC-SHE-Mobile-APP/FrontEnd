@@ -161,7 +161,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
 
 
   const filteredClaims = pendingClaims.filter(claim =>
-    claim.referenceNo.toLowerCase().includes(searchQuery.toLowerCase())
+    claim.claimNo.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
 
@@ -316,7 +316,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
       // Transform API data to match component structure
       const transformedData = data.map((claim, index) => ({
         id: claim.clmSeqNo || `claim_${index}`,
-        referenceNo: claim.clmSeqNo,
+        claimNo: claim.clmSeqNo,
         enteredBy: claim.patientName,
         relationship: claim.relationship,
         claimType: claim.indOut,
@@ -404,8 +404,8 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
   // Modified handleEdit function to clear any refresh flags
   const handleEdit = async (claim) => {
     try {
-      await SecureStore.setItemAsync("edit_referenceNo", claim.referenceNo);
-      await SecureStore.setItemAsync("referenNo", claim.referenceNo);
+      await SecureStore.setItemAsync("edit_claimNo", claim.claimNo);
+      await SecureStore.setItemAsync("referenNo", claim.claimNo);
       await SecureStore.setItemAsync("edit_enteredBy", claim.enteredBy);
       await SecureStore.setItemAsync("edit_relationship", claim.relationship);
       await SecureStore.setItemAsync("edit_claimType", claim.claimType);
@@ -647,7 +647,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
               <View style={styles.claimContent}>
                 <View style={styles.claimRow}>
                   <Text style={styles.claimLabel}>Claim No :</Text>
-                  <Text style={styles.claimValue}>{claim.referenceNo}</Text>
+                  <Text style={styles.claimValue}>{claim.claimNo}</Text>
                 </View>
                 <View style={styles.claimRow}>
                   <Text style={styles.claimLabel}>Patient Name :</Text>
@@ -662,7 +662,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
                   <Text style={styles.claimValue}>{claim.claimType}</Text>
                 </View>
                 <View style={styles.claimRow}>
-                  <Text style={styles.claimLabel}>Created on :</Text>
+                  <Text style={styles.claimLabel}>Last Edit on :</Text>
                   <Text style={styles.claimValue}>{claim.createdOn}</Text>
                 </View>
               </View>

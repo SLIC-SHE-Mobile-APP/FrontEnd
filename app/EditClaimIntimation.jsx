@@ -152,7 +152,7 @@ const EditClaimIntimation = ({ route }) => {
   const navigation = useNavigation();
   const {
     claim,
-    referenceNo,
+    claimNo,
     claimNumber,
     claimType,
     patientName,
@@ -314,7 +314,7 @@ const EditClaimIntimation = ({ route }) => {
         patientName: beneficiaryData.name,
         illness: beneficiaryData.illness,
         relationship: beneficiaryData.relationship,
-        claimSeqNo: claimDetails.referenceNo,
+        claimSeqNo: claimDetails.claimNo,
         createdOn: claimDetails.createdOn,
       };
 
@@ -371,7 +371,7 @@ const EditClaimIntimation = ({ route }) => {
 
       await updateIntimationAPI(beneficiaryDataForAPI);
 
-      const claimAmount = await fetchClaimAmount(claimDetails.referenceNo);
+      const claimAmount = await fetchClaimAmount(claimDetails.claimNo);
 
       const updatedBeneficiaries = beneficiaries.map((item) =>
         item.id === selectedBeneficiary.id
@@ -415,9 +415,9 @@ const EditClaimIntimation = ({ route }) => {
           true,
           async () => {
             hidePopup();
-            const referenceNo = claimDetails.referenceNo;
-            if (referenceNo) {
-              await retrieveBeneficiaryData(referenceNo);
+            const claimNo = claimDetails.claimNo;
+            if (claimNo) {
+              await retrieveBeneficiaryData(claimNo);
             }
             setEditBeneficiaryModalVisible(false);
             setDropdownVisible(false);
@@ -452,7 +452,7 @@ const EditClaimIntimation = ({ route }) => {
 
   // State for claim details
   const [claimDetails, setClaimDetails] = useState({
-    referenceNo: referenceNo || claimNumber || claim?.referenceNo || "",
+    claimNo: claimNo || claimNumber || claim?.claimNo || "",
     enteredBy: patientName || claim?.enteredBy || "Loading...",
     status: "Submission for Approval Pending",
     claimType: claimType || claim?.claimType || "",
@@ -467,7 +467,7 @@ const EditClaimIntimation = ({ route }) => {
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [claimTypes, setClaimType] = useState("");
-  const [referenceNo2, setReferenceNo] = useState("");
+  const [claimNo2, setClaimNo] = useState("");
 
   const [loadingStates, setLoadingStates] = useState({
     claimDetails: true,
@@ -526,15 +526,15 @@ const EditClaimIntimation = ({ route }) => {
       true,
       async () => {
         try {
-          console.log("Deleting claim:", claimDetails.referenceNo);
+          console.log("Deleting claim:", claimDetails.claimNo);
 
-          if (!claimDetails.referenceNo) {
-            showPopup("Error", "Claim reference number not found.", "error");
+          if (!claimDetails.claimNo) {
+            showPopup("Error", "Claim claim number not found.", "error");
             return;
           }
 
           const deleteClaimData = {
-            claimNo: claimDetails.referenceNo,
+            claimNo: claimDetails.claimNo,
           };
 
           console.log("Delete claim request data:", deleteClaimData);
@@ -563,7 +563,7 @@ const EditClaimIntimation = ({ route }) => {
 
           // Clear stored data after successful deletion
           try {
-            await SecureStore.deleteItemAsync("edit_referenceNo");
+            await SecureStore.deleteItemAsync("edit_claimNo");
             await SecureStore.deleteItemAsync("edit_claimType");
             await SecureStore.deleteItemAsync("edit_createdOn");
             await SecureStore.deleteItemAsync("edit_enteredBy");
@@ -872,7 +872,7 @@ const EditClaimIntimation = ({ route }) => {
     try {
       const { memId, seqNo } = parseClmMemSeqNo(document.clmMemSeqNo);
       const requestBody = {
-        claimNo: claimDetails.referenceNo,
+        claimNo: claimDetails.claimNo,
         memId: memId,
         seqNo: seqNo,
       };
@@ -900,10 +900,10 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  const fetchDocuments = async (referenceNo) => {
+  const fetchDocuments = async (claimNo) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/ClaimDocuments/${referenceNo}`,
+        `${API_BASE_URL}/ClaimDocuments/${claimNo}`,
         {
           method: "GET",
           headers: {
@@ -951,13 +951,13 @@ const EditClaimIntimation = ({ route }) => {
 
   const refreshPatientDetails = async () => {
     try {
-      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-      if (!referenceNo) return;
+      const claimNo = claimDetails.claimNo || claim?.claimNo;
+      if (!claimNo) return;
 
-      console.log("Refreshing patient details for referenceNo:", referenceNo);
+      console.log("Refreshing patient details for claimNo:", claimNo);
 
       // Force fetch fresh patient details from API
-      const patientDetails = await fetchPatientDetails(referenceNo);
+      const patientDetails = await fetchPatientDetails(claimNo);
 
       if (
         patientDetails.patient_Name ||
@@ -965,7 +965,7 @@ const EditClaimIntimation = ({ route }) => {
         patientDetails.relationship
       ) {
         // Update beneficiaries with fresh data
-        const claimAmount = await fetchClaimAmount(referenceNo);
+        const claimAmount = await fetchClaimAmount(claimNo);
 
         const updatedBeneficiary = {
           id: "1",
@@ -1060,23 +1060,23 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  const fetchClaimAmount = async (referenceNo) => {
+  const fetchClaimAmount = async (claimNo) => {
     try {
-      if (!referenceNo || referenceNo.trim() === "") {
-        const fallbackReferenceNo =
+      if (!claimNo || claimNo.trim() === "") {
+        const fallbackClaimNo =
           (await SecureStore.getItemAsync("stored_claim_seq_no")) ||
-          (await SecureStore.getItemAsync("edit_referenceNo")) ||
-          claimDetails.referenceNo;
+          (await SecureStore.getItemAsync("edit_claimNo")) ||
+          claimDetails.claimNo;
 
-        if (!fallbackReferenceNo || fallbackReferenceNo.trim() === "") {
+        if (!fallbackClaimNo || fallbackClaimNo.trim() === "") {
           return "0.00";
         }
-        referenceNo = fallbackReferenceNo;
+        claimNo = fallbackClaimNo;
       }
 
-      console.log("Fetching claim amount for referenceNo:", referenceNo);
+      console.log("Fetching claim amount for claimNo:", claimNo);
 
-      const requestBody = { seqNo: referenceNo.trim() };
+      const requestBody = { seqNo: claimNo.trim() };
 
       // Add timestamp to prevent caching
       const response = await fetch(
@@ -1135,16 +1135,16 @@ const EditClaimIntimation = ({ route }) => {
     try {
       setClaimAmountLoading(true);
 
-      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-      if (!referenceNo) {
-        console.warn("No reference number available for claim amount refresh");
+      const claimNo = claimDetails.claimNo || claim?.claimNo;
+      if (!claimNo) {
+        console.warn("No claim number available for claim amount refresh");
         return;
       }
 
-      console.log("Refreshing claim amount for referenceNo:", referenceNo);
+      console.log("Refreshing claim amount for claimNo:", claimNo);
 
       // Force fetch from API regardless of current state
-      const updatedAmount = await fetchClaimAmount(referenceNo);
+      const updatedAmount = await fetchClaimAmount(claimNo);
 
       console.log("Updated claim amount:", updatedAmount);
 
@@ -1182,8 +1182,8 @@ const EditClaimIntimation = ({ route }) => {
 
   const retrieveClaimDetails = async () => {
     try {
-      const storedReferenceNo = await SecureStore.getItemAsync(
-        "edit_referenceNo"
+      const storedClaimNo = await SecureStore.getItemAsync(
+        "edit_claimNo"
       );
       const storedClaimType = await SecureStore.getItemAsync("edit_claimType");
       const storedCreatedOn = await SecureStore.getItemAsync("edit_createdOn");
@@ -1191,12 +1191,12 @@ const EditClaimIntimation = ({ route }) => {
         "stored_claim_seq_no"
       );
 
-      const finalReferenceNo =
-        referenceNo ||
+      const finalClaimNo =
+        claimNo ||
         claimNumber ||
-        claim?.referenceNo ||
+        claim?.claimNo ||
         storedClaimSeqNo ||
-        storedReferenceNo ||
+        storedClaimNo ||
         "";
       const finalClaimType =
         claimType || claim?.claimType || storedClaimType || "";
@@ -1208,33 +1208,33 @@ const EditClaimIntimation = ({ route }) => {
 
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: finalReferenceNo,
+        claimNo: finalClaimNo,
         claimType: finalClaimType,
         createdOn: finalCreatedOn,
       }));
 
-      setReferenceNo(finalReferenceNo);
-      return finalReferenceNo;
+      setClaimNo(finalClaimNo);
+      return finalClaimNo;
     } catch (error) {
       console.error("Error retrieving claim details:", error);
-      const fallbackReferenceNo =
-        referenceNo || claimNumber || claim?.referenceNo || "";
+      const fallbackClaimNo =
+        claimNo || claimNumber || claim?.claimNo || "";
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: fallbackReferenceNo,
+        claimNo: fallbackClaimNo,
         claimType: claimType || claim?.claimType || "",
         createdOn:
           createdOn ||
           claim?.createdOn ||
           new Date().toLocaleDateString("en-GB"),
       }));
-      return fallbackReferenceNo;
+      return fallbackClaimNo;
     } finally {
       updateLoadingState("claimDetails", false);
     }
   };
 
-  const retrieveBeneficiaryData = async (referenceNo) => {
+  const retrieveBeneficiaryData = async (claimNo) => {
     try {
       const [storedPatientName, storedIllness, storedRelationship] =
         await Promise.all([
@@ -1250,10 +1250,10 @@ const EditClaimIntimation = ({ route }) => {
           SecureStore.getItemAsync("edit_illness"),
         ]);
 
-      // NEW: Fetch patient details from API if we have a reference number
+      // NEW: Fetch patient details from API if we have a claim number
       let patientDetails = { patient_Name: "", relationship: "", illness: "" };
-      if (referenceNo) {
-        patientDetails = await fetchPatientDetails(referenceNo);
+      if (claimNo) {
+        patientDetails = await fetchPatientDetails(claimNo);
       }
 
       // Use API data first, then stored data, then props
@@ -1271,7 +1271,7 @@ const EditClaimIntimation = ({ route }) => {
         "Self";
 
       if (finalPatientName) {
-        const claimAmount = await fetchClaimAmount(referenceNo);
+        const claimAmount = await fetchClaimAmount(claimNo);
 
         const beneficiary = {
           id: "1",
@@ -1355,12 +1355,12 @@ const EditClaimIntimation = ({ route }) => {
 
   const storeClaimDetails = async () => {
     try {
-      const actualReferenceNo =
+      const actualClaimNo =
         (await SecureStore.getItemAsync("stored_claim_seq_no")) ||
-        claimDetails.referenceNo ||
-        referenceNo ||
+        claimDetails.claimNo ||
+        claimNo ||
         claimNumber ||
-        claim?.referenceNo;
+        claim?.claimNo;
 
       const actualClaimType =
         (await SecureStore.getItemAsync("stored_claim_type")) ||
@@ -1369,8 +1369,8 @@ const EditClaimIntimation = ({ route }) => {
         claim?.claimType;
 
       await SecureStore.setItemAsync(
-        "edit_referenceNo",
-        String(actualReferenceNo || "")
+        "edit_claimNo",
+        String(actualClaimNo || "")
       );
       await SecureStore.setItemAsync(
         "edit_claimType",
@@ -1383,20 +1383,20 @@ const EditClaimIntimation = ({ route }) => {
 
       setClaimDetails((prev) => ({
         ...prev,
-        referenceNo: actualReferenceNo || prev.referenceNo,
+        claimNo: actualClaimNo || prev.claimNo,
         claimType: actualClaimType || prev.claimType,
       }));
 
       setClaimType(actualClaimType || "");
-      setReferenceNo(actualReferenceNo || "");
+      setClaimNo(actualClaimNo || "");
     } catch (error) {
       console.error("Error storing claim details:", error);
     }
   };
 
-  const submitFinalClaim = async (referenceNo) => {
+  const submitFinalClaim = async (claimNo) => {
     try {
-      const requestBody = { claimSeqNo: referenceNo };
+      const requestBody = { claimSeqNo: claimNo };
 
       const response = await fetch(
         `${API_BASE_URL}/FinalClaimSub/submitfinalclaim`,
@@ -1429,18 +1429,18 @@ const EditClaimIntimation = ({ route }) => {
   useEffect(() => {
     const initializeComponent = async () => {
       try {
-        const referenceNo = await retrieveClaimDetails();
+        const claimNo = await retrieveClaimDetails();
 
         const loadingPromises = [
-          retrieveBeneficiaryData(referenceNo), // This will now fetch patient details from API
+          retrieveBeneficiaryData(claimNo), // This will now fetch patient details from API
           fetchEmployeeInfo(),
           storeClaimDetails(),
           fetchDocumentTypes(),
           fetchDependents(),
         ];
 
-        if (referenceNo) {
-          loadingPromises.push(fetchDocuments(referenceNo));
+        if (claimNo) {
+          loadingPromises.push(fetchDocuments(claimNo));
         } else {
           updateLoadingState("documents", false);
         }
@@ -1473,28 +1473,28 @@ const EditClaimIntimation = ({ route }) => {
     React.useCallback(() => {
       const fetchDataOnFocus = async () => {
         if (!initialLoading) {
-          let referenceNo = claimDetails.referenceNo || claim?.referenceNo;
+          let claimNo = claimDetails.claimNo || claim?.claimNo;
 
-          if (!referenceNo) {
+          if (!claimNo) {
             try {
-              referenceNo =
+              claimNo =
                 (await SecureStore.getItemAsync("stored_claim_seq_no")) ||
-                (await SecureStore.getItemAsync("edit_referenceNo"));
+                (await SecureStore.getItemAsync("edit_claimNo"));
             } catch (error) {
               console.error(
-                "Error getting reference number from storage:",
+                "Error getting claim number from storage:",
                 error
               );
             }
           }
 
-          if (referenceNo && referenceNo !== "") {
+          if (claimNo && claimNo !== "") {
             setDocumentsLoading(true);
 
             try {
               // Always refresh all data when screen comes into focus
               await Promise.all([
-                fetchDocuments(referenceNo),
+                fetchDocuments(claimNo),
                 refreshClaimAmount(),
                 refreshPatientDetails(),
               ]);
@@ -1508,7 +1508,7 @@ const EditClaimIntimation = ({ route }) => {
       };
 
       fetchDataOnFocus();
-    }, [claimDetails.referenceNo, claim?.referenceNo, initialLoading])
+    }, [claimDetails.claimNo, claim?.claimNo, initialLoading])
   );
 
   useEffect(() => {
@@ -1533,7 +1533,7 @@ const EditClaimIntimation = ({ route }) => {
     });
 
     return unsubscribe;
-  }, [navigation, claimDetails.referenceNo]);
+  }, [navigation, claimDetails.claimNo]);
 
   const handleNavigateToUploadDocuments = () => {
     const currentClaimAmount =
@@ -1546,11 +1546,11 @@ const EditClaimIntimation = ({ route }) => {
       documents: documents,
       fromEditClaim: true,
       currentClaimAmount: currentClaimAmount,
-      referenceNo: claimDetails.referenceNo,
+      claimNo: claimDetails.claimNo,
       patientName: claimDetails.enteredBy,
       claimType: claimDetails.claimType,
       illness: beneficiaries.length > 0 ? beneficiaries[0].illness : "",
-      claimId: claimDetails.referenceNo,
+      claimId: claimDetails.claimNo,
     });
   };
 
@@ -1824,7 +1824,7 @@ const EditClaimIntimation = ({ route }) => {
       const cleanAmount = removeCommasFromAmount(newDocument.amount);
 
       const updateDocumentData = {
-        ClmSeqNo: claimDetails.referenceNo,
+        ClmSeqNo: claimDetails.claimNo,
         ClmMemSeqNo: parseInt(clmMemSeqNo),
         DocSeq: parseInt(docSeq),
         NewDocRef: editDocumentType,
@@ -1832,7 +1832,7 @@ const EditClaimIntimation = ({ route }) => {
         ImgContent: originalDocData?.imgContent || "",
         DocAmount: parseFloat(cleanAmount || "0"),
         CreatedBy: storedNic,
-        ImgName: `${claimDetails.referenceNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
+        ImgName: `${claimDetails.claimNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
       };
 
       await updateDocumentAPI(updateDocumentData);
@@ -1857,9 +1857,9 @@ const EditClaimIntimation = ({ route }) => {
 
       showPopup("Success", "Document updated successfully!", "success");
 
-      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-      if (referenceNo) {
-        await fetchDocuments(referenceNo);
+      const claimNo = claimDetails.claimNo || claim?.claimNo;
+      if (claimNo) {
+        await fetchDocuments(claimNo);
       }
 
       await refreshClaimAmount();
@@ -1875,9 +1875,9 @@ const EditClaimIntimation = ({ route }) => {
           true,
           async () => {
             hidePopup();
-            const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-            if (referenceNo) {
-              await fetchDocuments(referenceNo);
+            const claimNo = claimDetails.claimNo || claim?.claimNo;
+            if (claimNo) {
+              await fetchDocuments(claimNo);
             }
             setEditDocumentModalVisible(false);
             setNewDocument({ type: "", date: "", amount: "" });
@@ -1943,9 +1943,9 @@ const EditClaimIntimation = ({ route }) => {
 
           setDocuments((prev) => prev.filter((item) => item.id !== documentId));
 
-          const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-          if (referenceNo) {
-            await fetchDocuments(referenceNo);
+          const claimNo = claimDetails.claimNo || claim?.claimNo;
+          if (claimNo) {
+            await fetchDocuments(claimNo);
           }
 
           await refreshClaimAmount();
@@ -1974,9 +1974,9 @@ const EditClaimIntimation = ({ route }) => {
 
   const handleScreenRefresh = async () => {
     try {
-      const referenceNo = claimDetails.referenceNo || claim?.referenceNo;
-      if (referenceNo) {
-        console.log("Refreshing screen data for referenceNo:", referenceNo);
+      const claimNo = claimDetails.claimNo || claim?.claimNo;
+      if (claimNo) {
+        console.log("Refreshing screen data for claimNo:", claimNo);
 
         setClaimAmountLoading(true);
         setDocumentsLoading(true);
@@ -1984,7 +1984,7 @@ const EditClaimIntimation = ({ route }) => {
         await Promise.all([
           refreshClaimAmount(),
           refreshPatientDetails(),
-          fetchDocuments(referenceNo),
+          fetchDocuments(claimNo),
         ]);
 
         console.log("Screen refresh completed");
@@ -2008,12 +2008,12 @@ const EditClaimIntimation = ({ route }) => {
         setPopup((prev) => ({ ...prev, visible: false }));
 
         try {
-          if (!claimDetails.referenceNo) {
-            showPopup("Error", "Claim reference number not found.", "error");
+          if (!claimDetails.claimNo) {
+            showPopup("Error", "Claim claim number not found.", "error");
             return;
           }
 
-          await submitFinalClaim(claimDetails.referenceNo);
+          await submitFinalClaim(claimDetails.claimNo);
 
           // Show success message and navigate
           setTimeout(() => {
@@ -2077,16 +2077,16 @@ const EditClaimIntimation = ({ route }) => {
     });
   };
 
-  const fetchPatientDetails = async (referenceNo) => {
+  const fetchPatientDetails = async (claimNo) => {
     try {
-      console.log("Fetching patient details for referenceNo:", referenceNo);
+      console.log("Fetching patient details for claimNo:", claimNo);
 
-      if (!referenceNo || referenceNo.trim() === "") {
-        console.warn("Invalid referenceNo provided:", referenceNo);
+      if (!claimNo || claimNo.trim() === "") {
+        console.warn("Invalid claimNo provided:", claimNo);
         return { patient_Name: "", relationship: "", illness: "" };
       }
 
-      const requestBody = { seqNo: referenceNo.trim() };
+      const requestBody = { seqNo: claimNo.trim() };
 
       // Add timestamp to prevent caching
       const response = await fetch(
@@ -2106,8 +2106,8 @@ const EditClaimIntimation = ({ route }) => {
       if (!response.ok) {
         if (response.status === 404) {
           console.warn(
-            "No patient details found for referenceNo:",
-            referenceNo
+            "No patient details found for claimNo:",
+            claimNo
           );
           return { patient_Name: "", relationship: "", illness: "" };
         }
@@ -2235,9 +2235,9 @@ const EditClaimIntimation = ({ route }) => {
           </TouchableOpacity>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Reference No</Text>
+            <Text style={styles.detailLabel}>Claim No</Text>
             <Text style={styles.colon}>:</Text>
-            <Text style={styles.detailValue}>{referenceNo2}</Text>
+            <Text style={styles.detailValue}>{claimNo2}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Entered By</Text>
@@ -2257,7 +2257,7 @@ const EditClaimIntimation = ({ route }) => {
             <Text style={styles.detailValue}>{claimTypes}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Created on</Text>
+            <Text style={styles.detailLabel}>Last Edit on</Text>
             <Text style={styles.colon}>:</Text>
             <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
           </View>

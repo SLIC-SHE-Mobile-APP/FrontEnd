@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -213,7 +213,19 @@ const CustomPopup = ({
                   ? styles.popupCancelButton
                   : styles.popupOkButton,
               ]}
-              onPress={onClose}
+              onPress={() => {
+                if (showConfirmButton) {
+                  // This is the "Cancel" button - just close the popup
+                  onClose();
+                } else {
+                  // This is the single "OK" button - call onConfirm if it exists, otherwise onClose
+                  if (onConfirm) {
+                    onConfirm();
+                  } else {
+                    onClose();
+                  }
+                }
+              }}
             >
               <Text
                 style={[
@@ -260,7 +272,7 @@ const UploadDocumentsSaved = ({ route }) => {
   0;
   const [loading, setLoading] = useState(true);
   0;
-  const [storedReferenceNo, setStoredReferenceNo] = useState("");
+  const [storedClaimNo, setStoredClaimNo] = useState("");
   0;
   const [storedNic, setStoredNic] = useState("");
   0;
@@ -391,19 +403,19 @@ const UploadDocumentsSaved = ({ route }) => {
   useEffect(() => {
     const loadStoredValues = async () => {
       try {
-        const referenceNo = await SecureStore.getItemAsync("referenNo");
+        const claimNo = await SecureStore.getItemAsync("referenNo");
         const nic = await SecureStore.getItemAsync("user_nic");
         const docamount = await SecureStore.getItemAsync(
           "edit_beneficiary_amount"
         );
 
-        setStoredReferenceNo(referenceNo || "");
+        setStoredClaimNo(claimNo || "");
         setStoredNic(nic || "");
         const parsedDocAmount = parseFloat(docamount) || 0;
         setStoredDocAmount(parsedDocAmount);
 
         console.log("Loaded stored values:", {
-          referenceNo,
+          claimNo,
           nic,
           docamount,
           parsedDocAmount,
@@ -458,7 +470,7 @@ const UploadDocumentsSaved = ({ route }) => {
       name: fileName,
     });
 
-    formData.append("ClmSeqNo", storedReferenceNo);
+    formData.append("ClmSeqNo", storedClaimNo);
     formData.append("DocType", document.documentType);
     formData.append("ImgName", fileName);
     formData.append(
@@ -917,71 +929,81 @@ const UploadDocumentsSaved = ({ route }) => {
       return;
     }
 
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        showPopup(
-          "Permission Required",
-          "Camera permission is required to take photos",
-          "warning"
-        );
-        return;
-      }
+    // Show Yes/No confirmation popup before opening camera
+    showPopup(
+      "Take Photo",
+      "Any document without Submitted to SLICGL on [Date],[Policy No],[MemberID] will be rejected by SLICGL",
+      "info",
+      true, // showConfirmButton = true
+      async () => {
+        // This function only runs when "Confirm" is clicked
+        try {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== "granted") {
+            showPopup(
+              "Permission Required",
+              "Camera permission is required to take photos",
+              "warning"
+            );
+            return;
+          }
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const photo = result.assets[0];
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            const photo = result.assets[0];
 
-        showPopup(
-          "Processing Image",
-          "Please wait while we optimize your image...",
-          "info"
-        );
+            showPopup(
+              "Processing Image",
+              "Please wait while we optimize your image...",
+              "info"
+            );
 
-        const compressedUri = await compressImage(photo.uri);
-        if (!compressedUri) {
-          return;
+            const compressedUri = await compressImage(photo.uri);
+            if (!compressedUri) {
+              return;
+            }
+
+            hidePopup(); // Hide the processing message
+
+            const docTypeLabel =
+              documentTypes.find((type) => type.id === selectedDocumentType)
+                ?.label || selectedDocumentType;
+
+            const customName = `${docTypeLabel}.jpg`;
+
+            const newDocument = {
+              id: Date.now(),
+              name: customName,
+              uri: compressedUri,
+              type: "image/jpeg",
+              size: photo.fileSize || 0,
+              documentType: selectedDocumentType,
+              amount: formatAmountForDisplay(amount),
+              date: formatDate(documentDate),
+            };
+            setUploadedDocuments((prev) => [...prev, newDocument]);
+
+            setSelectedDocumentType("");
+            setAmount("");
+            setDocumentDate(new Date());
+
+            showPopup(
+              "Success",
+              "Photo captured and uploaded successfully!",
+              "success"
+            );
+          }
+        } catch (error) {
+          console.error("Error taking photo:", error);
+          showPopup("Error", "Failed to take photo", "error");
         }
-
-        hidePopup(); // Hide the processing message
-
-        const docTypeLabel =
-          documentTypes.find((type) => type.id === selectedDocumentType)
-            ?.label || selectedDocumentType;
-
-        const customName = `${docTypeLabel}.jpg`;
-
-        const newDocument = {
-          id: Date.now(),
-          name: customName,
-          uri: compressedUri,
-          type: "image/jpeg",
-          size: photo.fileSize || 0,
-          documentType: selectedDocumentType,
-          amount: formatAmountForDisplay(amount),
-          date: formatDate(documentDate),
-        };
-        setUploadedDocuments((prev) => [...prev, newDocument]);
-
-        setSelectedDocumentType("");
-        setAmount("");
-        setDocumentDate(new Date());
-
-        showPopup(
-          "Success",
-          "Photo captured and uploaded successfully!",
-          "success"
-        );
       }
-    } catch (error) {
-      console.error("Error taking photo:", error);
-      showPopup("Error", "Failed to take photo", "error");
-    }
+    );
   };
 
   const handleRemoveDocument = (documentId) => {
@@ -1103,10 +1125,10 @@ const UploadDocumentsSaved = ({ route }) => {
       return;
     }
 
-    if (!storedReferenceNo || !storedNic) {
+    if (!storedClaimNo || !storedNic) {
       showPopup(
         "Error",
-        "Missing required information. Please ensure you have a valid reference number and user identification.",
+        "Missing required information. Please ensure you have a valid claim number and user identification.",
         "error"
       );
       return;
@@ -1311,12 +1333,12 @@ const UploadDocumentsSaved = ({ route }) => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Patient Info Display */}
-        {(patientData.patientName || storedReferenceNo) && (
+        {(patientData.patientName || storedClaimNo) && (
           <View style={styles.patientInfoCard}>
             <Text style={styles.patientInfoTitle}>Patient Information</Text>
-            {storedReferenceNo && (
-              <Text style={styles.patientReferenceNo}>
-                Reference No: {storedReferenceNo}
+            {storedClaimNo && (
+              <Text style={styles.patientClaimNo}>
+                Claim No: {storedClaimNo}
               </Text>
             )}
             {patientData.patientName && (
@@ -1344,7 +1366,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                      styles.documentTypeSelected,
+                    styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1355,7 +1377,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                          styles.radioButtonSelected,
+                        styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1367,7 +1389,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                          styles.documentTypeTextSelected,
+                        styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1393,15 +1415,15 @@ const UploadDocumentsSaved = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.textInputError,
+              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+              styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                ? "Enter amount"
-                : "0.00"
+                  ? "Enter amount"
+                  : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1424,7 +1446,7 @@ const UploadDocumentsSaved = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                  styles.errorText,
+                styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1539,7 +1561,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1558,7 +1580,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1573,7 +1595,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonDisabled,
+                        styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1592,7 +1614,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                            styles.uploadButtonTextDisabled,
+                          styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1650,7 +1672,7 @@ const UploadDocumentsSaved = ({ route }) => {
           style={[
             styles.addDocumentButton,
             (uploadedDocuments.length === 0 || isUploading) &&
-              styles.addDocumentButtonDisabled,
+            styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocument}
           disabled={uploadedDocuments.length === 0 || isUploading}
@@ -1659,7 +1681,7 @@ const UploadDocumentsSaved = ({ route }) => {
             style={[
               styles.addDocumentButtonText,
               (uploadedDocuments.length === 0 || isUploading) &&
-                styles.addDocumentButtonTextDisabled,
+              styles.addDocumentButtonTextDisabled,
             ]}
           >
             {isUploading ? "Uploading..." : "Upload Document"}
@@ -1728,7 +1750,7 @@ const UploadDocumentsSaved = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                      editDocumentType.slice(1)
+                    editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1753,7 +1775,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                editDocumentType === "diagnosis" ? (
+                  editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
@@ -1790,7 +1812,7 @@ const UploadDocumentsSaved = ({ route }) => {
         message={popup.message}
         type={popup.type}
         showConfirmButton={popup.showConfirmButton}
-        onClose={popup.onConfirm || hidePopup}
+        onClose={hidePopup}
         onConfirm={popup.onConfirm}
       />
     </LinearGradient>
@@ -1922,7 +1944,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   limitWarning: {
-    color: "#FF6B6B",
+    color: "#13646D",
     fontWeight: "500",
   },
   limitInfo: {
