@@ -248,17 +248,28 @@ const UploadDocumentsSaved = ({ route }) => {
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false); 0
-  const [editingDocument, setEditingDocument] = useState(null); 0
-  const [editAmount, setEditAmount] = useState(""); 0
-  const [editDocumentType, setEditDocumentType] = useState(""); 0
-  const [documentTypes, setDocumentTypes] = useState([]); 0
-  const [loading, setLoading] = useState(true); 0
-  const [storedReferenceNo, setStoredReferenceNo] = useState(""); 0
-  const [storedNic, setStoredNic] = useState(""); 0
-  const [selectedDocId, setSelectedDocId] = useState(""); 0
-  const [storedDocAmount, setStoredDocAmount] = useState(0); 0
+  const [showEditModal, setShowEditModal] = useState(false);
+  0;
+  const [editingDocument, setEditingDocument] = useState(null);
+  0;
+  const [editAmount, setEditAmount] = useState("");
+  0;
+  const [editDocumentType, setEditDocumentType] = useState("");
+  0;
+  const [documentTypes, setDocumentTypes] = useState([]);
+  0;
+  const [loading, setLoading] = useState(true);
+  0;
+  const [storedReferenceNo, setStoredReferenceNo] = useState("");
+  0;
+  const [storedNic, setStoredNic] = useState("");
+  0;
+  const [selectedDocId, setSelectedDocId] = useState("");
+  0;
+  const [storedDocAmount, setStoredDocAmount] = useState(0);
+  0;
   const [isUploading, setIsUploading] = useState(false);
+  const [documentDateRange, setDocumentDateRange] = useState(null);
 
   // Popup state
   const [popup, setPopup] = useState({
@@ -357,6 +368,27 @@ const UploadDocumentsSaved = ({ route }) => {
   }, []);
 
   useEffect(() => {
+    const calculateDateRange = async () => {
+      const dateRange = await getDocumentDateRange();
+      setDocumentDateRange(dateRange);
+
+      // Set initial document date to max allowed date
+      if (dateRange.maxDate) {
+        setDocumentDate(dateRange.maxDate);
+      }
+
+      console.log("Document date range calculated:", {
+        minDate: dateRange.minDate?.toDateString(),
+        maxDate: dateRange.maxDate?.toDateString(),
+        isPolicyExpired: dateRange.isPolicyExpired,
+        policyEndDate: dateRange.policyEndDate?.toDateString(),
+      });
+    };
+
+    calculateDateRange();
+  }, []);
+
+  useEffect(() => {
     const loadStoredValues = async () => {
       try {
         const referenceNo = await SecureStore.getItemAsync("referenNo");
@@ -398,7 +430,10 @@ const UploadDocumentsSaved = ({ route }) => {
       };
 
       // Add hardware back button listener
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
 
       return () => subscription.remove();
     }, [navigation])
@@ -473,9 +508,114 @@ const UploadDocumentsSaved = ({ route }) => {
     }
   };
 
+  const getPolicyEndDate = async () => {
+    try {
+      const policyData = await SecureStore.getItemAsync("selected_policy_data");
+      if (policyData) {
+        const parsedData = JSON.parse(policyData);
+        // Check both possible date fields
+        const endDate = parsedData.policyEndDate || parsedData.endDate;
+        if (endDate) {
+          return new Date(endDate);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting policy end date:", error);
+      return null;
+    }
+  };
+
+  const isPolicyExpired = (policyEndDate, currentDate = new Date()) => {
+    if (!policyEndDate) return false;
+    return currentDate > policyEndDate;
+  };
+
+  const getDocumentDateRange = async () => {
+    try {
+      const policyEndDate = await getPolicyEndDate();
+      const currentDate = new Date();
+
+      if (!policyEndDate) {
+        // If no policy end date available, allow current date and 90 days back
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+        return {
+          minDate,
+          maxDate: currentDate,
+          isPolicyExpired: false,
+        };
+      }
+
+      const isExpired = isPolicyExpired(policyEndDate, currentDate);
+
+      if (isExpired) {
+        // Policy is expired - allow from policy end date to 90 days before policy end date
+        const maxDate = policyEndDate;
+        const minDate = new Date(policyEndDate);
+        minDate.setDate(policyEndDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: true,
+          policyEndDate,
+        };
+      } else {
+        // Policy is not expired - allow from current date to 90 days before current date
+        const maxDate = currentDate;
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: false,
+          policyEndDate,
+        };
+      }
+    } catch (error) {
+      console.error("Error calculating document date range:", error);
+      // Fallback to current date and 90 days back
+      const currentDate = new Date();
+      const minDate = new Date(currentDate);
+      minDate.setDate(currentDate.getDate() - 90);
+      return {
+        minDate,
+        maxDate: currentDate,
+        isPolicyExpired: false,
+      };
+    }
+  };
+
   const handleDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || documentDate;
     setShowDatePicker(Platform.OS === "ios");
+
+    if (documentDateRange) {
+      // Check if selected date is within allowed range
+      if (
+        currentDate < documentDateRange.minDate ||
+        currentDate > documentDateRange.maxDate
+      ) {
+        const formatDate = (date) => {
+          const day = date.getDate().toString().padStart(2, "0");
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+
+        showPopup(
+          "Invalid Date Selection",
+          `Please select a date between ${formatDate(
+            documentDateRange.minDate
+          )} and ${formatDate(documentDateRange.maxDate)}`,
+          "warning"
+        );
+        return;
+      }
+    }
+
     setDocumentDate(currentDate);
   };
 
@@ -1051,22 +1191,20 @@ const UploadDocumentsSaved = ({ route }) => {
     }
   };
 
-
   const handleBackPress = React.useCallback(() => {
     console.log("Back button pressed");
     try {
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
-       
-        navigation.navigate('Home'); 
+        navigation.navigate("Home");
       }
     } catch (error) {
       console.error("Navigation error:", error);
-      
+
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Home' }], 
+        routes: [{ name: "Home" }],
       });
     }
   }, [navigation]);
@@ -1083,6 +1221,29 @@ const UploadDocumentsSaved = ({ route }) => {
         description: document.name,
       });
       setShowImagePopup(true);
+    }
+  };
+
+  const getDatePickerHelpText = () => {
+    if (!documentDateRange) return "Loading date range...";
+
+    const formatDate = (date) => {
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    if (documentDateRange.isPolicyExpired) {
+      return `Policy expired on ${formatDate(
+        documentDateRange.policyEndDate
+      )}. You can select dates from ${formatDate(
+        documentDateRange.minDate
+      )} to ${formatDate(documentDateRange.maxDate)}`;
+    } else {
+      return `You can select dates from ${formatDate(
+        documentDateRange.minDate
+      )} to ${formatDate(documentDateRange.maxDate)}`;
     }
   };
 
@@ -1183,7 +1344,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                      styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1194,7 +1355,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                          styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1206,7 +1367,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                          styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1232,15 +1393,15 @@ const UploadDocumentsSaved = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                  ? "Enter amount"
-                  : "0.00"
+                ? "Enter amount"
+                : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1263,7 +1424,7 @@ const UploadDocumentsSaved = ({ route }) => {
               style={[
                 styles.helpText,
                 (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                  styles.errorText,
               ]}
             >
               {!amount || amount.trim() === "" || parseFloat(amount) <= 0
@@ -1286,7 +1447,10 @@ const UploadDocumentsSaved = ({ route }) => {
             <Ionicons name="calendar-outline" size={20} color="#00C4CC" />
           </TouchableOpacity>
 
-          {showDatePicker && (
+          {/* Help text showing allowed date range */}
+          <Text style={styles.helpText}>{getDatePickerHelpText()}</Text>
+
+          {showDatePicker && documentDateRange && (
             <DateTimePicker
               testID="dateTimePicker"
               value={documentDate}
@@ -1294,7 +1458,8 @@ const UploadDocumentsSaved = ({ route }) => {
               is24Hour={true}
               display="default"
               onChange={handleDateChange}
-              maximumDate={new Date()}
+              minimumDate={documentDateRange.minDate}
+              maximumDate={documentDateRange.maxDate}
             />
           )}
         </View>
@@ -1374,7 +1539,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1393,7 +1558,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1408,7 +1573,7 @@ const UploadDocumentsSaved = ({ route }) => {
                             (!amount ||
                               amount.trim() === "" ||
                               parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1427,7 +1592,7 @@ const UploadDocumentsSaved = ({ route }) => {
                               (!amount ||
                                 amount.trim() === "" ||
                                 parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1484,15 +1649,19 @@ const UploadDocumentsSaved = ({ route }) => {
         <TouchableOpacity
           style={[
             styles.addDocumentButton,
-            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonDisabled,
+            (uploadedDocuments.length === 0 || isUploading) &&
+              styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocument}
           disabled={uploadedDocuments.length === 0 || isUploading}
         >
-          <Text style={[
-            styles.addDocumentButtonText,
-            (uploadedDocuments.length === 0 || isUploading) && styles.addDocumentButtonTextDisabled
-          ]}>
+          <Text
+            style={[
+              styles.addDocumentButtonText,
+              (uploadedDocuments.length === 0 || isUploading) &&
+                styles.addDocumentButtonTextDisabled,
+            ]}
+          >
             {isUploading ? "Uploading..." : "Upload Document"}
           </Text>
         </TouchableOpacity>
@@ -1559,7 +1728,7 @@ const UploadDocumentsSaved = ({ route }) => {
                 <Text style={styles.editValue}>
                   {editDocumentType
                     ? editDocumentType.charAt(0).toUpperCase() +
-                    editDocumentType.slice(1)
+                      editDocumentType.slice(1)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1584,7 +1753,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   editable={isEditAmountEditable()}
                 />
                 {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
+                editDocumentType === "diagnosis" ? (
                   <Text style={styles.editHelpText}>
                     Amount is automatically set to 0.00 for {editDocumentType}
                   </Text>
