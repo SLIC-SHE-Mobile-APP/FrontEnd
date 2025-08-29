@@ -380,14 +380,48 @@ const EditClaimIntimation1 = ({ route }) => {
   // Format date from API response (e.g., "2025-03-04T00:00:00" to "04/03/2025")
   const formatDate = (dateString) => {
     try {
-      const date = new Date(dateString);
+      if (!dateString) {
+        return "";
+      }
+
+      // Convert to string if it's not already
+      const dateStr = dateString.toString().trim();
+
+      // If it's already in DD/MM/YYYY format, return as is
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+        return dateStr;
+      }
+
+      // If it's in DD/MM/YY format, convert to DD/MM/YYYY
+      if (/^\d{2}\/\d{2}\/\d{2}$/.test(dateStr)) {
+        const parts = dateStr.split("/");
+        const day = parts[0];
+        const month = parts[1];
+        const year = parseInt(parts[2]);
+
+        // Convert 2-digit year to 4-digit year
+        // Assume years 00-49 are 2000-2049, years 50-99 are 1950-1999
+        const fullYear = year <= 49 ? 2000 + year : 1900 + year;
+
+        return `${day}/${month}/${fullYear}`;
+      }
+
+      // For other formats, try to parse as Date object
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date format:", dateStr);
+        return dateStr; // Return original if can't parse
+      }
+
+      // Format as DD/MM/YYYY
       const day = date.getDate().toString().padStart(2, "0");
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const year = date.getFullYear();
+
       return `${day}/${month}/${year}`;
     } catch (error) {
-      console.error("Error formatting date:", error);
-      return dateString;
+      console.error("Error formatting date:", error, "Input:", dateString);
+      return dateString || "";
     }
   };
 
@@ -2978,7 +3012,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 30,
-    marginTop: 20,
     paddingBottom: 20,
     backgroundColor: "transparent",
   },
