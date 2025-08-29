@@ -265,7 +265,7 @@ const PaymentHistory = ({ onClose }) => {
             paidAmount: item.paiD_AMOUNT ? `Rs.${item.paiD_AMOUNT.toFixed(2)}` : 'Not Available',
             payeeName: item.payeE_NAME || 'Not Available',
             patientName: item.patienT_NAME || 'Not Available',
-            referenceNo: item.referencE_NUMBER || 'Not Available',
+            claimNo: item.referencE_NUMBER || 'Not Available',
             bhtNo: item.bhT_NUMBER || 'Not Available',
             claimStatus: item.paiD_AMOUNT > 0 ? 'Accept' : 'Reject',
             chequeNo: item.chequE_NO || 'Not Available',
@@ -344,7 +344,7 @@ const PaymentHistory = ({ onClose }) => {
               <View key={i} style={styles.paymentCard}>
                 {[
                   ['Claim Number', p.claimNumber, 'Patient Name', p.patientName],
-                  ['Received On', p.receivedOn, 'Reference No', p.referenceNo],
+                  ['Received On', p.receivedOn, 'Claim No', p.claimNo],
                   ['Transaction No', p.transactionNo, 'B.H.T. No', p.bhtNo],
                   ['Treatment Date', p.treatmentDate, 'Claim Status', p.claimStatus],
                   ['Claim Amount', p.claimAmount, 'Cheque No', p.chequeNo],
