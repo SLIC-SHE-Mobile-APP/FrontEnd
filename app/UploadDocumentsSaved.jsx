@@ -261,25 +261,15 @@ const UploadDocumentsSaved = ({ route }) => {
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  0;
   const [editingDocument, setEditingDocument] = useState(null);
-  0;
   const [editAmount, setEditAmount] = useState("");
-  0;
   const [editDocumentType, setEditDocumentType] = useState("");
-  0;
   const [documentTypes, setDocumentTypes] = useState([]);
-  0;
   const [loading, setLoading] = useState(true);
-  0;
   const [storedClaimNo, setStoredClaimNo] = useState("");
-  0;
   const [storedNic, setStoredNic] = useState("");
-  0;
   const [selectedDocId, setSelectedDocId] = useState("");
-  0;
   const [storedDocAmount, setStoredDocAmount] = useState(0);
-  0;
   const [isUploading, setIsUploading] = useState(false);
   const [documentDateRange, setDocumentDateRange] = useState(null);
 
@@ -298,19 +288,70 @@ const UploadDocumentsSaved = ({ route }) => {
     {
       id: 1,
       source: require("../assets/images/sample1.jpg"),
-      description: "Medical Bill Sample",
+      description: "Medical bill sample",
     },
     {
       id: 2,
       source: require("../assets/images/sample2.jpg"),
-      description: "Prescription Sample",
+      description: "Prescription sample",
     },
     {
       id: 3,
       source: require("../assets/images/sample3.jpg"),
-      description: "Diagnosis Report Sample",
+      description: "Diagnosis report sample",
     },
   ]);
+
+  // Helper function to format amount with commas
+  const formatAmountWithCommas = (amountString) => {
+    if (!amountString || amountString === "") return "";
+    
+    const amount = parseFloat(amountString);
+    if (isNaN(amount)) return amountString;
+    
+    // Format with commas and 2 decimal places
+    return amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Helper function to parse amount from comma-formatted string
+  const parseAmountFromCommas = (displayAmount) => {
+    if (!displayAmount || displayAmount === "") return "";
+    
+    // Remove commas and return the numeric string
+    return displayAmount.replace(/,/g, "");
+  };
+
+  // Helper function to format amount input as user types
+  const formatAmountInput = (text) => {
+    // Remove all non-numeric characters except decimal point
+    const cleanText = text.replace(/[^0-9.]/g, "");
+    
+    if (cleanText === "") return "";
+    
+    const parts = cleanText.split(".");
+    if (parts.length > 2) return text; // Invalid input
+    
+    // Format the integer part with commas
+    const integerPart = parts[0];
+    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    
+    // Return with decimal part if exists
+    if (parts.length === 2) {
+      const decimalPart = parts[1].substring(0, 2); // Limit to 2 decimal places
+      return formattedInteger + "." + decimalPart;
+    }
+    
+    return formattedInteger;
+  };
+
+  // Helper function to convert document type to sentence case
+  const toSentenceCase = (text) => {
+    if (!text) return text;
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+  };
 
   // Show popup function
   const showPopup = (
@@ -351,7 +392,7 @@ const UploadDocumentsSaved = ({ route }) => {
         const data = await response.json();
         const transformedDocumentTypes = data.map((doc) => ({
           id: doc.docId,
-          label: doc.docDesc,
+          label: toSentenceCase(doc.docDesc),
           icon: getIconForDocType(doc.docDesc),
         }));
 
@@ -366,10 +407,10 @@ const UploadDocumentsSaved = ({ route }) => {
 
         // Fallback to hardcoded types if API fails
         setDocumentTypes([
-          { id: "O01", label: "BILL", icon: "receipt-outline" },
-          { id: "O02", label: "PRESCRIPTION", icon: "medical-outline" },
-          { id: "O03", label: "DIAGNOSIS CARD", icon: "document-text-outline" },
-          { id: "O04", label: "OTHER", icon: "folder-outline" },
+          { id: "O01", label: "Bill", icon: "receipt-outline" },
+          { id: "O02", label: "Prescription", icon: "medical-outline" },
+          { id: "O03", label: "Diagnosis card", icon: "document-text-outline" },
+          { id: "O04", label: "Other", icon: "folder-outline" },
         ]);
       } finally {
         setLoading(false);
@@ -477,7 +518,9 @@ const UploadDocumentsSaved = ({ route }) => {
       "DocDate",
       formatDateForAPI(new Date(document.date.split("/").reverse().join("-")))
     );
-    formData.append("DocAmount", document.amount);
+    // Convert back from comma format to regular number for API
+    const regularAmount = parseAmountFromCommas(document.amount);
+    formData.append("DocAmount", regularAmount);
     formData.append("CreatedBy", storedNic);
 
     return formData;
@@ -543,79 +586,33 @@ const UploadDocumentsSaved = ({ route }) => {
     return currentDate > policyEndDate;
   };
 
-  const getDocumentDateRange = async () => {
-    try {
-      const policyEndDate = await getPolicyEndDate();
-      const currentDate = new Date();
-
-      if (!policyEndDate) {
-        // If no policy end date available, allow current date and 90 days back
-        const minDate = new Date(currentDate);
-        minDate.setDate(currentDate.getDate() - 90);
-        return {
-          minDate,
-          maxDate: currentDate,
-          isPolicyExpired: false,
-        };
-      }
-
-      const isExpired = isPolicyExpired(policyEndDate, currentDate);
-
-      if (isExpired) {
-        // Policy is expired - allow from policy end date to 90 days before policy end date
-        const maxDate = policyEndDate;
-        const minDate = new Date(policyEndDate);
-        minDate.setDate(policyEndDate.getDate() - 90);
-
-        return {
-          minDate,
-          maxDate,
-          isPolicyExpired: true,
-          policyEndDate,
-        };
-      } else {
-        // Policy is not expired - allow from current date to 90 days before current date
-        const maxDate = currentDate;
-        const minDate = new Date(currentDate);
-        minDate.setDate(currentDate.getDate() - 90);
-
-        return {
-          minDate,
-          maxDate,
-          isPolicyExpired: false,
-          policyEndDate,
-        };
-      }
-    } catch (error) {
-      console.error("Error calculating document date range:", error);
-      // Fallback to current date and 90 days back
-      const currentDate = new Date();
-      const minDate = new Date(currentDate);
-      minDate.setDate(currentDate.getDate() - 90);
-      return {
-        minDate,
-        maxDate: currentDate,
-        isPolicyExpired: false,
-      };
-    }
-  };
-
   const handleDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || documentDate;
     setShowDatePicker(Platform.OS === "ios");
 
     if (documentDateRange) {
       // Check if selected date is within allowed range
-      if (
-        currentDate < documentDateRange.minDate ||
-        currentDate > documentDateRange.maxDate
-      ) {
+      // Convert dates to start of day for proper comparison
+      const selectedDateStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const minDateStart = new Date(documentDateRange.minDate.getFullYear(), documentDateRange.minDate.getMonth(), documentDateRange.minDate.getDate());
+      const maxDateStart = new Date(documentDateRange.maxDate.getFullYear(), documentDateRange.maxDate.getMonth(), documentDateRange.maxDate.getDate());
+
+      if (selectedDateStart < minDateStart || selectedDateStart > maxDateStart) {
         const formatDate = (date) => {
           const day = date.getDate().toString().padStart(2, "0");
           const month = (date.getMonth() + 1).toString().padStart(2, "0");
           const year = date.getFullYear();
           return `${day}/${month}/${year}`;
         };
+
+        console.log("Date validation failed:", {
+          selectedDate: formatDate(selectedDateStart),
+          minDate: formatDate(minDateStart),
+          maxDate: formatDate(maxDateStart),
+          selectedDateStart,
+          minDateStart,
+          maxDateStart
+        });
 
         showPopup(
           "Invalid Date Selection",
@@ -648,20 +645,9 @@ const UploadDocumentsSaved = ({ route }) => {
       return;
     }
 
-    const cleanedText = text.replace(/[^0-9.]/g, "");
-    const parts = cleanedText.split(".");
-    if (parts.length > 2) {
-      return;
-    }
-
-    let formattedAmount = cleanedText;
-    if (parts.length === 2) {
-      if (parts[1].length > 2) {
-        formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
-      }
-    }
-
-    setAmount(formattedAmount);
+    // Format the input with commas as user types
+    const formattedText = formatAmountInput(text);
+    setAmount(formattedText);
   };
 
   const compressImage = async (imageUri) => {
@@ -728,20 +714,9 @@ const UploadDocumentsSaved = ({ route }) => {
       return;
     }
 
-    const cleanedText = text.replace(/[^0-9.]/g, "");
-    const parts = cleanedText.split(".");
-    if (parts.length > 2) {
-      return;
-    }
-
-    let formattedAmount = cleanedText;
-    if (parts.length === 2) {
-      if (parts[1].length > 2) {
-        formattedAmount = parts[0] + "." + parts[1].substring(0, 2);
-      }
-    }
-
-    setEditAmount(formattedAmount);
+    // Format the input with commas as user types
+    const formattedText = formatAmountInput(text);
+    setEditAmount(formattedText);
   };
 
   const validateAmount = (amountString) => {
@@ -754,7 +729,9 @@ const UploadDocumentsSaved = ({ route }) => {
         return false;
       }
 
-      const amount = parseFloat(amountString);
+      // Parse amount from comma-formatted string
+      const cleanAmount = parseAmountFromCommas(amountString);
+      const amount = parseFloat(cleanAmount);
       if (isNaN(amount) || amount <= 0) {
         return false;
       }
@@ -766,7 +743,9 @@ const UploadDocumentsSaved = ({ route }) => {
       return false;
     }
 
-    const amount = parseFloat(amountString);
+    // Parse amount from comma-formatted string
+    const cleanAmount = parseAmountFromCommas(amountString);
+    const amount = parseFloat(cleanAmount);
     if (isNaN(amount) || amount < 0) {
       return false;
     }
@@ -777,10 +756,15 @@ const UploadDocumentsSaved = ({ route }) => {
   const formatAmountForDisplay = (amountString) => {
     if (!amountString) return "";
 
+    // If it's already formatted with commas, return as is
+    if (amountString.includes(',')) {
+      return amountString;
+    }
+
     const amount = parseFloat(amountString);
     if (isNaN(amount)) return amountString;
 
-    return amount.toFixed(2);
+    return formatAmountWithCommas(amount.toFixed(2));
   };
 
   const canAddMoreDocuments = () => {
@@ -819,7 +803,7 @@ const UploadDocumentsSaved = ({ route }) => {
 
     if (
       selectedDocumentType === "O01" &&
-      (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+      (!amount || amount.trim() === "" || parseFloat(parseAmountFromCommas(amount)) <= 0)
     ) {
       showPopup(
         "Validation Error",
@@ -910,7 +894,7 @@ const UploadDocumentsSaved = ({ route }) => {
 
     if (
       selectedDocumentType === "O01" &&
-      (!amount || amount.trim() === "" || parseFloat(amount) <= 0)
+      (!amount || amount.trim() === "" || parseFloat(parseAmountFromCommas(amount)) <= 0)
     ) {
       showPopup(
         "Validation Error",
@@ -1061,7 +1045,9 @@ const UploadDocumentsSaved = ({ route }) => {
         return false;
       }
 
-      const amount = parseFloat(amountString);
+      // Parse amount from comma-formatted string
+      const cleanAmount = parseAmountFromCommas(amountString);
+      const amount = parseFloat(cleanAmount);
       if (isNaN(amount) || amount <= 0) {
         return false;
       }
@@ -1073,7 +1059,9 @@ const UploadDocumentsSaved = ({ route }) => {
       return false;
     }
 
-    const amount = parseFloat(amountString);
+    // Parse amount from comma-formatted string
+    const cleanAmount = parseAmountFromCommas(amountString);
+    const amount = parseFloat(cleanAmount);
     if (isNaN(amount) || amount < 0) {
       return false;
     }
@@ -1140,7 +1128,9 @@ const UploadDocumentsSaved = ({ route }) => {
       }
 
       if (doc.documentType === "O01") {
-        const amount = parseFloat(doc.amount);
+        // Convert from comma format back to regular number for validation
+        const regularAmount = parseAmountFromCommas(doc.amount);
+        const amount = parseFloat(regularAmount);
         if (isNaN(amount) || amount <= 0) {
           return true;
         }
@@ -1246,6 +1236,65 @@ const UploadDocumentsSaved = ({ route }) => {
     }
   };
 
+  const getDocumentDateRange = async () => {
+    try {
+      const policyEndDate = await getPolicyEndDate();
+      const currentDate = new Date();
+
+      if (!policyEndDate) {
+        // If no policy end date available, allow current date and 90 days back
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+        return {
+          minDate,
+          maxDate: currentDate,
+          isPolicyExpired: false,
+        };
+      }
+
+      const isExpired = isPolicyExpired(policyEndDate, currentDate);
+
+      if (isExpired) {
+        // Policy is expired - allow from 90 days AFTER policy end date back to policy end date
+        const maxDate = new Date(policyEndDate);
+        maxDate.setDate(policyEndDate.getDate() + 90); // 90 days AFTER policy end date
+
+        const minDate = policyEndDate; // Start from policy end date
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: true,
+          policyEndDate,
+        };
+      } else {
+        // Policy is not expired - allow from current date to 90 days before current date
+        const maxDate = currentDate;
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: false,
+          policyEndDate,
+        };
+      }
+    } catch (error) {
+      console.error("Error calculating document date range:", error);
+      // Fallback to current date and 90 days back
+      const currentDate = new Date();
+      const minDate = new Date(currentDate);
+      minDate.setDate(currentDate.getDate() - 90);
+      return {
+        minDate,
+        maxDate: currentDate,
+        isPolicyExpired: false,
+      };
+    }
+  };
+
+  // Updated help text function
   const getDatePickerHelpText = () => {
     if (!documentDateRange) return "Loading date range...";
 
@@ -1261,7 +1310,9 @@ const UploadDocumentsSaved = ({ route }) => {
         documentDateRange.policyEndDate
       )}. You can select dates from ${formatDate(
         documentDateRange.minDate
-      )} to ${formatDate(documentDateRange.maxDate)}`;
+      )} to ${formatDate(
+        documentDateRange.maxDate
+      )} (up to 90 days after policy expiry)`;
     } else {
       return `You can select dates from ${formatDate(
         documentDateRange.minDate
@@ -1302,7 +1353,7 @@ const UploadDocumentsSaved = ({ route }) => {
 
   const getDocumentTypeLabel = (docId) => {
     const docType = documentTypes.find((type) => type.id === docId);
-    return docType ? docType.label : docId;
+    return docType ? docType.label : toSentenceCase(docId);
   };
 
   if (loading) {
@@ -1312,7 +1363,7 @@ const UploadDocumentsSaved = ({ route }) => {
           <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#13646D" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Upload Documents Saved</Text>
+          <Text style={styles.headerTitle}>Upload Documents</Text>
           <View style={styles.placeholder} />
         </View>
         <LoadingScreen />
@@ -1366,7 +1417,7 @@ const UploadDocumentsSaved = ({ route }) => {
                   style={[
                     styles.documentTypeOption,
                     selectedDocumentType === type.id &&
-                    styles.documentTypeSelected,
+                      styles.documentTypeSelected,
                     isDisabled && styles.documentTypeDisabled,
                   ]}
                   onPress={() => handleDocumentTypeSelect(type.id)}
@@ -1377,7 +1428,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.radioButton,
                         selectedDocumentType === type.id &&
-                        styles.radioButtonSelected,
+                          styles.radioButtonSelected,
                         isDisabled && styles.radioButtonDisabled,
                       ]}
                     >
@@ -1389,7 +1440,7 @@ const UploadDocumentsSaved = ({ route }) => {
                       style={[
                         styles.documentTypeText,
                         selectedDocumentType === type.id &&
-                        styles.documentTypeTextSelected,
+                          styles.documentTypeTextSelected,
                         isDisabled && styles.documentTypeTextDisabled,
                       ]}
                     >
@@ -1415,15 +1466,15 @@ const UploadDocumentsSaved = ({ route }) => {
               styles.textInput,
               !isAmountEditable() && styles.textInputDisabled,
               selectedDocumentType === "O01" &&
-              (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-              styles.textInputError,
+                (!amount || amount.trim() === "" || parseFloat(parseAmountFromCommas(amount)) <= 0) &&
+                styles.textInputError,
             ]}
             placeholder={
               !selectedDocumentType
                 ? "Select document type first"
                 : isAmountEditable()
-                  ? "Enter amount"
-                  : "0.00"
+                ? "Enter amount"
+                : "0.00"
             }
             placeholderTextColor="#B0B0B0"
             value={amount}
@@ -1445,11 +1496,11 @@ const UploadDocumentsSaved = ({ route }) => {
             <Text
               style={[
                 styles.helpText,
-                (!amount || amount.trim() === "" || parseFloat(amount) <= 0) &&
-                styles.errorText,
+                (!amount || amount.trim() === "" || parseFloat(parseAmountFromCommas(amount)) <= 0) &&
+                  styles.errorText,
               ]}
             >
-              {!amount || amount.trim() === "" || parseFloat(amount) <= 0
+              {!amount || amount.trim() === "" || parseFloat(parseAmountFromCommas(amount)) <= 0
                 ? "Amount is required and must be greater than 0 for Bill type"
                 : "Amount is required for Bill type"}
             </Text>
@@ -1560,8 +1611,8 @@ const UploadDocumentsSaved = ({ route }) => {
                           (selectedDocumentType === "O01" &&
                             (!amount ||
                               amount.trim() === "" ||
-                              parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                              parseFloat(parseAmountFromCommas(amount)) <= 0))) &&
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleBrowseFiles}
                       disabled={
@@ -1569,7 +1620,7 @@ const UploadDocumentsSaved = ({ route }) => {
                         (selectedDocumentType === "O01" &&
                           (!amount ||
                             amount.trim() === "" ||
-                            parseFloat(amount) <= 0))
+                            parseFloat(parseAmountFromCommas(amount)) <= 0))
                       }
                     >
                       <Text
@@ -1579,8 +1630,8 @@ const UploadDocumentsSaved = ({ route }) => {
                             (selectedDocumentType === "O01" &&
                               (!amount ||
                                 amount.trim() === "" ||
-                                parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                                parseFloat(parseAmountFromCommas(amount)) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Browse files
@@ -1594,8 +1645,8 @@ const UploadDocumentsSaved = ({ route }) => {
                           (selectedDocumentType === "O01" &&
                             (!amount ||
                               amount.trim() === "" ||
-                              parseFloat(amount) <= 0))) &&
-                        styles.uploadButtonDisabled,
+                              parseFloat(parseAmountFromCommas(amount)) <= 0))) &&
+                          styles.uploadButtonDisabled,
                       ]}
                       onPress={handleTakePhoto}
                       disabled={
@@ -1603,7 +1654,7 @@ const UploadDocumentsSaved = ({ route }) => {
                         (selectedDocumentType === "O01" &&
                           (!amount ||
                             amount.trim() === "" ||
-                            parseFloat(amount) <= 0))
+                            parseFloat(parseAmountFromCommas(amount)) <= 0))
                       }
                     >
                       <Text
@@ -1613,8 +1664,8 @@ const UploadDocumentsSaved = ({ route }) => {
                             (selectedDocumentType === "O01" &&
                               (!amount ||
                                 amount.trim() === "" ||
-                                parseFloat(amount) <= 0))) &&
-                          styles.uploadButtonTextDisabled,
+                                parseFloat(parseAmountFromCommas(amount)) <= 0))) &&
+                            styles.uploadButtonTextDisabled,
                         ]}
                       >
                         Take Photo
@@ -1672,7 +1723,7 @@ const UploadDocumentsSaved = ({ route }) => {
           style={[
             styles.addDocumentButton,
             (uploadedDocuments.length === 0 || isUploading) &&
-            styles.addDocumentButtonDisabled,
+              styles.addDocumentButtonDisabled,
           ]}
           onPress={handleAddDocument}
           disabled={uploadedDocuments.length === 0 || isUploading}
@@ -1681,7 +1732,7 @@ const UploadDocumentsSaved = ({ route }) => {
             style={[
               styles.addDocumentButtonText,
               (uploadedDocuments.length === 0 || isUploading) &&
-              styles.addDocumentButtonTextDisabled,
+                styles.addDocumentButtonTextDisabled,
             ]}
           >
             {isUploading ? "Uploading..." : "Upload Document"}
@@ -1749,8 +1800,7 @@ const UploadDocumentsSaved = ({ route }) => {
                 <Text style={styles.editLabel}>Document Type</Text>
                 <Text style={styles.editValue}>
                   {editDocumentType
-                    ? editDocumentType.charAt(0).toUpperCase() +
-                    editDocumentType.slice(1)
+                    ? getDocumentTypeLabel(editDocumentType)
                     : "Unknown"}
                 </Text>
               </View>
@@ -1758,7 +1808,7 @@ const UploadDocumentsSaved = ({ route }) => {
               <View style={styles.editSection}>
                 <Text style={styles.editLabel}>
                   Amount{" "}
-                  {editDocumentType === "bill" && (
+                  {editDocumentType === "O01" && (
                     <Text style={styles.requiredAsterisk}>*</Text>
                   )}
                 </Text>
@@ -1774,12 +1824,12 @@ const UploadDocumentsSaved = ({ route }) => {
                   keyboardType="decimal-pad"
                   editable={isEditAmountEditable()}
                 />
-                {editDocumentType === "prescription" ||
-                  editDocumentType === "diagnosis" ? (
+                {editDocumentType === "O02" ||
+                editDocumentType === "O03" ? (
                   <Text style={styles.editHelpText}>
-                    Amount is automatically set to 0.00 for {editDocumentType}
+                    Amount is automatically set to 0.00 for {getDocumentTypeLabel(editDocumentType)}
                   </Text>
-                ) : editDocumentType === "bill" ? (
+                ) : editDocumentType === "O01" ? (
                   <Text style={styles.editHelpText}>
                     Amount is required for Bill type
                   </Text>
