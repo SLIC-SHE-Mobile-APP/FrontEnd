@@ -8,7 +8,20 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import {Animated,BackHandler,Dimensions,Image,Modal,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
+import {
+  Animated,
+  BackHandler,
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 
 import { API_BASE_URL } from "../constants/index.js";
@@ -798,10 +811,7 @@ const UploadDocuments = ({ route }) => {
   const fetchClaimAmountFromAPI = async (claimNo) => {
     try {
       setClaimAmountLoading(true);
-      console.log(
-        "Fetching claim amount from API for claimNo:",
-        claimNo
-      );
+      console.log("Fetching claim amount from API for claimNo:", claimNo);
 
       if (!claimNo || claimNo.trim() === "") {
         console.warn("Invalid claimNo provided:", claimNo);
@@ -1271,22 +1281,48 @@ const UploadDocuments = ({ route }) => {
 
     if (documentDateRange) {
       // Check if selected date is within allowed range
+      // Convert dates to start of day for proper comparison
+      const selectedDateStart = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        currentDate.getDate()
+      );
+      const minDateStart = new Date(
+        documentDateRange.minDate.getFullYear(),
+        documentDateRange.minDate.getMonth(),
+        documentDateRange.minDate.getDate()
+      );
+      const maxDateStart = new Date(
+        documentDateRange.maxDate.getFullYear(),
+        documentDateRange.maxDate.getMonth(),
+        documentDateRange.maxDate.getDate()
+      );
+
       if (
-        currentDate < documentDateRange.minDate ||
-        currentDate > documentDateRange.maxDate
+        selectedDateStart < minDateStart ||
+        selectedDateStart > maxDateStart
       ) {
-        const formatDateForMessage = (date) => {
+        const formatDate = (date) => {
           const day = date.getDate().toString().padStart(2, "0");
           const month = (date.getMonth() + 1).toString().padStart(2, "0");
           const year = date.getFullYear();
           return `${day}/${month}/${year}`;
         };
 
+        console.log("Date validation failed:", {
+          selectedDate: formatDate(selectedDateStart),
+          minDate: formatDate(minDateStart),
+          maxDate: formatDate(maxDateStart),
+          selectedDateStart,
+          minDateStart,
+          maxDateStart,
+        });
+
         showPopup(
           "Invalid Date Selection",
-          `Please select a date between ${formatDateForMessage(
+          `Please select a date between ${formatDate(
             documentDateRange.minDate
-          )} and ${formatDateForMessage(documentDateRange.maxDate)}`,
+          )} and ${formatDate(documentDateRange.maxDate)}`,
           "warning"
         );
         return;
@@ -1761,10 +1797,7 @@ const UploadDocuments = ({ route }) => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(
-            "No patient details found for claimNo:",
-            claimNo
-          );
+          console.warn("No patient details found for claimNo:", claimNo);
           return { patient_Name: "", relationship: "", illness: "" };
         }
         throw new Error(`HTTP error! status: ${response.status}`);
