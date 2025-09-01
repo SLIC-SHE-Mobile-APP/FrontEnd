@@ -157,6 +157,7 @@ const EditClaimIntimation1 = ({ route }) => {
 
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [documentDateRange, setDocumentDateRange] = useState(null);
 
   // Document types state
   const [documentTypes, setDocumentTypes] = useState([]);
@@ -239,6 +240,126 @@ const EditClaimIntimation1 = ({ route }) => {
   const toSentenceCase = (str) => {
     if (!str) return str;
     return str.toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  };
+
+  const getPolicyEndDate = async () => {
+    try {
+      const policyData = await SecureStore.getItemAsync("selected_policy_data");
+      if (policyData) {
+        const parsedData = JSON.parse(policyData);
+        // Check both possible date fields
+        const endDate = parsedData.policyEndDate || parsedData.endDate;
+        if (endDate) {
+          return new Date(endDate);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting policy end date:", error);
+      return null;
+    }
+  };
+
+  const getDocumentDateRange = async () => {
+    try {
+      const policyEndDate = await getPolicyEndDate();
+      const currentDate = new Date();
+
+      if (!policyEndDate) {
+        // If no policy end date available, allow current date and 90 days back
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+        return {
+          minDate,
+          maxDate: currentDate,
+          isPolicyExpired: false,
+        };
+      }
+
+      const isExpired = isPolicyExpired(policyEndDate, currentDate);
+
+      if (isExpired) {
+        // Policy is expired - allow ONLY 90 days before policy end date up to policy end date
+        const maxDate = new Date(policyEndDate);
+        const minDate = new Date(policyEndDate);
+        minDate.setDate(policyEndDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: true,
+          policyEndDate,
+        };
+      } else {
+        // Policy is not expired - allow from current date to 90 days before current date
+        const maxDate = currentDate;
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: false,
+          policyEndDate,
+        };
+      }
+    } catch (error) {
+      console.error("Error calculating document date range:", error);
+      // Fallback to current date and 90 days back
+      const currentDate = new Date();
+      const minDate = new Date(currentDate);
+      minDate.setDate(currentDate.getDate() - 90);
+      return {
+        minDate,
+        maxDate,
+        isPolicyExpired: false,
+      };
+    }
+  };
+
+  const getDatePickerHelpText = () => {
+    if (!documentDateRange) return "Loading date range...";
+
+    const formatDateForDisplay = (date) => {
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    if (documentDateRange.isPolicyExpired) {
+      return `Policy expired on ${formatDateForDisplay(
+        documentDateRange.policyEndDate
+      )}. You can only select document dates within 90 days before the policy expiry date: ${formatDateForDisplay(
+        documentDateRange.minDate
+      )} to ${formatDateForDisplay(documentDateRange.maxDate)}`;
+    } else {
+      return `You can select document dates from the last 90 days: ${formatDateForDisplay(
+        documentDateRange.minDate
+      )} to ${formatDateForDisplay(documentDateRange.maxDate)}`;
+    }
+  };
+
+  // Add this useEffect to calculate date range on component mount
+  useEffect(() => {
+    const calculateDateRange = async () => {
+      const dateRange = await getDocumentDateRange();
+      setDocumentDateRange(dateRange);
+
+      console.log("Document date range calculated:", {
+        minDate: dateRange.minDate?.toDateString(),
+        maxDate: dateRange.maxDate?.toDateString(),
+        isPolicyExpired: dateRange.isPolicyExpired,
+        policyEndDate: dateRange.policyEndDate?.toDateString(),
+      });
+    };
+
+    calculateDateRange();
+  }, []);
+
+  const isPolicyExpired = (policyEndDate, currentDate = new Date()) => {
+    if (!policyEndDate) return false;
+    return currentDate > policyEndDate;
   };
 
   const getDocumentTypeLabel = (docId) => {
@@ -611,7 +732,6 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
-  // Fetch documents from API without image processing
   const fetchDocuments = async (claimNo) => {
     try {
       console.log("Fetching documents for claimNo:", claimNo);
@@ -637,18 +757,21 @@ const EditClaimIntimation1 = ({ route }) => {
       const result = await response.json();
 
       if (result.success && result.data && Array.isArray(result.data)) {
-        // Transform API data to match component structure WITH image content storage
+        // Transform API data to match component structure
         const transformedDocuments = result.data.map((doc, index) => {
+          // Fix: Check if document has an image by trying to load it
+          // Since imgContent is null in the response, assume all documents have images
+          // and let the view API determine if image exists
           return {
             id: doc.clmMemSeqNo || `doc_${index}`,
-            clmMemSeqNo: doc.clmMemSeqNo, // Keep original for delete API and image loading
+            clmMemSeqNo: doc.clmMemSeqNo,
             type: doc.docType || "Unknown",
             date: formatDate(doc.docDate),
-            amount: formatAmount(doc.docAmount), // Format amount with 2 decimal places
+            amount: formatAmount(doc.docAmount),
             imagePath: doc.imagePath || "0",
-            hasImage: doc.imgContent && doc.imgContent.length > 0,
+            hasImage: true, // Changed: Assume all documents have images and let view API handle it
             imageLoaded: false,
-            imgContent: doc.imgContent || null, // Store original image content for API calls
+            imgContent: doc.imgContent || null,
           };
         });
 
@@ -677,7 +800,6 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
-  // Load image on demand
   const loadDocumentImage = async (document) => {
     try {
       // Set loading state for this specific document
@@ -690,46 +812,167 @@ const EditClaimIntimation1 = ({ route }) => {
         {
           method: "GET",
           headers: {
-            "Content-Type": "application/json",
+            Accept: "image/*", // Changed: Specify we expect image data
           },
         }
       );
 
       if (!response.ok) {
+        // If 404 or similar, the image doesn't exist
+        if (response.status === 404) {
+          showPopup(
+            "No Image",
+            "This document doesn't have an associated image.",
+            "info"
+          );
+
+          // Update document to reflect no image available
+          setDocuments((prev) =>
+            prev.map((doc) =>
+              doc.id === document.id ? { ...doc, hasImage: false } : doc
+            )
+          );
+
+          // Clear loading state
+          setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(document.id);
+            return newMap;
+          });
+          return;
+        }
+
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Get the response as blob
-      const blob = await response.blob();
+      // Check content type to determine how to handle the response
+      const contentType = response.headers.get("content-type");
+      console.log("Response content type:", contentType);
 
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64String = reader.result;
-        setSelectedImageUri(base64String);
-        setImageModalVisible(true);
-        // Clear loading state for this document
+      if (contentType && contentType.startsWith("image/")) {
+        // Handle as binary image data
+        const blob = await response.blob();
+
+        // Convert blob to base64 using FileReader
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64String = reader.result;
+          console.log(
+            "Image loaded successfully, base64 length:",
+            base64String.length
+          );
+          setSelectedImageUri(base64String);
+          setImageModalVisible(true);
+
+          // Clear loading state
+          setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(document.id);
+            return newMap;
+          });
+        };
+        reader.onerror = (error) => {
+          console.error("FileReader error:", error);
+          showPopup("Error", "Failed to process image data", "error");
+
+          // Clear loading state
+          setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(document.id);
+            return newMap;
+          });
+        };
+        reader.readAsDataURL(blob);
+      } else if (contentType && contentType.includes("application/json")) {
+        // Handle JSON response (might contain base64 encoded image)
+        const jsonResponse = await response.json();
+        console.log("JSON response:", jsonResponse);
+
+        if (jsonResponse.imgContent) {
+          // If the response contains base64 image data
+          const base64String = jsonResponse.imgContent.startsWith("data:")
+            ? jsonResponse.imgContent
+            : `data:image/jpeg;base64,${jsonResponse.imgContent}`;
+
+          setSelectedImageUri(base64String);
+          setImageModalVisible(true);
+        } else {
+          showPopup(
+            "No Image",
+            "This document doesn't have an associated image.",
+            "info"
+          );
+
+          // Update document to reflect no image available
+          setDocuments((prev) =>
+            prev.map((doc) =>
+              doc.id === document.id ? { ...doc, hasImage: false } : doc
+            )
+          );
+        }
+
+        // Clear loading state
         setImageLoadingStates((prev) => {
           const newMap = new Map(prev);
           newMap.delete(document.id);
           return newMap;
         });
-      };
-      reader.onerror = () => {
-        console.error("Error reading image blob");
-        showPopup("Error", "Failed to load image", "error");
-        // Clear loading state for this document
+      } else {
+        // Handle as text/other response
+        const textResponse = await response.text();
+        console.log("Text response:", textResponse);
+
+        // Try to determine if it's base64 encoded image
+        if (textResponse && textResponse.length > 100) {
+          const base64String = textResponse.startsWith("data:")
+            ? textResponse
+            : `data:image/jpeg;base64,${textResponse}`;
+
+          setSelectedImageUri(base64String);
+          setImageModalVisible(true);
+        } else {
+          showPopup(
+            "No Image",
+            "This document doesn't have an associated image.",
+            "info"
+          );
+
+          // Update document to reflect no image available
+          setDocuments((prev) =>
+            prev.map((doc) =>
+              doc.id === document.id ? { ...doc, hasImage: false } : doc
+            )
+          );
+        }
+
+        // Clear loading state
         setImageLoadingStates((prev) => {
           const newMap = new Map(prev);
           newMap.delete(document.id);
           return newMap;
         });
-      };
-      reader.readAsDataURL(blob);
+      }
     } catch (error) {
       console.error("Error loading document image:", error);
-      showPopup("Error", "Failed to load image", "error");
-      // Clear loading state for this document
+
+      if (error.message.includes("404")) {
+        showPopup(
+          "No Image",
+          "This document doesn't have an associated image.",
+          "info"
+        );
+
+        // Update document to reflect no image available
+        setDocuments((prev) =>
+          prev.map((doc) =>
+            doc.id === document.id ? { ...doc, hasImage: false } : doc
+          )
+        );
+      } else {
+        showPopup("Error", `Failed to load image: ${error.message}`, "error");
+      }
+
+      // Clear loading state
       setImageLoadingStates((prev) => {
         const newMap = new Map(prev);
         newMap.delete(document.id);
@@ -797,9 +1040,7 @@ const EditClaimIntimation1 = ({ route }) => {
       );
 
       if (!claimDetails.claimNo) {
-        console.warn(
-          "No claim number available for refreshing claim amount"
-        );
+        console.warn("No claim number available for refreshing claim amount");
         return;
       }
 
@@ -964,9 +1205,7 @@ const EditClaimIntimation1 = ({ route }) => {
       }
 
       // If no route params, try to retrieve from storage (subsequent loads)
-      const storedClaimNo = await SecureStore.getItemAsync(
-        "edit_claimNo"
-      );
+      const storedClaimNo = await SecureStore.getItemAsync("edit_claimNo");
       const storedClaimType = await SecureStore.getItemAsync("edit_claimType");
       const storedCreatedOn = await SecureStore.getItemAsync("edit_createdOn");
 
@@ -1244,9 +1483,7 @@ const EditClaimIntimation1 = ({ route }) => {
               setDocumentsLoading(false);
             }
           } else {
-            console.log(
-              "No valid claim number found, skipping document fetch"
-            );
+            console.log("No valid claim number found, skipping document fetch");
           }
         }
       };
@@ -1621,9 +1858,7 @@ const EditClaimIntimation1 = ({ route }) => {
           true,
           async () => {
             // Save locally without API call as fallback
-            const claimAmount = await fetchClaimAmount(
-              claimDetails.claimNo
-            );
+            const claimAmount = await fetchClaimAmount(claimDetails.claimNo);
             const updatedBeneficiaries = beneficiaries.map((item) =>
               item.id === selectedBeneficiary.id
                 ? { ...item, ...newBeneficiary, amount: claimAmount }
@@ -1655,9 +1890,7 @@ const EditClaimIntimation1 = ({ route }) => {
           true,
           async () => {
             // Save locally without API call as fallback
-            const claimAmount = await fetchClaimAmount(
-              claimDetails.claimNo
-            );
+            const claimAmount = await fetchClaimAmount(claimDetails.claimNo);
             const updatedBeneficiaries = beneficiaries.map((item) =>
               item.id === selectedBeneficiary.id
                 ? { ...item, ...newBeneficiary, amount: claimAmount }
@@ -1739,6 +1972,57 @@ const EditClaimIntimation1 = ({ route }) => {
   const handleEditDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || editDocumentDate;
     setShowEditDatePicker(Platform.OS === "ios");
+
+    if (documentDateRange) {
+      // Check if selected date is within allowed range
+      // Convert dates to start of day for proper comparison
+      const selectedDateStart = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        currentDate.getDate()
+      );
+      const minDateStart = new Date(
+        documentDateRange.minDate.getFullYear(),
+        documentDateRange.minDate.getMonth(),
+        documentDateRange.minDate.getDate()
+      );
+      const maxDateStart = new Date(
+        documentDateRange.maxDate.getFullYear(),
+        documentDateRange.maxDate.getMonth(),
+        documentDateRange.maxDate.getDate()
+      );
+
+      if (
+        selectedDateStart < minDateStart ||
+        selectedDateStart > maxDateStart
+      ) {
+        const formatDateForDisplay = (date) => {
+          const day = date.getDate().toString().padStart(2, "0");
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+
+        console.log("Date validation failed:", {
+          selectedDate: formatDateForDisplay(selectedDateStart),
+          minDate: formatDateForDisplay(minDateStart),
+          maxDate: formatDateForDisplay(maxDateStart),
+          selectedDateStart,
+          minDateStart,
+          maxDateStart,
+        });
+
+        showPopup(
+          "Invalid Date Selection",
+          `Please select a date between ${formatDateForDisplay(
+            documentDateRange.minDate
+          )} and ${formatDateForDisplay(documentDateRange.maxDate)}`,
+          "warning"
+        );
+        return;
+      }
+    }
+
     setEditDocumentDate(currentDate);
 
     // Update newDocument date
@@ -2848,7 +3132,10 @@ const EditClaimIntimation1 = ({ route }) => {
                 <Ionicons name="calendar-outline" size={20} color="#666" />
               </TouchableOpacity>
 
-              {showEditDatePicker && (
+              {/* Help text showing allowed date range */}
+              <Text style={styles.helpText}>{getDatePickerHelpText()}</Text>
+
+              {showEditDatePicker && documentDateRange && (
                 <DateTimePicker
                   testID="editDateTimePicker"
                   value={editDocumentDate}
@@ -2856,7 +3143,8 @@ const EditClaimIntimation1 = ({ route }) => {
                   is24Hour={true}
                   display="default"
                   onChange={handleEditDateChange}
-                  maximumDate={new Date()} // Prevent future dates
+                  minimumDate={documentDateRange.minDate}
+                  maximumDate={documentDateRange.maxDate}
                 />
               )}
 
