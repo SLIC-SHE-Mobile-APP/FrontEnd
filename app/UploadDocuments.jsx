@@ -906,8 +906,8 @@ const UploadDocuments = ({ route }) => {
       const isExpired = isPolicyExpired(policyEndDate, currentDate);
 
       if (isExpired) {
-        // Policy is expired - allow from policy end date to 90 days before policy end date
-        const maxDate = policyEndDate;
+        // Policy is expired - allow ONLY 90 days before policy end date up to policy end date
+        const maxDate = new Date(policyEndDate);
         const minDate = new Date(policyEndDate);
         minDate.setDate(policyEndDate.getDate() - 90);
 
@@ -918,7 +918,7 @@ const UploadDocuments = ({ route }) => {
           policyEndDate,
         };
       } else {
-        // Policy is not expired - allow from current date to 90 days before current date
+        // Policy is not expired - allow from current date back to 90 days before current date
         const maxDate = currentDate;
         const minDate = new Date(currentDate);
         minDate.setDate(currentDate.getDate() - 90);
@@ -1635,11 +1635,11 @@ const UploadDocuments = ({ route }) => {
     if (documentDateRange.isPolicyExpired) {
       return `Policy expired on ${formatDateForHelp(
         documentDateRange.policyEndDate
-      )}. You can select dates from ${formatDateForHelp(
+      )}. You can only select document dates within 90 days before the policy expiry date: ${formatDateForHelp(
         documentDateRange.minDate
       )} to ${formatDateForHelp(documentDateRange.maxDate)}`;
     } else {
-      return `You can select dates from ${formatDateForHelp(
+      return `You can select document dates from the last 90 days: ${formatDateForHelp(
         documentDateRange.minDate
       )} to ${formatDateForHelp(documentDateRange.maxDate)}`;
     }

@@ -4,7 +4,20 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
-import {Animated,BackHandler,Dimensions,Image,Modal,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
+import {
+  Animated,
+  BackHandler,
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
@@ -794,14 +807,48 @@ const EditClaimIntimation = ({ route }) => {
 
   const formatDate = (dateString) => {
     try {
-      const date = new Date(dateString);
+      if (!dateString) {
+        return "";
+      }
+
+      // Convert to string if it's not already
+      const dateStr = dateString.toString().trim();
+
+      // If it's already in DD/MM/YYYY format, return as is
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+        return dateStr;
+      }
+
+      // If it's in DD/MM/YY format, convert to DD/MM/YYYY
+      if (/^\d{2}\/\d{2}\/\d{2}$/.test(dateStr)) {
+        const parts = dateStr.split("/");
+        const day = parts[0];
+        const month = parts[1];
+        const year = parseInt(parts[2]);
+
+        // Convert 2-digit year to 4-digit year
+        // Assume years 00-49 are 2000-2049, years 50-99 are 1950-1999
+        const fullYear = year <= 49 ? 2000 + year : 1900 + year;
+
+        return `${day}/${month}/${fullYear}`;
+      }
+
+      // For other formats, try to parse as Date object
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date format:", dateStr);
+        return dateStr; // Return original if can't parse
+      }
+
+      // Format as DD/MM/YYYY
       const day = date.getDate().toString().padStart(2, "0");
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const year = date.getFullYear();
-      return `${day}/${month}/${"20" + year}`;
+
+      return `${day}/${month}/${year}`;
     } catch (error) {
-      console.error("Error formatting date:", error);
-      return dateString;
+      console.error("Error formatting date:", error, "Input:", dateString);
+      return dateString || "";
     }
   };
 
@@ -923,10 +970,12 @@ const EditClaimIntimation = ({ route }) => {
           id: doc.clmMemSeqNo || `doc_${index}`,
           clmMemSeqNo: doc.clmMemSeqNo,
           type: doc.docType || "Unknown",
-          date: formatDate(doc.docDate),
+          date: formatDate(doc.docDate), // This will now format correctly
           amount: formatAmount(doc.docAmount),
           imagePath: doc.imagePath || "0",
-          hasImage: doc.imgContent && doc.imgContent.length > 0,
+          // FIXED: Always set hasImage to true since imgContent is null in response
+          // Let the view API determine if image actually exists
+          hasImage: true,
           imageLoaded: false,
           imgContent: doc.imgContent || null,
         }));
@@ -1182,9 +1231,7 @@ const EditClaimIntimation = ({ route }) => {
 
   const retrieveClaimDetails = async () => {
     try {
-      const storedClaimNo = await SecureStore.getItemAsync(
-        "edit_claimNo"
-      );
+      const storedClaimNo = await SecureStore.getItemAsync("edit_claimNo");
       const storedClaimType = await SecureStore.getItemAsync("edit_claimType");
       const storedCreatedOn = await SecureStore.getItemAsync("edit_createdOn");
       const storedClaimSeqNo = await SecureStore.getItemAsync(
@@ -1217,8 +1264,7 @@ const EditClaimIntimation = ({ route }) => {
       return finalClaimNo;
     } catch (error) {
       console.error("Error retrieving claim details:", error);
-      const fallbackClaimNo =
-        claimNo || claimNumber || claim?.claimNo || "";
+      const fallbackClaimNo = claimNo || claimNumber || claim?.claimNo || "";
       setClaimDetails((prev) => ({
         ...prev,
         claimNo: fallbackClaimNo,
@@ -1425,7 +1471,6 @@ const EditClaimIntimation = ({ route }) => {
   };
 
   // Initialize component
-  // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
       try {
@@ -1481,10 +1526,7 @@ const EditClaimIntimation = ({ route }) => {
                 (await SecureStore.getItemAsync("stored_claim_seq_no")) ||
                 (await SecureStore.getItemAsync("edit_claimNo"));
             } catch (error) {
-              console.error(
-                "Error getting claim number from storage:",
-                error
-              );
+              console.error("Error getting claim number from storage:", error);
             }
           }
 
@@ -2064,16 +2106,20 @@ const EditClaimIntimation = ({ route }) => {
     );
   };
 
-
   const isSubmitDisabled = () => {
     if (beneficiaries.length === 0) {
       return true;
     }
 
-    return beneficiaries.some(beneficiary => {
+    return beneficiaries.some((beneficiary) => {
       const amount = removeCommasFromAmount(beneficiary.amount);
       const numericAmount = parseFloat(amount);
-      return !amount || amount.trim() === "" || isNaN(numericAmount) || numericAmount <= 0;
+      return (
+        !amount ||
+        amount.trim() === "" ||
+        isNaN(numericAmount) ||
+        numericAmount <= 0
+      );
     });
   };
 
@@ -2105,10 +2151,7 @@ const EditClaimIntimation = ({ route }) => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(
-            "No patient details found for claimNo:",
-            claimNo
-          );
+          console.warn("No patient details found for claimNo:", claimNo);
           return { patient_Name: "", relationship: "", illness: "" };
         }
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -2199,8 +2242,8 @@ const EditClaimIntimation = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-              ? "View"
-              : "No Image"}
+            ? "View"
+            : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -2388,15 +2431,17 @@ const EditClaimIntimation = ({ route }) => {
           <TouchableOpacity
             style={[
               styles.submitButton,
-              isSubmitDisabled() && styles.submitButtonDisabled
+              isSubmitDisabled() && styles.submitButtonDisabled,
             ]}
             onPress={isSubmitDisabled() ? null : handleSubmitClaim}
             disabled={isSubmitDisabled()}
           >
-            <Text style={[
-              styles.submitButtonText,
-              isSubmitDisabled() && styles.submitButtonTextDisabled
-            ]}>
+            <Text
+              style={[
+                styles.submitButtonText,
+                isSubmitDisabled() && styles.submitButtonTextDisabled,
+              ]}
+            >
               Submit Claim
             </Text>
           </TouchableOpacity>
@@ -2493,10 +2538,10 @@ const EditClaimIntimation = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                      ? documentTypes.find(
+                    ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                      : "Select Document Type"}
+                    : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -2524,7 +2569,7 @@ const EditClaimIntimation = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                          styles.selectedDropdownOption,
+                            styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -2534,7 +2579,7 @@ const EditClaimIntimation = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                            styles.selectedDropdownOptionText,
+                              styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -2583,15 +2628,15 @@ const EditClaimIntimation = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                  !validateEditAmount(newDocument.amount, editDocumentType) &&
-                  styles.textInputError,
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
+                    styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                      ? "Enter amount"
-                      : "0.00"
+                    ? "Enter amount"
+                    : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -2611,7 +2656,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.errorText,
+                      styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -2623,7 +2668,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.errorText,
+                      styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -2654,7 +2699,7 @@ const EditClaimIntimation = ({ route }) => {
                 style={[
                   styles.saveBtn,
                   !validateEditAmount(newDocument.amount, editDocumentType) &&
-                  styles.saveBtnDisabled,
+                    styles.saveBtnDisabled,
                 ]}
                 disabled={
                   !validateEditAmount(newDocument.amount, editDocumentType)
@@ -2664,7 +2709,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.saveText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.saveTextDisabled,
+                      styles.saveTextDisabled,
                   ]}
                 >
                   Save
@@ -2724,8 +2769,8 @@ const EditClaimIntimation = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                    ? selectedMember.name
-                    : "Select Member"}
+                  ? selectedMember.name
+                  : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -2743,7 +2788,7 @@ const EditClaimIntimation = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                      styles.selectedDropdownOption,
+                        styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -2751,7 +2796,7 @@ const EditClaimIntimation = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                        styles.selectedDropdownOptionText,
+                          styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -3555,3 +3600,6 @@ const styles = StyleSheet.create({
 });
 
 export default EditClaimIntimation;
+
+
+
