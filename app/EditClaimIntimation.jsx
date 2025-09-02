@@ -186,6 +186,7 @@ const EditClaimIntimation = ({ route }) => {
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [documentDateRange, setDocumentDateRange] = useState(null);
   const [isEditBeneficiaryModalVisible, setEditBeneficiaryModalVisible] =
     useState(false);
   const [selectedBeneficiary, setSelectedBeneficiary] = useState(null);
@@ -275,6 +276,29 @@ const EditClaimIntimation = ({ route }) => {
     } finally {
       setLoadingMembers(false);
     }
+  };
+
+  const getPolicyEndDate = async () => {
+    try {
+      const policyData = await SecureStore.getItemAsync("selected_policy_data");
+      if (policyData) {
+        const parsedData = JSON.parse(policyData);
+        // Check both possible date fields
+        const endDate = parsedData.policyEndDate || parsedData.endDate;
+        if (endDate) {
+          return new Date(endDate);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting policy end date:", error);
+      return null;
+    }
+  };
+
+  const isPolicyExpired = (policyEndDate, currentDate = new Date()) => {
+    if (!policyEndDate) return false;
+    return currentDate > policyEndDate;
   };
 
   // 3. Add these functions for beneficiary editing
@@ -1358,6 +1382,30 @@ const EditClaimIntimation = ({ route }) => {
       updateLoadingState("beneficiaryData", false);
     }
   };
+
+  const getDatePickerHelpText = () => {
+    if (!documentDateRange) return "Loading date range...";
+
+    const formatDateForHelp = (date) => {
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    if (documentDateRange.isPolicyExpired) {
+      return `Policy expired on ${formatDateForHelp(
+        documentDateRange.policyEndDate
+      )}. You can only select document dates within 90 days before the policy expiry date: ${formatDateForHelp(
+        documentDateRange.minDate
+      )} to ${formatDateForHelp(documentDateRange.maxDate)}`;
+    } else {
+      return `You can select document dates from the last 90 days: ${formatDateForHelp(
+        documentDateRange.minDate
+      )} to ${formatDateForHelp(documentDateRange.maxDate)}`;
+    }
+  };
+
   const fetchEmployeeInfo = async () => {
     try {
       setLoading(true);
@@ -1398,6 +1446,22 @@ const EditClaimIntimation = ({ route }) => {
       updateLoadingState("employeeInfo", false);
     }
   };
+
+  useEffect(() => {
+    const calculateDateRange = async () => {
+      const dateRange = await getDocumentDateRange();
+      setDocumentDateRange(dateRange);
+
+      console.log("Document date range calculated:", {
+        minDate: dateRange.minDate?.toDateString(),
+        maxDate: dateRange.maxDate?.toDateString(),
+        isPolicyExpired: dateRange.isPolicyExpired,
+        policyEndDate: dateRange.policyEndDate?.toDateString(),
+      });
+    };
+
+    calculateDateRange();
+  }, []);
 
   const storeClaimDetails = async () => {
     try {
@@ -1664,6 +1728,57 @@ const EditClaimIntimation = ({ route }) => {
   const handleEditDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || editDocumentDate;
     setShowEditDatePicker(Platform.OS === "ios");
+
+    if (documentDateRange) {
+      // Check if selected date is within allowed range
+      // Convert dates to start of day for proper comparison
+      const selectedDateStart = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        currentDate.getDate()
+      );
+      const minDateStart = new Date(
+        documentDateRange.minDate.getFullYear(),
+        documentDateRange.minDate.getMonth(),
+        documentDateRange.minDate.getDate()
+      );
+      const maxDateStart = new Date(
+        documentDateRange.maxDate.getFullYear(),
+        documentDateRange.maxDate.getMonth(),
+        documentDateRange.maxDate.getDate()
+      );
+
+      if (
+        selectedDateStart < minDateStart ||
+        selectedDateStart > maxDateStart
+      ) {
+        const formatDate = (date) => {
+          const day = date.getDate().toString().padStart(2, "0");
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+
+        console.log("Date validation failed:", {
+          selectedDate: formatDate(selectedDateStart),
+          minDate: formatDate(minDateStart),
+          maxDate: formatDate(maxDateStart),
+          selectedDateStart,
+          minDateStart,
+          maxDateStart,
+        });
+
+        showPopup(
+          "Invalid Date Selection",
+          `Please select a date between ${formatDate(
+            documentDateRange.minDate
+          )} and ${formatDate(documentDateRange.maxDate)}`,
+          "warning"
+        );
+        return;
+      }
+    }
+
     setEditDocumentDate(currentDate);
 
     const formattedDate = formatDate(currentDate);
@@ -2171,6 +2286,63 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
+  const getDocumentDateRange = async () => {
+    try {
+      const policyEndDate = await getPolicyEndDate();
+      const currentDate = new Date();
+
+      if (!policyEndDate) {
+        // If no policy end date available, allow current date and 90 days back
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+        return {
+          minDate,
+          maxDate: currentDate,
+          isPolicyExpired: false,
+        };
+      }
+
+      const isExpired = isPolicyExpired(policyEndDate, currentDate);
+
+      if (isExpired) {
+        // Policy is expired - allow ONLY 90 days before policy end date up to policy end date
+        const maxDate = new Date(policyEndDate);
+        const minDate = new Date(policyEndDate);
+        minDate.setDate(policyEndDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: true,
+          policyEndDate,
+        };
+      } else {
+        // Policy is not expired - allow from current date back to 90 days before current date
+        const maxDate = currentDate;
+        const minDate = new Date(currentDate);
+        minDate.setDate(currentDate.getDate() - 90);
+
+        return {
+          minDate,
+          maxDate,
+          isPolicyExpired: false,
+          policyEndDate,
+        };
+      }
+    } catch (error) {
+      console.error("Error calculating document date range:", error);
+      // Fallback to current date and 90 days back
+      const currentDate = new Date();
+      const minDate = new Date(currentDate);
+      minDate.setDate(currentDate.getDate() - 90);
+      return {
+        minDate,
+        maxDate: currentDate,
+        isPolicyExpired: false,
+      };
+    }
+  };
+
   const handleSubmitLater = () => {
     showPopup(
       "Save Claim",
@@ -2604,7 +2776,10 @@ const EditClaimIntimation = ({ route }) => {
                 <Ionicons name="calendar-outline" size={20} color="#666" />
               </TouchableOpacity>
 
-              {showEditDatePicker && (
+              {/* Help text showing allowed date range */}
+              <Text style={styles.helpText}>{getDatePickerHelpText()}</Text>
+
+              {showEditDatePicker && documentDateRange && (
                 <DateTimePicker
                   testID="editDateTimePicker"
                   value={editDocumentDate}
@@ -2612,7 +2787,8 @@ const EditClaimIntimation = ({ route }) => {
                   is24Hour={true}
                   display="default"
                   onChange={handleEditDateChange}
-                  maximumDate={new Date()}
+                  minimumDate={documentDateRange.minDate}
+                  maximumDate={documentDateRange.maxDate}
                 />
               )}
 
@@ -3600,6 +3776,3 @@ const styles = StyleSheet.create({
 });
 
 export default EditClaimIntimation;
-
-
-
