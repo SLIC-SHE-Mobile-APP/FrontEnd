@@ -197,6 +197,7 @@ const EditClaimIntimation = ({ route }) => {
     amount: "",
   });
   const [claimAmountLoading, setClaimAmountLoading] = useState(false);
+  const [isSavingDocument, setIsSavingDocument] = useState(false);
 
   const removeCommasFromAmount = (amount) => {
     if (!amount) return "";
@@ -276,6 +277,78 @@ const EditClaimIntimation = ({ route }) => {
     } finally {
       setLoadingMembers(false);
     }
+  };
+
+  const SavingAnimation = () => {
+    const [rotateAnim] = useState(new Animated.Value(0));
+    const [pulseAnim] = useState(new Animated.Value(1));
+
+    useEffect(() => {
+      if (isSavingDocument) {
+        // Start rotating animation
+        const rotateAnimation = Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          })
+        );
+
+        // Start pulsing animation
+        const pulseAnimation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.2,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+
+        rotateAnimation.start();
+        pulseAnimation.start();
+
+        return () => {
+          rotateAnimation.stop();
+          pulseAnimation.stop();
+        };
+      }
+    }, [isSavingDocument]);
+
+    const spin = rotateAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ["0deg", "360deg"],
+    });
+
+    if (!isSavingDocument) return null;
+
+    return (
+      <View style={styles.savingOverlay}>
+        <View style={styles.savingContainer}>
+          <Animated.View
+            style={[
+              styles.savingIconContainer,
+              {
+                transform: [{ rotate: spin }, { scale: pulseAnim }],
+              },
+            ]}
+          >
+            <View style={styles.savingIconOuter}>
+              <View style={styles.savingIconInner}>
+                <Ionicons name="save-outline" size={24} color="#FFFFFF" />
+              </View>
+            </View>
+          </Animated.View>
+          <Text style={styles.savingText}>Updating Document...</Text>
+          <Text style={styles.savingSubText}>Please wait</Text>
+        </View>
+      </View>
+    );
   };
 
   const getPolicyEndDate = async () => {
@@ -1676,6 +1749,35 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
+  const parseDocumentDate = (dateString) => {
+    try {
+      if (!dateString) {
+        return new Date();
+      }
+
+      // If it's in DD/MM/YYYY format
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        const parts = dateString.split("/");
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed in Date
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month, day);
+      }
+
+      // Try to parse as regular date
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date format, using today:", dateString);
+        return new Date();
+      }
+
+      return date;
+    } catch (error) {
+      console.error("Error parsing document date:", error);
+      return new Date();
+    }
+  };
+
   const handleEditDocument = (document) => {
     setSelectedDocument(document);
 
@@ -1683,11 +1785,14 @@ const EditClaimIntimation = ({ route }) => {
       (type) => type.docDesc === document.type
     );
     setEditDocumentType(docType ? docType.docId : "");
-    setEditDocumentDate(new Date());
+
+    // Parse the existing document date and set it as default
+    const existingDate = parseDocumentDate(document.date);
+    setEditDocumentDate(existingDate);
 
     setNewDocument({
       type: document.type,
-      date: document.date,
+      date: document.date, // Keep original formatted date for display
       amount: document.amount,
     });
 
@@ -1855,10 +1960,88 @@ const EditClaimIntimation = ({ route }) => {
     return false;
   };
 
+  // Add this helper function to fetch existing image content
+  const fetchExistingImageContent = async (clmMemSeqNo) => {
+    try {
+      console.log("Fetching existing image content for:", clmMemSeqNo);
+
+      const response = await fetch(
+        `${API_BASE_URL}/ClaimDocuments/view/${clmMemSeqNo}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "image/*",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log("No existing image found for document");
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Check content type to handle response appropriately
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.startsWith("image/")) {
+        // Handle as binary image data
+        const blob = await response.blob();
+
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            // Return base64 string without data URL prefix
+            const base64 = reader.result.split(",")[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } else if (contentType && contentType.includes("application/json")) {
+        // Handle JSON response
+        const jsonResponse = await response.json();
+        if (jsonResponse.imgContent) {
+          // Remove data URL prefix if present
+          return jsonResponse.imgContent.replace(
+            /^data:image\/[a-z]+;base64,/,
+            ""
+          );
+        }
+        return null;
+      } else {
+        // Handle as text response (might be base64)
+        const textResponse = await response.text();
+        if (textResponse && textResponse.length > 100) {
+          // Remove data URL prefix if present
+          return textResponse.replace(/^data:image\/[a-z]+;base64,/, "");
+        }
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching existing image content:", error);
+      return null; // Return null if image fetch fails
+    }
+  };
+
+  // Updated updateDocumentAPI function
   const updateDocumentAPI = async (documentData) => {
     try {
+      console.log("Updating document via API:", documentData);
+
+      // Fetch existing image content before updating
+      let imageContent = null;
+      if (documentData.ClmMemSeqNo && documentData.DocSeq) {
+        const clmMemSeqNo = `${documentData.ClmMemSeqNo}-${documentData.DocSeq}`;
+        imageContent = await fetchExistingImageContent(clmMemSeqNo);
+      }
+
+      // Create FormData for multipart/form-data request
       const formData = new FormData();
 
+      // Add all fields to FormData
       formData.append("ClmSeqNo", documentData.ClmSeqNo);
       formData.append("ClmMemSeqNo", documentData.ClmMemSeqNo.toString());
       formData.append("DocSeq", documentData.DocSeq.toString());
@@ -1868,23 +2051,36 @@ const EditClaimIntimation = ({ route }) => {
       formData.append("CreatedBy", documentData.CreatedBy);
       formData.append("ImgName", documentData.ImgName);
 
-      if (documentData.ImgContent && documentData.ImgContent !== "") {
+      // Handle image content - use existing image if no new image provided
+      const finalImageContent = documentData.ImgContent || imageContent;
+
+      if (finalImageContent && finalImageContent !== "") {
         try {
-          const base64Data = documentData.ImgContent.replace(
+          // Clean base64 data (remove data URL prefix if present)
+          const cleanBase64 = finalImageContent.replace(
             /^data:image\/[a-z]+;base64,/,
             ""
           );
 
+          // Create file object compatible with React Native FormData
           const imageFile = {
-            uri: `data:image/jpeg;base64,${base64Data}`,
+            uri: `data:image/jpeg;base64,${cleanBase64}`,
             type: "image/jpeg",
             name: documentData.ImgName + ".jpg",
           };
 
           formData.append("ImgContent", imageFile);
+          console.log(
+            "Image content prepared for upload (length:",
+            cleanBase64.length,
+            ")"
+          );
         } catch (imageError) {
           console.error("Error processing image:", imageError);
+          // Continue without image if there's an error
         }
+      } else {
+        console.log("No image content available for this document");
       }
 
       const response = await fetch(
@@ -1892,20 +2088,20 @@ const EditClaimIntimation = ({ route }) => {
         {
           method: "POST",
           body: formData,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          // Remove Content-Type header to let React Native set it automatically with boundary
         }
       );
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Update Document API Error Response:", errorText);
         throw new Error(
           `HTTP error! status: ${response.status}, message: ${errorText}`
         );
       }
 
       const result = await response.json();
+      console.log("Update document API response:", result);
       return result;
     } catch (error) {
       console.error("Error updating document via API:", error);
@@ -1931,6 +2127,9 @@ const EditClaimIntimation = ({ route }) => {
 
   const handleSaveDocumentEdit = async () => {
     try {
+      // Start loading animation
+      setIsSavingDocument(true);
+
       if (!editDocumentType) {
         showPopup(
           "Validation Error",
@@ -1992,6 +2191,7 @@ const EditClaimIntimation = ({ route }) => {
         ImgName: `${claimDetails.claimNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
       };
 
+      // Call API (this is where the loading animation is most important)
       await updateDocumentAPI(updateDocumentData);
 
       const updatedDocument = {
@@ -2068,6 +2268,9 @@ const EditClaimIntimation = ({ route }) => {
           }
         );
       }
+    } finally {
+      // Always stop loading animation, whether success or error
+      setIsSavingDocument(false);
     }
   };
 
@@ -2682,7 +2885,9 @@ const EditClaimIntimation = ({ route }) => {
         visible={isEditDocumentModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setEditDocumentModalVisible(false)}
+        onRequestClose={() =>
+          !isSavingDocument && setEditDocumentModalVisible(false)
+        }
       >
         <View style={styles.modalOverlay}>
           <View style={styles.documentModalContent}>
@@ -2690,6 +2895,7 @@ const EditClaimIntimation = ({ route }) => {
               contentContainerStyle={styles.documentModalScrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={!isSavingDocument}
             >
               <Text style={styles.modalTitle}>Edit Document</Text>
 
@@ -2866,32 +3072,64 @@ const EditClaimIntimation = ({ route }) => {
                   setEditDocumentType("");
                   setEditDocumentDate(new Date());
                 }}
-                style={styles.cancelBtn}
+                style={[styles.cancelBtn, isSavingDocument && { opacity: 0.5 }]}
+                disabled={isSavingDocument}
               >
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text
+                  style={[
+                    styles.cancelText,
+                    isSavingDocument && { color: "#999" },
+                  ]}
+                >
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveDocumentEdit}
                 style={[
                   styles.saveBtn,
-                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  (!validateEditAmount(newDocument.amount, editDocumentType) ||
+                    isSavingDocument) &&
                     styles.saveBtnDisabled,
                 ]}
                 disabled={
-                  !validateEditAmount(newDocument.amount, editDocumentType)
+                  !validateEditAmount(newDocument.amount, editDocumentType) ||
+                  isSavingDocument
                 }
               >
-                <Text
-                  style={[
-                    styles.saveText,
-                    !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.saveTextDisabled,
-                  ]}
-                >
-                  Save
-                </Text>
+                {isSavingDocument ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Animated.View style={{ marginRight: 8 }}>
+                      <Ionicons
+                        name="reload-outline"
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                    </Animated.View>
+                    <Text style={styles.saveText}>Saving...</Text>
+                  </View>
+                ) : (
+                  <Text
+                    style={[
+                      styles.saveText,
+                      !validateEditAmount(
+                        newDocument.amount,
+                        editDocumentType
+                      ) && styles.saveTextDisabled,
+                    ]}
+                  >
+                    Save
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
+            <SavingAnimation />
           </View>
         </View>
       </Modal>
@@ -3772,6 +4010,80 @@ const styles = StyleSheet.create({
   },
   submitButtonTextDisabled: {
     color: "#666",
+  },
+  savingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(46, 125, 125, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  savingContainer: {
+    backgroundColor: "#FFFFFF",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    minWidth: 200,
+    elevation: 10,
+    shadowColor: "#2E7D7D",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    borderWidth: 1,
+    borderColor: "#E0F2F2",
+  },
+  savingIconContainer: {
+    marginBottom: 20,
+  },
+  savingIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#2E7D7D",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#2E7D7D",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  savingIconInner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#4A9B9B",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  savingText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#2E7D7D",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  savingSubText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+  saveBtnDisabled: {
+    backgroundColor: "#cccccc",
+    opacity: 0.6,
+  },
+  saveTextDisabled: {
+    color: "#999999",
   },
 });
 

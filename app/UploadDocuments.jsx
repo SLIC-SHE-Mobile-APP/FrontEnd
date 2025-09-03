@@ -8,20 +8,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import {
-  Animated,
-  BackHandler,
-  Dimensions,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import {Animated,BackHandler,Dimensions,Image,Modal,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 
 import { API_BASE_URL } from "../constants/index.js";
@@ -239,7 +226,7 @@ const CustomPopup = ({
                     : styles.popupOkButtonText,
                 ]}
               >
-                {showConfirmButton ? "No" : "Ok"}
+                {showConfirmButton ? "No" : "OK"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -2444,7 +2431,7 @@ const UploadDocuments = ({ route }) => {
                       ]}
                     >
                       {type.label}
-                      {isDisabled && " (Not Available)"}
+                      {isDisabled}
                     </Text>
                   </View>
                 </TouchableOpacity>
