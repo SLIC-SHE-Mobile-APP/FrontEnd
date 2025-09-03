@@ -2,13 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState, useRef } from "react";
 import * as ImageManipulator from "expo-image-manipulator";
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Dimensions,
   Image,
   Modal,
@@ -267,6 +268,29 @@ const PendingRequirement1 = () => {
     showConfirmButton: false,
     onConfirm: null,
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Check if we can go back in router
+        if (router.canGoBack()) {
+          router.back();
+          return true; // Prevent default behavior
+        }
+
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [])
+  );
 
   // Get requirement data from route params
   const params = useLocalSearchParams();
@@ -1089,9 +1113,14 @@ const PendingRequirement1 = () => {
     setIsDropdownOpen(false);
   };
 
-  const handleClose = () => {
-    router.back();
-  };
+  const handleClose = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Navigate to home screen or handle gracefully
+      router.replace("/(tabs)/home"); // Replace with your actual home route
+    }
+  }, []);
 
   const allowedFormats = ["JPG", "JPEG", "TIFF", "PNG"];
 
