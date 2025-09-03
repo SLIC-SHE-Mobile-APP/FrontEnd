@@ -521,11 +521,8 @@ function LoginRequestOTPContent() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.welcomeCard}>
-            <Text style={styles.welcomeText}>Welcome To</Text>
-            <View style={styles.sheDigitalBadge}>
-              <Text style={styles.sheDigitalText}>SHE Digital</Text>
-            </View>
+          <View style={styles.titleCard}>
+            <Text style={styles.titleText}>Surgical And Hospitalization Expenses</Text>
           </View>
 
           <View style={styles.formSection}>
@@ -721,35 +718,21 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
   },
-  welcomeCard: {
+  titleCard: {
     padding: 20,
     alignItems: "center",
     marginBottom: 20,
   },
-  welcomeText: {
-    fontSize: 25,
-    color: "#13646D",
-    marginBottom: 10,
-    fontWeight: "500",
-  },
-  sheDigitalBadge: {
-    width: 192,
-    height: 44,
-    backgroundColor: "transparent", 
-    borderWidth: 2, 
-    borderColor: "#FF4757", 
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderTopRightRadius: 15,
-    borderBottomLeftRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sheDigitalText: {
-    color: "#FF4757", 
-    fontSize: 18,
-    fontWeight: "500", 
+  titleText: {
+    fontSize: 20,
+    color: "#17ABB7",
+    fontWeight: "600",
     textAlign: "center",
+    borderWidth: 2,
+    borderColor: "#17ABB7",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   logInText: {
     fontSize: 18,
