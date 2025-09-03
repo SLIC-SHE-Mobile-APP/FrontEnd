@@ -71,7 +71,7 @@ const LoadingIcon = () => {
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ["0deg", "360deg"],
   });
 
   return (
@@ -93,7 +93,9 @@ const LoadingIcon = () => {
 };
 
 // Loading Screen Component with Custom Icon
-const LoadingScreen = ({ loadingMessage = "Loading Pending requirement data..." }) => (
+const LoadingScreen = ({
+  loadingMessage = "Loading Pending requirement data...",
+}) => (
   <View style={styles.loadingOverlay}>
     <View style={styles.loadingContainer}>
       <LoadingIcon />
@@ -236,7 +238,9 @@ const PendingRequirement1 = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true); // Start with loading true
   const [initialDataLoaded, setInitialDataLoaded] = useState(false); // Track if initial data is loaded
-  const [loadingMessage, setLoadingMessage] = useState("Loading requirement data...");
+  const [loadingMessage, setLoadingMessage] = useState(
+    "Loading requirement data..."
+  );
   const [requirementData, setRequirementData] = useState({
     claimNumber: "G/010/12334/525",
     requiredDocuments: ["Prescription"],
@@ -389,7 +393,7 @@ const PendingRequirement1 = () => {
 
         setRequirementData((prevData) => ({ ...prevData, ...paramsData }));
       }
-      
+
       setInitialDataLoaded(true);
     } catch (error) {
       logWithTimestamp("=== DATA LOAD ERROR ===", error);
@@ -403,7 +407,7 @@ const PendingRequirement1 = () => {
     try {
       setLoadingMessage("Loading pending documents...");
       setLoadingDocuments(true);
-      
+
       const cacheBuster = Date.now();
       const response = await fetch(
         `${API_BASE_URL}/UploadDocumentRespo/pending-documents?polNo=${encodeURIComponent(
@@ -583,7 +587,7 @@ const PendingRequirement1 = () => {
     try {
       setLoading(true);
       setLoadingMessage("Processing document...");
-      
+
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/jpeg", "image/jpg", "image/png", "image/tiff"],
         copyToCacheDirectory: false,
@@ -660,7 +664,7 @@ const PendingRequirement1 = () => {
     try {
       setLoading(true);
       setLoadingMessage("Processing photo...");
-      
+
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
       if (status !== "granted") {
@@ -857,18 +861,29 @@ const PendingRequirement1 = () => {
           );
           const failedSubmissions = results.filter((result) => !result.success);
 
+          setLoading(false);
+
           if (failedSubmissions.length === 0) {
             await fetchPendingDocuments();
+
+            // Show success popup but handle navigation differently
             showPopup(
               "Success",
               `All ${successfulSubmissions.length} document type(s) submitted successfully!`,
               "success",
               false,
-              () => {
-                hidePopup();
-                handleClose();
-              }
+              null // Don't pass onConfirm here
             );
+
+            // Set up a delayed navigation that will happen when the popup is closed
+            // The key is to wait for the popup state to fully reset
+            setTimeout(() => {
+              hidePopup(); // Ensure popup is hidden
+              setTimeout(() => {
+                console.log("Navigating to home page...");
+                router.push("/home");
+              }, 100); // Small delay after hiding popup
+            }, 2000); // Show success message for 2 seconds
           } else {
             const failedDocCodes = failedSubmissions
               .map((f) => f.docCode)
@@ -881,15 +896,151 @@ const PendingRequirement1 = () => {
             await fetchPendingDocuments();
           }
         } catch (error) {
+          setLoading(false);
           showPopup(
             "Error",
             "Failed to submit documents. Please check your connection and try again.",
             "error"
           );
-        } finally {
-          setLoading(false);
         }
       }
+    );
+  };
+
+  // Alternative approach: Modify the CustomPopup component to handle navigation
+  // Update the CustomPopup component's OK button behavior
+  const CustomPopupWithNavigation = ({
+    visible,
+    title,
+    message,
+    type = "info",
+    onClose,
+    onConfirm,
+    showConfirmButton = false,
+    navigateToHome = false, // New prop
+  }) => {
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+    useEffect(() => {
+      if (visible) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            tension: 100,
+            friction: 8,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 0.3,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }, [visible]);
+
+    const getIconAndColor = () => {
+      switch (type) {
+        case "success":
+          return { icon: "✓", color: "#4CAF50", bgColor: "#E8F5E8" };
+        case "error":
+          return { icon: "✕", color: "#F44336", bgColor: "#FFEBEE" };
+        case "warning":
+          return { icon: "⚠", color: "#FF9800", bgColor: "#FFF3E0" };
+        default:
+          return { icon: "ℹ", color: "#2196F3", bgColor: "#E3F2FD" };
+      }
+    };
+
+    const { icon, color, bgColor } = getIconAndColor();
+
+    const handleOkPress = () => {
+      onClose();
+      if (navigateToHome) {
+        setTimeout(() => {
+          router.push("/home");
+        }, 300);
+      }
+    };
+
+    if (!visible) return null;
+
+    return (
+      <Modal
+        transparent
+        visible={visible}
+        animationType="none"
+        statusBarTranslucent={true}
+      >
+        <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={navigateToHome ? handleOkPress : onClose}
+          />
+          <Animated.View
+            style={[
+              styles.popupContainer,
+              {
+                transform: [{ scale: scaleAnim }],
+              },
+            ]}
+          >
+            <View
+              style={[styles.popupIconContainer, { backgroundColor: bgColor }]}
+            >
+              <Text style={[styles.popupIcon, { color }]}>{icon}</Text>
+            </View>
+
+            {title && <Text style={styles.popupTitle}>{title}</Text>}
+            <Text style={styles.popupMessage}>{message}</Text>
+
+            <View style={styles.popupButtonContainer}>
+              {showConfirmButton && (
+                <TouchableOpacity
+                  style={[styles.popupButton, styles.popupConfirmButton]}
+                  onPress={onConfirm}
+                >
+                  <Text style={styles.popupConfirmButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.popupButton,
+                  showConfirmButton
+                    ? styles.popupCancelButton
+                    : styles.popupOkButton,
+                ]}
+                onPress={navigateToHome ? handleOkPress : onClose}
+              >
+                <Text
+                  style={[
+                    showConfirmButton
+                      ? styles.popupCancelButtonText
+                      : styles.popupOkButtonText,
+                  ]}
+                >
+                  {showConfirmButton ? "Cancel" : "OK"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     );
   };
 
@@ -970,13 +1121,17 @@ const PendingRequirement1 = () => {
     const initializeData = async () => {
       await loadRequirementData();
     };
-    
+
     initializeData();
   }, []);
 
   // Effect to fetch pending documents after requirement data is loaded
   useEffect(() => {
-    if (initialDataLoaded && requirementData.polNo && requirementData.claimNumber) {
+    if (
+      initialDataLoaded &&
+      requirementData.polNo &&
+      requirementData.claimNumber
+    ) {
       fetchPendingDocuments();
     }
   }, [initialDataLoaded, requirementData.polNo, requirementData.claimNumber]);
@@ -1286,7 +1441,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 50,
+    marginTop: 30,
     paddingBottom: 10,
     paddingHorizontal: 20,
   },
@@ -1298,7 +1453,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "800",
     color: "#13646D",
     textAlign: "center",
     flex: 1,
