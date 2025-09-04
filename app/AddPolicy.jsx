@@ -1,19 +1,18 @@
-import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Modal,
-  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -482,7 +481,7 @@ const AddPolicy = () => {
         showPopup(
           "Policy Not Found",
           result.message ||
-            "The policy number you entered could not be found in our system. Please verify the policy number and try again.",
+          "The policy number you entered could not be found in our system. Please verify the policy number and try again.",
           "error"
         );
       }
@@ -615,24 +614,130 @@ const AddPolicy = () => {
     }
   };
 
+  const handleDeletePolicy = async (policyToDelete) => {
+    showPopup(
+      "Delete Policy",
+      `Are you sure you want to delete policy ${policyToDelete.policyNumber}?`,
+      "warning",
+      true, // showConfirmButton
+      async () => {
+        try {
+          setLoading(true);
+
+          // Call the API to delete the policy
+          const response = await fetch(
+            `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                policyNumber: policyToDelete.policyNumber,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          // Check if the response has content before parsing
+          const responseText = await response.text();
+          let result = null;
+          if (responseText && responseText.trim() !== "") {
+            try {
+              result = JSON.parse(responseText);
+            } catch (parseError) {
+              console.log("Response is not JSON, treating as successful");
+            }
+          }
+
+          // Remove from policy list
+          const updatedPolicies = policyList.filter(policy => policy.id !== policyToDelete.id);
+          setPolicyList(updatedPolicies);
+
+          // Add to deleted policies list
+          setDeletedPolicies(prev => [...prev, policyToDelete.policyNumber]);
+
+          // Check if the deleted policy was currently selected and clear if needed
+          try {
+            const selectedPolicyNumber = await SecureStore.getItemAsync("selected_policy_number");
+            if (selectedPolicyNumber === policyToDelete.policyNumber) {
+              // Clear stored policy data
+              await SecureStore.deleteItemAsync("selected_policy_number");
+              await SecureStore.deleteItemAsync("selected_member_number");
+              await SecureStore.deleteItemAsync("selected_policy_id");
+              await SecureStore.deleteItemAsync("selected_policy_period");
+              await SecureStore.deleteItemAsync("selected_policy_type");
+              await SecureStore.deleteItemAsync("selected_policy_data");
+              console.log("Cleared stored policy data for deleted policy");
+            }
+          } catch (error) {
+            console.error("Error clearing stored policy data:", error);
+          }
+
+          // Hide the confirmation popup
+          hidePopup();
+
+          // Show success message
+          showPopup(
+            "Policy Deleted",
+            `Policy ${policyToDelete.policyNumber} has been successfully deleted.`,
+            "success"
+          );
+
+        } catch (error) {
+          console.error("Error deleting policy:", error);
+          hidePopup();
+          showPopup(
+            "Delete Error",
+            "Failed to delete policy. Please check your connection and try again.",
+            "error"
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
+  };
+
+
   const renderPolicyItem = ({ item }) => (
     <TouchableOpacity
       style={styles.policyCard}
       onPress={() => handlePolicySelect(item)}
       activeOpacity={0.7}
     >
-      <View style={styles.row}>
-        <Text style={styles.label}>Policy Number :</Text>
-        <Text style={styles.value}>{item.policyNumber}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Member Number :</Text>
-        <Text style={styles.value}>{item.memberId}</Text>
-      </View>
-      {/* Add a visual indicator that items are clickable */}
-      <View style={styles.clickIndicator}>
-        <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
-        <Icon name="arrow-right" size={16} color="#FFFFFF" />
+      <View style={styles.policyCardContent}>
+        {/* Delete Button - moved to top right */}
+        <TouchableOpacity
+          style={styles.deleteButtonTopRight}
+          onPress={(e) => {
+            e.stopPropagation(); // Prevent triggering the card's onPress
+            handleDeletePolicy(item);
+          }}
+          activeOpacity={0.7}
+        >
+          <Icon name="trash" size={16} color="#FF4444" />
+        </TouchableOpacity>
+
+        <View style={styles.policyInfo}>
+          <View style={styles.row}>
+            <Text style={styles.label}>Policy Number :</Text>
+            <Text style={styles.value}>{item.policyNumber}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Member Number :</Text>
+            <Text style={styles.value}>{item.memberId}</Text>
+          </View>
+          {/* Add a visual indicator that items are clickable */}
+          <View style={styles.clickIndicator}>
+            <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
+            <Icon name="arrow-right" size={16} color="#FFFFFF" />
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -750,8 +855,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 0,
-    paddingLeft:20,
-    paddingRight:20,
+    paddingLeft: 20,
+    paddingRight: 20,
   },
   // Custom Loading Styles
   loadingOverlay: {
@@ -1046,5 +1151,51 @@ const styles = StyleSheet.create({
     color: "#05445E",
     fontWeight: "bold",
     // marginLeft: 15,
+  },
+
+  policyCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  policyInfo: {
+    flex: 1,
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 8,
+    marginLeft: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  }, deleteButtonTopRight: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 1,
+  },
+  policyCardContent: {
+    position: 'relative',
+    paddingRight: 50,
+  },
+  policyInfo: {
+    flex: 1,
   },
 });
