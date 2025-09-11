@@ -215,6 +215,29 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     setSelectedClaim(null);
   };
 
+  const formatDateToDDMMYYYY = (dateString) => {
+    if (!dateString) return null;
+    
+    try {
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+      
+      // Extract day, month, year
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0'); // +1 because getMonth() is 0-indexed
+      const year = date.getFullYear();
+      
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return null;
+    }
+  };
+
   const handleRetry = () => {
     if (policyNo && policyNo !== "Not Available" && memberNo && memberNo !== "Not Available") {
       setLoading(true);
@@ -275,7 +298,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
                           value === "" || 
                           value === null || 
                           value === undefined;
-
+  
     if (isDataMissing) {
       return (
         <View style={styles.missingDataContainer}>
@@ -283,13 +306,14 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         </View>
       );
     }
-
-    // Handle date formatting
-    if (fieldName === 'Submission Date' && value) {
-      try {
-        const formattedDate = new Date(value).toLocaleDateString();
+  
+    // Handle date formatting for any date field
+    if ((fieldName === 'Submission Date' || fieldName === 'Last Edit on') && value) {
+      const formattedDate = formatDateToDDMMYYYY(value);
+      
+      if (formattedDate) {
         return <Text style={styles.fieldValue}>{formattedDate}</Text>;
-      } catch (error) {
+      } else {
         return (
           <View style={styles.missingDataContainer}>
             <Ionicons name="information-circle-outline" size={14} color="#00ADBB" />
@@ -298,7 +322,7 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
         );
       }
     }
-
+  
     return <Text style={[styles.fieldValue, fieldName === 'Status' && { color: getStatusColor(value) }]}>{value}</Text>;
   };
 
