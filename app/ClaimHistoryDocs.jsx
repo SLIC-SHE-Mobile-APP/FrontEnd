@@ -23,6 +23,7 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [imageLoadingStates, setImageLoadingStates] = useState(new Map());
 
   // Add ref to track component mounting state
   const isMountedRef = useRef(true);
@@ -174,53 +175,128 @@ const ClaimHistoryDocs = ({ onClose, claimData }) => {
     setSelectedImage(null);
   }, []);
 
+  const loadDocumentImage = async (document) => {
+    try {
+      // Set loading state for this specific document
+      setImageLoadingStates((prev) => new Map(prev.set(document.clmSeqNo, true)));
+
+      console.log("Loading image for document:", document.clmSeqNo);
+
+      let imageSource;
+      if (document.imagePath !== "0") {
+        imageSource = { uri: document.imagePath };
+      } else if (document.imgContent) {
+        imageSource = { uri: `data:image/png;base64,${document.imgContent}` };
+      } else {
+        // No image available
+        setImageLoadingStates((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(document.clmSeqNo);
+          return newMap;
+        });
+        alert("This document doesn't have an associated image.");
+        return;
+      }
+
+      // Set the selected image and show modal
+      setSelectedImage({
+        source: imageSource,
+        description: `${document.docType} - Claim No: ${document.clmSeqNo}`,
+        docType: document.docType,
+        claimNo: document.clmSeqNo,
+        amount: document.docAmount,
+      });
+      setIsImageModalVisible(true);
+
+      // Clear loading state
+      setImageLoadingStates((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(document.clmSeqNo);
+        return newMap;
+      });
+
+    } catch (error) {
+      console.error("Error loading document image:", error);
+
+      // Clear loading state
+      setImageLoadingStates((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(document.clmSeqNo);
+        return newMap;
+      });
+
+      alert(`Failed to load image: ${error.message}`);
+    }
+  };
+
   // Memoized document card to prevent unnecessary re-renders
-  const renderDocumentCard = useCallback((document, index) => (
-    <View key={index} style={styles.documentCard}>
-      <TouchableOpacity
-        onPress={() => openImageModal(document)}
-        style={styles.iconContainer}
-        activeOpacity={0.8}
-      >
-        {document.imagePath !== "0" ? (
-          <Image
-            source={{ uri: document.imagePath }}
-            style={styles.documentIcon}
-            resizeMode="contain"
-          />
-        ) : (
-          <Image
-            source={{ uri: `data:image/png;base64,${document.imgContent}` }}
-            style={styles.documentIcon}
-            resizeMode="contain"
-          />
-        )}
-        <View style={styles.expandOverlay}>
-          <Ionicons name="expand-outline" size={16} color="#fff" />
-        </View>
-      </TouchableOpacity>
+  const renderDocumentCard = useCallback((document, index) => {
+    const isLoadingThisImage = imageLoadingStates.get(document.clmSeqNo) || false;
 
-      <View style={styles.documentContent}>
-        <View style={styles.documentRow}>
-          <Text style={styles.documentLabel}>Document Type</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.docType}</Text>
-        </View>
+    return (
+      <View key={index} style={styles.documentCard}>
+        {/* Image icon container - matching EditClaimIntimation1 style */}
+        <TouchableOpacity
+          style={styles.documentImageIconContainer}
+          onPress={() => {
+            if (document.imagePath !== "0" || document.imgContent) {
+              loadDocumentImage(document);
+            } else {
+              // Handle no image case
+              alert("This document doesn't have an associated image.");
+            }
+          }}
+          disabled={isLoadingThisImage}
+        >
+          <View
+            style={[
+              styles.imageIconWrapper,
+              { backgroundColor: (document.imagePath !== "0" || document.imgContent) ? "#4DD0E1" : "#E0E0E0" },
+            ]}
+          >
+            {isLoadingThisImage ? (
+              <Animated.View style={{ transform: [{ rotate: "45deg" }] }}>
+                <Ionicons name="refresh" size={20} color="#FFFFFF" />
+              </Animated.View>
+            ) : (
+              <Ionicons
+                name={(document.imagePath !== "0" || document.imgContent) ? "image" : "document-outline"}
+                size={20}
+                color={(document.imagePath !== "0" || document.imgContent) ? "#FFFFFF" : "#999"}
+              />
+            )}
+          </View>
+          <Text style={styles.imageIconText}>
+            {isLoadingThisImage
+              ? "Loading..."
+              : (document.imagePath !== "0" || document.imgContent)
+                ? "View"
+                : "No Image"}
+          </Text>
+        </TouchableOpacity>
 
-        <View style={styles.documentRow}>
-          <Text style={styles.documentLabel}>Claim No</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.clmSeqNo}</Text>
-        </View>
+        <View style={styles.documentContent}>
+          <View style={styles.documentRow}>
+            <Text style={styles.documentLabel}>Document Type</Text>
+            <Text style={styles.separator}>:</Text>
+            <Text style={styles.documentValue}>{document.docType}</Text>
+          </View>
 
-        <View style={styles.documentRow}>
-          <Text style={styles.documentLabel}>Amount</Text>
-          <Text style={styles.separator}>:</Text>
-          <Text style={styles.documentValue}>{document.docAmount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</Text>
+          <View style={styles.documentRow}>
+            <Text style={styles.documentLabel}>Claim No</Text>
+            <Text style={styles.separator}>:</Text>
+            <Text style={styles.documentValue}>{document.clmSeqNo}</Text>
+          </View>
+
+          <View style={styles.documentRow}>
+            <Text style={styles.documentLabel}>Amount</Text>
+            <Text style={styles.separator}>:</Text>
+            <Text style={styles.documentValue}>{document.docAmount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</Text>
+          </View>
         </View>
       </View>
-    </View>
-  ), [openImageModal]);
+    );
+  }, [imageLoadingStates]);
 
   // Memoize documents list to prevent re-renders
   const documentsList = useMemo(() => {
@@ -525,6 +601,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#ccc",
     textAlign: "center",
+  }, documentImageIconContainer: {
+    width: 50,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    marginRight: 10,
+  },
+  imageIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  imageIconText: {
+    fontSize: 10,
+    color: "#666",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+
+  // Update existing documentCard style:
+  documentCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
+    marginBottom: 15,
+    padding: 16,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    minHeight: 110, // Add minimum height
+  },
+
+  // Update documentContent to have proper spacing:
+  documentContent: {
+    flex: 1,
+    paddingTop: 5,
   },
 });
 

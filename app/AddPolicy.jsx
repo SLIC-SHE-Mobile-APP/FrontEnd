@@ -1,18 +1,18 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useRef, useState } from "react";
+import React, { Profiler, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
+  Animated, BackHandler, Dimensions,
   FlatList,
   Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -278,6 +278,36 @@ const AddPolicy = () => {
 
     initializeData();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Disable hardware back button if no policies exist
+        if (policyList.length === 0) {
+          showPopup(
+            "No Policies Available",
+            "You must have at least one policy to navigate back. Please add a policy first.",
+            "warning"
+          );
+          return true; // Prevent default behavior
+        }
+
+        // Check if we can go back in router
+        if (router.canGoBack()) {
+          router.back();
+          return true; // Prevent default behavior
+        }
+
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [router, policyList.length])
+  );
 
   const loadRemovedPolicies = async () => {
     try {
@@ -704,6 +734,25 @@ const AddPolicy = () => {
   };
 
 
+  const handleBackPress = React.useCallback(() => {
+    // Disable back button if no policies exist
+    if (policyList.length === 0) {
+      showPopup(
+        "No Policies Available",
+        "You must have at least one policy to navigate back. Please add a policy first.",
+        "warning"
+      );
+      return;
+    }
+
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/home");
+    }
+  }, [router, policyList.length]);
+
+
   const renderPolicyItem = ({ item }) => (
     <TouchableOpacity
       style={styles.policyCard}
@@ -767,12 +816,20 @@ const AddPolicy = () => {
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
       <View style={styles.container}>
         <View style={styles.header}>
-          {/* <TouchableOpacity
-            onPress={() => navigateToHomeWithRefresh(true)}
-            style={styles.backButton}
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={[
+              styles.backButton,
+              policyList.length === 0 && styles.backButtonDisabled
+            ]}
+            disabled={policyList.length === 0}
           >
-            <Ionicons name="arrow-back" size={24} color="#05445E" />
-          </TouchableOpacity> */}
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={policyList.length === 0 ? "#CCCCCC" : "#05445E"}
+            />
+          </TouchableOpacity>
           <Text style={styles.title}>Manage Policy</Text>
         </View>
         {deletedPolicies.length > 0 && (
@@ -808,9 +865,12 @@ const AddPolicy = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.addButton, loading && styles.buttonDisabled]}
+          style={[
+            styles.addButton,
+            (loading || !policyNumber.trim()) && styles.buttonDisabled
+          ]}
           onPress={handleAddPolicy}
-          disabled={loading}
+          disabled={loading || !policyNumber.trim()}
         >
           <Text style={styles.addButtonText}>
             {loading ? "Adding..." : "Add Policy"}
@@ -1198,4 +1258,25 @@ const styles = StyleSheet.create({
   policyInfo: {
     flex: 1,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 30,
+  },
+  backButton: {
+    padding: 5,
+    marginRight: 15,
+  },
+  title: {
+    fontSize: 20,
+    color: "#05445E",
+    fontWeight: "bold",
+    flex: 1,
+  },
+  backButtonDisabled: {
+    opacity: 0.5,
+  },
 });
+
+
