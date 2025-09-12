@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import {Alert,Animated,BackHandler,Dimensions,Image,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
+import { Alert, Animated, BackHandler, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, } from "react-native";
 
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -50,6 +50,7 @@ export default function PolicyHome({ route }) {
   const [isFromAddPolicy, setIsFromAddPolicy] = useState(false);
   const [isPolicyExpiredBeyondGrace, setIsPolicyExpiredBeyondGrace] =
     useState(false);
+  const [membersCached, setMembersCached] = useState(false);
 
   // Add new loading state for policy selection
   const [isLoadingPolicySelection, setIsLoadingPolicySelection] =
@@ -256,7 +257,8 @@ export default function PolicyHome({ route }) {
         console.log("Members not found (404), disabling dropdown");
         setMembers([]);
         setMembersCount(0);
-        setIsDropdownDisabled(true); // Add this state variable
+        setIsDropdownDisabled(true);
+        setMembersCached(true); // Cache the empty result
         return;
       }
 
@@ -277,7 +279,8 @@ export default function PolicyHome({ route }) {
       }));
 
       setMembers(transformedMembers);
-      setIsDropdownDisabled(false); // Enable dropdown when data is available
+      setIsDropdownDisabled(false);
+      setMembersCached(true); // Set cache flag after successful fetch
 
       // Check if there's a stored member name and restore selection
       const storedMemberName = await SecureStore.getItemAsync(
@@ -297,6 +300,7 @@ export default function PolicyHome({ route }) {
       // Set empty members array on error and disable dropdown
       setMembers([]);
       setIsDropdownDisabled(true);
+      setMembersCached(true); // Cache the error state
     } finally {
       setIsLoadingMembers(false);
     }
@@ -602,10 +606,18 @@ export default function PolicyHome({ route }) {
           return; // Exit early, don't show modal
         }
 
-        // Show modal for first-time users or when no policy is selected
+        // NEW LOGIC: Auto-select if only one policy exists
+        if (transformedPolicies.length === 1 && !storedPolicyNumber) {
+          console.log("Only one policy found, auto-selecting it");
+          const singlePolicy = transformedPolicies[0];
+          await handlePolicySelection(singlePolicy);
+          return; // Exit early after auto-selection
+        }
+
+        // Show modal for first-time users or when no policy is selected (multiple policies)
         const shouldShowModal =
           !selectedPolicyNumber &&
-          transformedPolicies.length > 0 &&
+          transformedPolicies.length > 1 && // Changed from > 0 to > 1
           isFirstTime &&
           !(await SecureStore.getItemAsync("policy_selected_in_add_policy"));
 
@@ -785,6 +797,7 @@ export default function PolicyHome({ route }) {
       setEmployeeInfo(null);
       setPolicyInfo(null);
       setShowMemberDropdown(false);
+      setMembersCached(false); // Reset cache flag
 
       // Clear any stored member data
       await SecureStore.deleteItemAsync("selected_member_name");
@@ -796,13 +809,15 @@ export default function PolicyHome({ route }) {
     }
   };
 
+
   const refreshMembersData = async () => {
     try {
       const count = await fetchMembersCount();
       setMembersCount(count);
 
-      // Don't automatically fetch all members - only fetch when dropdown is opened
-      // This maintains the existing behavior
+      // Reset cache flag to force fresh fetch on next dropdown open
+      setMembersCached(false);
+
       console.log("Members count refreshed:", count);
     } catch (error) {
       console.error("Error refreshing members data:", error);
@@ -1142,9 +1157,10 @@ export default function PolicyHome({ route }) {
 
   const toggleMemberDropdown = async () => {
     if (!showMemberDropdown) {
-      // Always fetch fresh members when opening the dropdown
-      // This ensures we get updated data after policy selection
-      await fetchMembers();
+      // Only fetch if not cached or if members array is empty
+      if (!membersCached || members.length === 0) {
+        await fetchMembers();
+      }
     }
     setShowMemberDropdown(!showMemberDropdown);
   };
@@ -1571,9 +1587,9 @@ export default function PolicyHome({ route }) {
                       style={[
                         styles.policyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                          styles.selectedPolicyItem,
+                        styles.selectedPolicyItem,
                         selectedPolicyNumber === policy.policyNumber &&
-                          styles.disabledPolicyItem,
+                        styles.disabledPolicyItem,
                       ]}
                       onPress={() => {
                         // Only allow selection if it's not the currently selected policy

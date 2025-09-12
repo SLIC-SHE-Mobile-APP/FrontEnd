@@ -1,19 +1,18 @@
-import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState, useRef } from "react";
+import React, { Profiler, useEffect, useRef, useState } from "react";
 import {
-  Animated,
+  Animated, BackHandler, Dimensions,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Modal,
-  Dimensions,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -280,6 +279,36 @@ const AddPolicy = () => {
     initializeData();
   }, []);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Disable hardware back button if no policies exist
+        if (policyList.length === 0) {
+          showPopup(
+            "No Policies Available",
+            "You must have at least one policy to navigate back. Please add a policy first.",
+            "warning"
+          );
+          return true; // Prevent default behavior
+        }
+
+        // Check if we can go back in router
+        if (router.canGoBack()) {
+          router.back();
+          return true; // Prevent default behavior
+        }
+
+        // If no previous screen, allow default behavior (minimize app)
+        return false;
+      };
+
+      // Add hardware back button listener
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [router, policyList.length])
+  );
+
   const loadRemovedPolicies = async () => {
     try {
       const storedNic = await SecureStore.getItemAsync("user_nic");
@@ -482,7 +511,7 @@ const AddPolicy = () => {
         showPopup(
           "Policy Not Found",
           result.message ||
-            "The policy number you entered could not be found in our system. Please verify the policy number and try again.",
+          "The policy number you entered could not be found in our system. Please verify the policy number and try again.",
           "error"
         );
       }
@@ -615,24 +644,149 @@ const AddPolicy = () => {
     }
   };
 
+  const handleDeletePolicy = async (policyToDelete) => {
+    showPopup(
+      "Delete Policy",
+      `Are you sure you want to delete policy ${policyToDelete.policyNumber}?`,
+      "warning",
+      true, // showConfirmButton
+      async () => {
+        try {
+          setLoading(true);
+
+          // Call the API to delete the policy
+          const response = await fetch(
+            `${API_BASE_URL}/DeletePoliciesHome/RemovePolicy`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                policyNumber: policyToDelete.policyNumber,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          // Check if the response has content before parsing
+          const responseText = await response.text();
+          let result = null;
+          if (responseText && responseText.trim() !== "") {
+            try {
+              result = JSON.parse(responseText);
+            } catch (parseError) {
+              console.log("Response is not JSON, treating as successful");
+            }
+          }
+
+          // Remove from policy list
+          const updatedPolicies = policyList.filter(policy => policy.id !== policyToDelete.id);
+          setPolicyList(updatedPolicies);
+
+          // Add to deleted policies list
+          setDeletedPolicies(prev => [...prev, policyToDelete.policyNumber]);
+
+          // Check if the deleted policy was currently selected and clear if needed
+          try {
+            const selectedPolicyNumber = await SecureStore.getItemAsync("selected_policy_number");
+            if (selectedPolicyNumber === policyToDelete.policyNumber) {
+              // Clear stored policy data
+              await SecureStore.deleteItemAsync("selected_policy_number");
+              await SecureStore.deleteItemAsync("selected_member_number");
+              await SecureStore.deleteItemAsync("selected_policy_id");
+              await SecureStore.deleteItemAsync("selected_policy_period");
+              await SecureStore.deleteItemAsync("selected_policy_type");
+              await SecureStore.deleteItemAsync("selected_policy_data");
+              console.log("Cleared stored policy data for deleted policy");
+            }
+          } catch (error) {
+            console.error("Error clearing stored policy data:", error);
+          }
+
+          // Hide the confirmation popup
+          hidePopup();
+
+          // Show success message
+          showPopup(
+            "Policy Deleted",
+            `Policy ${policyToDelete.policyNumber} has been successfully deleted.`,
+            "success"
+          );
+
+        } catch (error) {
+          console.error("Error deleting policy:", error);
+          hidePopup();
+          showPopup(
+            "Delete Error",
+            "Failed to delete policy. Please check your connection and try again.",
+            "error"
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
+  };
+
+
+  const handleBackPress = React.useCallback(() => {
+    // Disable back button if no policies exist
+    if (policyList.length === 0) {
+      showPopup(
+        "No Policies Available",
+        "You must have at least one policy to navigate back. Please add a policy first.",
+        "warning"
+      );
+      return;
+    }
+
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/home");
+    }
+  }, [router, policyList.length]);
+
+
   const renderPolicyItem = ({ item }) => (
     <TouchableOpacity
       style={styles.policyCard}
       onPress={() => handlePolicySelect(item)}
       activeOpacity={0.7}
     >
-      <View style={styles.row}>
-        <Text style={styles.label}>Policy Number :</Text>
-        <Text style={styles.value}>{item.policyNumber}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Member Number :</Text>
-        <Text style={styles.value}>{item.memberId}</Text>
-      </View>
-      {/* Add a visual indicator that items are clickable */}
-      <View style={styles.clickIndicator}>
-        <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
-        <Icon name="arrow-right" size={16} color="#FFFFFF" />
+      <View style={styles.policyCardContent}>
+        {/* Delete Button - moved to top right */}
+        <TouchableOpacity
+          style={styles.deleteButtonTopRight}
+          onPress={(e) => {
+            e.stopPropagation(); // Prevent triggering the card's onPress
+            handleDeletePolicy(item);
+          }}
+          activeOpacity={0.7}
+        >
+          <Icon name="trash" size={16} color="#FF4444" />
+        </TouchableOpacity>
+
+        <View style={styles.policyInfo}>
+          <View style={styles.row}>
+            <Text style={styles.label}>Policy Number :</Text>
+            <Text style={styles.value}>{item.policyNumber}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Member Number :</Text>
+            <Text style={styles.value}>{item.memberId}</Text>
+          </View>
+          {/* Add a visual indicator that items are clickable */}
+          <View style={styles.clickIndicator}>
+            <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
+            <Icon name="arrow-right" size={16} color="#FFFFFF" />
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -662,12 +816,20 @@ const AddPolicy = () => {
     <LinearGradient colors={["#FFFFFF", "#6DD3D3"]} style={styles.gradient}>
       <View style={styles.container}>
         <View style={styles.header}>
-          {/* <TouchableOpacity
-            onPress={() => navigateToHomeWithRefresh(true)}
-            style={styles.backButton}
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={[
+              styles.backButton,
+              policyList.length === 0 && styles.backButtonDisabled
+            ]}
+            disabled={policyList.length === 0}
           >
-            <Ionicons name="arrow-back" size={24} color="#05445E" />
-          </TouchableOpacity> */}
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={policyList.length === 0 ? "#CCCCCC" : "#05445E"}
+            />
+          </TouchableOpacity>
           <Text style={styles.title}>Manage Policy</Text>
         </View>
         {deletedPolicies.length > 0 && (
@@ -703,9 +865,12 @@ const AddPolicy = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.addButton, loading && styles.buttonDisabled]}
+          style={[
+            styles.addButton,
+            (loading || !policyNumber.trim()) && styles.buttonDisabled
+          ]}
           onPress={handleAddPolicy}
-          disabled={loading}
+          disabled={loading || !policyNumber.trim()}
         >
           <Text style={styles.addButtonText}>
             {loading ? "Adding..." : "Add Policy"}
@@ -750,8 +915,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 0,
-    paddingLeft:20,
-    paddingRight:20,
+    paddingLeft: 20,
+    paddingRight: 20,
   },
   // Custom Loading Styles
   loadingOverlay: {
@@ -1047,4 +1212,71 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     // marginLeft: 15,
   },
+
+  policyCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  policyInfo: {
+    flex: 1,
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 8,
+    marginLeft: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  }, deleteButtonTopRight: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 1,
+  },
+  policyCardContent: {
+    position: 'relative',
+    paddingRight: 50,
+  },
+  policyInfo: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 30,
+  },
+  backButton: {
+    padding: 5,
+    marginRight: 15,
+  },
+  title: {
+    fontSize: 20,
+    color: "#05445E",
+    fontWeight: "bold",
+    flex: 1,
+  },
+  backButtonDisabled: {
+    opacity: 0.5,
+  },
 });
+
+

@@ -466,10 +466,7 @@ const EditClaimIntimation = ({ route }) => {
         return;
       }
 
-      if (!newBeneficiary.illness || newBeneficiary.illness.trim() === "") {
-        showPopup("Validation Error", "Illness field is required.", "warning");
-        return;
-      }
+      
 
       console.log("Saving beneficiary edit with API integration...");
 

@@ -1,18 +1,17 @@
-import { useRouter, useFocusEffect } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
+  Animated,
+  BackHandler,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Alert,
-  Animated,
-  BackHandler,
+  View
 } from "react-native";
-import * as SecureStore from "expo-secure-store";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
@@ -671,7 +670,6 @@ export default function PolicyMemberDetails() {
         </TouchableOpacity>
         <Text style={styles.headerTitle1}>Policy Details</Text>
       </View>
-
       {/* Body */}
       <ScrollView contentContainerStyle={styles.body}>
         {/* Member Information */}

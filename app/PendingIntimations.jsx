@@ -615,7 +615,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
               style={styles.clearSearchButton}
               onPress={() => setSearchQuery("")}
             >
-              <Ionicons name="close-circle" size={20} color="#666" />
+              {/* <Ionicons name="close-circle" size={20} color="#666" /> */}
             </TouchableOpacity>
           )}
         </View>
