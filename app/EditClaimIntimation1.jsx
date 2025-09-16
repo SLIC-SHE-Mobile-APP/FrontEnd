@@ -1244,9 +1244,6 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
-
-  
-
   // Store initial claim details when component first loads
   const storeInitialClaimDetails = async (claimData) => {
     try {
@@ -1605,37 +1602,37 @@ const EditClaimIntimation1 = ({ route }) => {
     initializeComponent();
   }, []);
 
-  const refreshClaimDetails = async (claimNo) => {
-    try {
-      console.log("Refreshing claim details for updated last edit date...");
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchDocumentsOnFocus = async () => {
+        // Only fetch documents on focus if not in initial loading state
+        if (!initialLoading) {
+          console.log("Fetching documents on focus");
+          const claimNo = claimDetails.claimNo || claim?.claimNo;
 
-      if (!claimNo) {
-        console.warn("No claim number provided for refreshing claim details");
-        return;
-      }
+          // Check if claim number exists and is not empty
+          if (claimNo && claimNo !== "") {
+            setDocumentsLoading(true);
 
-      // You may need to create an API endpoint to get updated claim details
-      // For now, we'll update the createdOn to current date/time as a fallback
-      const currentDateTime = new Date().toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
+            try {
+              await fetchDocuments(claimNo);
 
-      setClaimDetails(prev => ({
-        ...prev,
-        createdOn: currentDateTime
-      }));
+              // Only refresh claim amount if documents fetch was successful
+              console.log("Refreshing claim amount after navigation...");
+              await refreshClaimAmount();
+            } catch (error) {
+              console.error("Error fetching documents on focus:", error);
+              setDocumentsLoading(false);
+            }
+          } else {
+            console.log("No valid claim number found, skipping document fetch");
+          }
+        }
+      };
 
-      console.log("Claim details refreshed with updated date:", currentDateTime);
-    } catch (error) {
-      console.error("Error refreshing claim details:", error);
-    }
-  };
-
+      fetchDocumentsOnFocus();
+    }, [claimDetails.claimNo, claim?.claimNo, initialLoading])
+  );
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", async () => {
@@ -1713,9 +1710,9 @@ const EditClaimIntimation1 = ({ route }) => {
       patientData:
         beneficiaries.length > 0
           ? {
-            patientName: beneficiaries[0].name,
-            illness: beneficiaries[0].illness,
-          }
+              patientName: beneficiaries[0].name,
+              illness: beneficiaries[0].illness,
+            }
           : {},
     });
   };
@@ -2684,8 +2681,8 @@ const EditClaimIntimation1 = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-              ? "View"
-              : "No Image"}
+            ? "View"
+            : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -3247,7 +3244,7 @@ const EditClaimIntimation1 = ({ route }) => {
             <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Created On</Text>
+            <Text style={styles.detailLabel}>Last Edit on</Text>
             <Text style={styles.colon}>:</Text>
             <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
           </View>
@@ -3494,8 +3491,8 @@ const EditClaimIntimation1 = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                    ? selectedMember.name
-                    : "Select Member"}
+                  ? selectedMember.name
+                  : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -3513,7 +3510,7 @@ const EditClaimIntimation1 = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                      styles.selectedDropdownOption,
+                        styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -3521,7 +3518,7 @@ const EditClaimIntimation1 = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                        styles.selectedDropdownOptionText,
+                          styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -3585,7 +3582,7 @@ const EditClaimIntimation1 = ({ route }) => {
             >
               <Text style={styles.modalTitle}>Edit Document</Text>
 
-              {/* Document Type Dropdown - existing code remains the same */}
+              {/* Document Type Dropdown */}
               <Text style={styles.documentFieldLabel}>Document Type</Text>
               <TouchableOpacity
                 style={[
@@ -3602,10 +3599,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                      ? documentTypes.find(
+                    ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                      : "Select Document Type"}
+                    : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -3616,7 +3613,7 @@ const EditClaimIntimation1 = ({ route }) => {
                 />
               </TouchableOpacity>
 
-              {/* Document Type Dropdown Options - existing code remains the same */}
+              {/* Document Type Dropdown Options */}
               {isEditDocTypeDropdownVisible && !loadingDocumentTypes && (
                 <View style={styles.documentDropdownOptions}>
                   {documentTypes.map((docType) => {
@@ -3633,7 +3630,7 @@ const EditClaimIntimation1 = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                          styles.selectedDropdownOption,
+                            styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -3643,7 +3640,7 @@ const EditClaimIntimation1 = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                            styles.selectedDropdownOptionText,
+                              styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -3656,7 +3653,7 @@ const EditClaimIntimation1 = ({ route }) => {
                 </View>
               )}
 
-              {/* Document Date - existing code remains the same */}
+              {/* Document Date */}
               <Text style={styles.documentFieldLabel}>Document Date</Text>
               <TouchableOpacity
                 style={styles.documentDropdownButton}
@@ -3667,7 +3664,6 @@ const EditClaimIntimation1 = ({ route }) => {
                 </Text>
                 <Ionicons name="calendar-outline" size={20} color="#666" />
               </TouchableOpacity>
-
               <Text style={styles.helpText}>{getDatePickerHelpText()}</Text>
 
               {showEditDatePicker && documentDateRange && (
@@ -3683,7 +3679,7 @@ const EditClaimIntimation1 = ({ route }) => {
                 />
               )}
 
-              {/* Document Amount - existing code remains the same */}
+              {/* Document Amount */}
               <Text style={styles.documentFieldLabel}>
                 Document Amount
                 {(editDocumentType === "O01" || editDocumentType === "O04") && (
@@ -3695,15 +3691,15 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                  !validateEditAmount(newDocument.amount, editDocumentType) &&
-                  styles.textInputError,
+                    !validateEditAmount(newDocument.amount, editDocumentType) &&
+                    styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                      ? "Enter amount"
-                      : "0.00"
+                    ? "Enter amount"
+                    : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -3712,7 +3708,7 @@ const EditClaimIntimation1 = ({ route }) => {
                 editable={isEditAmountEditable()}
               />
 
-              {/* Amount validation help text - existing code remains the same */}
+              {/* Amount validation help text */}
               {editDocumentType === "O02" || editDocumentType === "O03" ? (
                 <Text style={styles.helpText}>
                   Amount is automatically set to 0.00 for{" "}
@@ -3723,7 +3719,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.errorText,
+                      styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3735,7 +3731,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.errorText,
+                      styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3748,17 +3744,31 @@ const EditClaimIntimation1 = ({ route }) => {
                 </Text>
               ) : null}
 
-              {/* NEW: Image Upload Section */}
+              {/* Document Image Section */}
               <Text style={styles.documentFieldLabel}>Document Image</Text>
 
               {selectedImageForEdit ? (
-                // Show selected image with options to change or remove
                 <View style={styles.imagePreviewContainer}>
-                  <Image
-                    source={{ uri: selectedImageForEdit.uri }}
-                    style={styles.imagePreview}
-                    resizeMode="cover"
-                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedImageUri(selectedImageForEdit.uri);
+                      setImageModalVisible(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: selectedImageForEdit.uri }}
+                      style={styles.imagePreview}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.imagePreviewOverlay}>
+                      <Ionicons
+                        name="expand-outline"
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                    </View>
+                  </TouchableOpacity>
                   <View style={styles.imageActionButtons}>
                     <TouchableOpacity
                       style={styles.imageActionButton}
@@ -3795,7 +3805,6 @@ const EditClaimIntimation1 = ({ route }) => {
                   </View>
                 </View>
               ) : (
-                // Show upload options when no image selected
                 <TouchableOpacity
                   style={styles.imageUploadButton}
                   onPress={showImagePickerOptions}
@@ -3822,7 +3831,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   setEditDocTypeDropdownVisible(false);
                   setEditDocumentType("");
                   setEditDocumentDate(new Date());
-                  setSelectedImageForEdit(null); // Clear selected image
+                  setSelectedImageForEdit(null);
                 }}
                 style={[styles.cancelBtn, isSavingDocument && { opacity: 0.5 }]}
                 disabled={isSavingDocument}
@@ -3843,7 +3852,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.saveBtn,
                   (!validateEditAmount(newDocument.amount, editDocumentType) ||
                     isSavingDocument) &&
-                  styles.saveBtnDisabled,
+                    styles.saveBtnDisabled,
                 ]}
                 disabled={
                   !validateEditAmount(newDocument.amount, editDocumentType) ||
@@ -4940,6 +4949,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6C757D",
     fontWeight: "500",
+  },
+  imagePreviewOverlay: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
