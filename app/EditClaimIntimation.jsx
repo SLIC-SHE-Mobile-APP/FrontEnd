@@ -598,6 +598,8 @@ const EditClaimIntimation = ({ route }) => {
   const [isImageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imageLoadingStates, setImageLoadingStates] = useState(new Map());
+  const [isPreviewImageModalVisible, setPreviewImageModalVisible] = useState(false);
+
 
   const [newDocument, setNewDocument] = useState({
     type: "",
@@ -2537,22 +2539,22 @@ const EditClaimIntimation = ({ route }) => {
     );
   };
 
-  const isSubmitDisabled = () => {
-    if (beneficiaries.length === 0) {
-      return true;
-    }
+  // const isSubmitDisabled = () => {
+  //   if (beneficiaries.length === 0) {
+  //     return true;
+  //   }
 
-    return beneficiaries.some((beneficiary) => {
-      const amount = removeCommasFromAmount(beneficiary.amount);
-      const numericAmount = parseFloat(amount);
-      return (
-        !amount ||
-        amount.trim() === "" ||
-        isNaN(numericAmount) ||
-        numericAmount <= 0
-      );
-    });
-  };
+  //   return beneficiaries.some((beneficiary) => {
+  //     const amount = removeCommasFromAmount(beneficiary.amount);
+  //     const numericAmount = parseFloat(amount);
+  //     return (
+  //       !amount ||
+  //       amount.trim() === "" ||
+  //       isNaN(numericAmount) ||
+  //       numericAmount <= 0
+  //     );
+  //   });
+  // };
 
   const fetchPatientDetails = async (claimNo) => {
     try {
@@ -2920,7 +2922,8 @@ const EditClaimIntimation = ({ route }) => {
             style={[
               styles.submitButton,
             ]}
-            onPress={handleSubmitClaim}
+            onPress={ handleSubmitClaim}
+            // disabled={isSubmitDisabled()}
           >
             <Text
               style={[
@@ -3176,43 +3179,37 @@ const EditClaimIntimation = ({ route }) => {
               <Text style={styles.documentFieldLabel}>Document Image</Text>
 
               {selectedImageForEdit ? (
-                // Show selected image with options to change or remove
+                // Show selected image with options to change, remove, or view full screen
                 <View style={styles.imagePreviewContainer}>
-                  <Image
-                    source={{ uri: selectedImageForEdit.uri }}
-                    style={styles.imagePreview}
-                    resizeMode="cover"
-                  />
+                  <TouchableOpacity
+                    style={styles.imagePreviewTouchable}
+                    onPress={() => setPreviewImageModalVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: selectedImageForEdit.uri }}
+                      style={styles.imagePreview}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.imagePreviewOverlay}>
+                      <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
+                      <Text style={styles.imagePreviewOverlayText}>Tap to view full size</Text>
+                    </View>
+                  </TouchableOpacity>
                   <View style={styles.imageActionButtons}>
                     <TouchableOpacity
                       style={styles.imageActionButton}
                       onPress={showImagePickerOptions}
                     >
-                      <Ionicons
-                        name="camera-outline"
-                        size={20}
-                        color="#2E7D7D"
-                      />
+                      <Ionicons name="camera-outline" size={20} color="#2E7D7D" />
                       <Text style={styles.imageActionButtonText}>Change</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[
-                        styles.imageActionButton,
-                        styles.removeImageButton,
-                      ]}
+                      style={[styles.imageActionButton, styles.removeImageButton]}
                       onPress={handleRemoveImage}
                     >
-                      <Ionicons
-                        name="trash-outline"
-                        size={20}
-                        color="#FF6B6B"
-                      />
-                      <Text
-                        style={[
-                          styles.imageActionButtonText,
-                          styles.removeImageButtonText,
-                        ]}
-                      >
+                      <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+                      <Text style={[styles.imageActionButtonText, styles.removeImageButtonText]}>
                         Remove
                       </Text>
                     </TouchableOpacity>
@@ -3224,19 +3221,12 @@ const EditClaimIntimation = ({ route }) => {
                   style={styles.imageUploadButton}
                   onPress={showImagePickerOptions}
                 >
-                  <Ionicons
-                    name="cloud-upload-outline"
-                    size={32}
-                    color="#2E7D7D"
-                  />
-                  <Text style={styles.imageUploadButtonText}>
-                    Upload New Image
-                  </Text>
-                  <Text style={styles.imageUploadSubText}>
-                    Camera or Gallery
-                  </Text>
+                  <Ionicons name="cloud-upload-outline" size={32} color="#2E7D7D" />
+                  <Text style={styles.imageUploadButtonText}>Upload New Image</Text>
+                  <Text style={styles.imageUploadSubText}>Camera or Gallery</Text>
                 </TouchableOpacity>
               )}
+
             </ScrollView>
 
             <View style={styles.documentModalButtons}>
@@ -3331,6 +3321,40 @@ const EditClaimIntimation = ({ route }) => {
               resizeMode="contain"
             />
           )}
+        </View>
+      </Modal>
+      <Modal
+        visible={isPreviewImageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageModalVisible(false)}
+      >
+        <View style={styles.fullScreenImageModalOverlay}>
+          <View style={styles.fullScreenImageHeader}>
+            <Text style={styles.fullScreenImageTitle}>Document Preview</Text>
+            <TouchableOpacity
+              style={styles.fullScreenImageClose}
+              onPress={() => setPreviewImageModalVisible(false)}
+            >
+              <Ionicons name="close" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          {selectedImageForEdit && (
+            <View style={styles.fullScreenImageContainer}>
+              <Image
+                source={{ uri: selectedImageForEdit.uri }}
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+
+          <View style={styles.fullScreenImageFooter}>
+            <Text style={styles.fullScreenImageFooterText}>
+              Pinch to zoom • Swipe to dismiss
+            </Text>
+          </View>
         </View>
       </Modal>
       <Modal
@@ -4235,9 +4259,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#B0B0B0",
     opacity: 0.6,
   },
-  submitButtonTextDisabled: {
-    color: "#666",
-  },
+  
   savingOverlay: {
     position: "absolute",
     top: 0,
@@ -4450,6 +4472,80 @@ const styles = StyleSheet.create({
     color: "#6C757D",
     fontWeight: "500",
   },
+  imagePreviewTouchable: {
+    position: 'relative',
+    marginBottom: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  imagePreviewOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePreviewOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  
+  // Full Screen Image Modal Styles
+  fullScreenImageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  fullScreenImageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  fullScreenImageTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  fullScreenImageClose: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
+  },
+  fullScreenImageFooter: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    alignItems: 'center',
+  },
+  fullScreenImageFooterText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    fontWeight: '400',
+  }
 });
 
 export default EditClaimIntimation;
