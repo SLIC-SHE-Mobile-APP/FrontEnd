@@ -1244,6 +1244,9 @@ const EditClaimIntimation1 = ({ route }) => {
     }
   };
 
+
+  
+
   // Store initial claim details when component first loads
   const storeInitialClaimDetails = async (claimData) => {
     try {
@@ -1602,37 +1605,37 @@ const EditClaimIntimation1 = ({ route }) => {
     initializeComponent();
   }, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      const fetchDocumentsOnFocus = async () => {
-        // Only fetch documents on focus if not in initial loading state
-        if (!initialLoading) {
-          console.log("Fetching documents on focus");
-          const claimNo = claimDetails.claimNo || claim?.claimNo;
+  const refreshClaimDetails = async (claimNo) => {
+    try {
+      console.log("Refreshing claim details for updated last edit date...");
 
-          // Check if claim number exists and is not empty
-          if (claimNo && claimNo !== "") {
-            setDocumentsLoading(true);
+      if (!claimNo) {
+        console.warn("No claim number provided for refreshing claim details");
+        return;
+      }
 
-            try {
-              await fetchDocuments(claimNo);
+      // You may need to create an API endpoint to get updated claim details
+      // For now, we'll update the createdOn to current date/time as a fallback
+      const currentDateTime = new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
 
-              // Only refresh claim amount if documents fetch was successful
-              console.log("Refreshing claim amount after navigation...");
-              await refreshClaimAmount();
-            } catch (error) {
-              console.error("Error fetching documents on focus:", error);
-              setDocumentsLoading(false);
-            }
-          } else {
-            console.log("No valid claim number found, skipping document fetch");
-          }
-        }
-      };
+      setClaimDetails(prev => ({
+        ...prev,
+        createdOn: currentDateTime
+      }));
 
-      fetchDocumentsOnFocus();
-    }, [claimDetails.claimNo, claim?.claimNo, initialLoading])
-  );
+      console.log("Claim details refreshed with updated date:", currentDateTime);
+    } catch (error) {
+      console.error("Error refreshing claim details:", error);
+    }
+  };
+
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", async () => {
@@ -1710,9 +1713,9 @@ const EditClaimIntimation1 = ({ route }) => {
       patientData:
         beneficiaries.length > 0
           ? {
-              patientName: beneficiaries[0].name,
-              illness: beneficiaries[0].illness,
-            }
+            patientName: beneficiaries[0].name,
+            illness: beneficiaries[0].illness,
+          }
           : {},
     });
   };
@@ -2681,8 +2684,8 @@ const EditClaimIntimation1 = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -3244,7 +3247,7 @@ const EditClaimIntimation1 = ({ route }) => {
             <Text style={styles.detailValue}>{claimDetails.claimType}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Created on</Text>
+            <Text style={styles.detailLabel}>Created On</Text>
             <Text style={styles.colon}>:</Text>
             <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
           </View>
@@ -3491,8 +3494,8 @@ const EditClaimIntimation1 = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : "Select Member"}
+                    ? selectedMember.name
+                    : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -3510,7 +3513,7 @@ const EditClaimIntimation1 = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -3518,7 +3521,7 @@ const EditClaimIntimation1 = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -3599,10 +3602,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -3630,7 +3633,7 @@ const EditClaimIntimation1 = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -3640,7 +3643,7 @@ const EditClaimIntimation1 = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -3692,15 +3695,15 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                    !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.textInputError,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                    ? "Enter amount"
-                    : "0.00"
+                      ? "Enter amount"
+                      : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -3720,7 +3723,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3732,7 +3735,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3840,7 +3843,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.saveBtn,
                   (!validateEditAmount(newDocument.amount, editDocumentType) ||
                     isSavingDocument) &&
-                    styles.saveBtnDisabled,
+                  styles.saveBtnDisabled,
                 ]}
                 disabled={
                   !validateEditAmount(newDocument.amount, editDocumentType) ||

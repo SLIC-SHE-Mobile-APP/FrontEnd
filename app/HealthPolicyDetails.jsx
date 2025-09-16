@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation,useFocusEffect  } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -445,8 +445,8 @@ const HealthPolicyDetails = () => {
           contentBased: true,
         },
         "Hospitals List": {
-          minHeight: 650,
-          maxHeight: 457,
+          minHeight: 450,
+          maxHeight: 430,
           preferredRatio: 0.9,
           contentBased: true,
         },

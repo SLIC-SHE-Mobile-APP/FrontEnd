@@ -559,7 +559,7 @@ const HealthInsuCard = ({ onClose }) => {
                 <View style={styles.hotlineColumn}>
                   <TouchableOpacity
                     style={styles.hotlineButton}
-                    onPress={() => makePhoneCall("0112357357")}
+                   
                   >
                     <Ionicons
                       name="call"
@@ -567,7 +567,7 @@ const HealthInsuCard = ({ onClose }) => {
                       color="#2E5A87"
                       style={styles.callIcon}
                     />
-                    <Text style={styles.hotline}>0112357357</Text>
+                    <Text  onPress={() => makePhoneCall("0112357357")} style={styles.hotline}>0112357357</Text>
                   </TouchableOpacity>
                 </View>
               </View>

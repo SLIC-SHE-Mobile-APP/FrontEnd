@@ -482,23 +482,7 @@ const UploadDocuments = ({ route }) => {
 
   const handleSavePatientEdit = async () => {
     try {
-      if (!editPatientData.patientName || !editPatientData.illness) {
-        showPopup(
-          "Validation Error",
-          "Patient name and illness are required.",
-          "warning"
-        );
-        return;
-      }
-
-      if (editPatientData.illness.trim() === "") {
-        showPopup(
-          "Validation Error",
-          "Illness field cannot be empty.",
-          "warning"
-        );
-        return;
-      }
+      
 
       console.log("Saving patient edit with API integration...");
 
@@ -1672,6 +1656,7 @@ const UploadDocuments = ({ route }) => {
       async () => {
         // This function only runs when "Yes" is clicked
         try {
+          hidePopup(); // Hide the processing message
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== "granted") {
             showPopup(
@@ -1702,8 +1687,7 @@ const UploadDocuments = ({ route }) => {
               return;
             }
 
-            hidePopup(); // Hide the processing message
-
+            
             const docTypeLabel =
               documentTypes.find((type) => type.id === selectedDocumentType)
                 ?.label || selectedDocumentType;
