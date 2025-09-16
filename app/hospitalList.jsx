@@ -3,7 +3,7 @@ import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   Dimensions,
   FlatList,
   Linking,
@@ -11,8 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Animated
+  View
 } from 'react-native';
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from '../constants/index.js';

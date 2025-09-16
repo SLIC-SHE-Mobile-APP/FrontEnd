@@ -662,7 +662,7 @@ const PendingIntimations = ({ onClose, onEditClaim }) => {
                   <Text style={styles.claimValue}>{claim.claimType}</Text>
                 </View>
                 <View style={styles.claimRow}>
-                  <Text style={styles.claimLabel}>Last Edit on :</Text>
+                  <Text style={styles.claimLabel}>Created On :</Text>
                   <Text style={styles.claimValue}>{claim.createdOn}</Text>
                 </View>
               </View>
