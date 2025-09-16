@@ -2672,7 +2672,7 @@ const EditClaimIntimation = ({ route }) => {
             <Text style={styles.detailValue}>{claimTypes}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Last Edit on</Text>
+            <Text style={styles.detailLabel}>Created On</Text>
             <Text style={styles.colon}>:</Text>
             <Text style={styles.detailValue}>{claimDetails.createdOn}</Text>
           </View>

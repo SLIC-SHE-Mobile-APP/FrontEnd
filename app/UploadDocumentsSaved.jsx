@@ -954,7 +954,7 @@ const UploadDocumentsSaved = ({ route }) => {
           }
 
           const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ImagePicker.MediaTypeptions.Images,
             allowsEditing: false,
             quality: 0.8,
           });
