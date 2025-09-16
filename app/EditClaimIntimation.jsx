@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
+  Alert, Animated,
   BackHandler,
   Dimensions,
   Image,
@@ -16,7 +17,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -198,6 +199,8 @@ const EditClaimIntimation = ({ route }) => {
   });
   const [claimAmountLoading, setClaimAmountLoading] = useState(false);
   const [isSavingDocument, setIsSavingDocument] = useState(false);
+  const [selectedImageForEdit, setSelectedImageForEdit] = useState(null);
+  const [imagePickerVisible, setImagePickerVisible] = useState(false);
 
   const removeCommasFromAmount = (amount) => {
     if (!amount) return "";
@@ -466,7 +469,7 @@ const EditClaimIntimation = ({ route }) => {
         return;
       }
 
-      
+
 
       console.log("Saving beneficiary edit with API integration...");
 
@@ -2023,14 +2026,117 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  // Updated updateDocumentAPI function
-  const updateDocumentAPI = async (documentData) => {
+  const requestPermissions = async () => {
     try {
-      console.log("Updating document via API:", documentData);
+      const { status: cameraStatus } =
+        await ImagePicker.requestCameraPermissionsAsync();
+      const { status: mediaLibraryStatus } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      // Fetch existing image content before updating
+      if (cameraStatus !== "granted" || mediaLibraryStatus !== "granted") {
+        Alert.alert(
+          "Permissions Required",
+          "Camera and photo library permissions are required to upload images.",
+          [{ text: "OK" }]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error requesting permissions:", error);
+      return false;
+    }
+  };
+
+  const handleCameraCapture = async () => {
+    try {
+      const hasPermissions = await requestPermissions();
+      if (!hasPermissions) return;
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setSelectedImageForEdit({
+          uri: asset.uri,
+          base64: asset.base64,
+          type: "image/jpeg",
+          name: `document_${Date.now()}.jpg`,
+        });
+        setImagePickerVisible(false);
+
+        showPopup(
+          "Image Captured",
+          "Image captured successfully. Save the document to upload the new image.",
+          "success"
+        );
+      }
+    } catch (error) {
+      console.error("Error capturing image:", error);
+      showPopup("Error", "Failed to capture image. Please try again.", "error");
+    }
+  };
+
+  const handleGallerySelection = async () => {
+    try {
+      const hasPermissions = await requestPermissions();
+      if (!hasPermissions) return;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setSelectedImageForEdit({
+          uri: asset.uri,
+          base64: asset.base64,
+          type: "image/jpeg",
+          name: `document_${Date.now()}.jpg`,
+        });
+        setImagePickerVisible(false);
+
+        showPopup(
+          "Image Selected",
+          "Image selected successfully. Save the document to upload the new image.",
+          "success"
+        );
+      }
+    } catch (error) {
+      console.error("Error selecting image:", error);
+      showPopup("Error", "Failed to select image. Please try again.", "error");
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImageForEdit(null);
+    showPopup("Image Removed", "Image removed successfully.", "info");
+  };
+
+  const showImagePickerOptions = () => {
+    setImagePickerVisible(true);
+  };
+
+  // Updated updateDocumentAPI function
+  const updateDocumentAPIWithImage = async (documentData) => {
+    try {
+      console.log("Updating document via API with image:", documentData);
+
+      // Fetch existing image content only if no new image is provided
       let imageContent = null;
-      if (documentData.ClmMemSeqNo && documentData.DocSeq) {
+      if (
+        !selectedImageForEdit &&
+        documentData.ClmMemSeqNo &&
+        documentData.DocSeq
+      ) {
         const clmMemSeqNo = `${documentData.ClmMemSeqNo}-${documentData.DocSeq}`;
         imageContent = await fetchExistingImageContent(clmMemSeqNo);
       }
@@ -2048,8 +2154,18 @@ const EditClaimIntimation = ({ route }) => {
       formData.append("CreatedBy", documentData.CreatedBy);
       formData.append("ImgName", documentData.ImgName);
 
-      // Handle image content - use existing image if no new image provided
-      const finalImageContent = documentData.ImgContent || imageContent;
+      // Handle image content - prioritize new image over existing
+      let finalImageContent = null;
+
+      if (selectedImageForEdit && selectedImageForEdit.base64) {
+        // Use new uploaded image
+        finalImageContent = selectedImageForEdit.base64;
+        console.log("Using new uploaded image");
+      } else if (imageContent) {
+        // Use existing image if no new image uploaded
+        finalImageContent = imageContent;
+        console.log("Using existing image");
+      }
 
       if (finalImageContent && finalImageContent !== "") {
         try {
@@ -2062,8 +2178,8 @@ const EditClaimIntimation = ({ route }) => {
           // Create file object compatible with React Native FormData
           const imageFile = {
             uri: `data:image/jpeg;base64,${cleanBase64}`,
-            type: "image/jpeg",
-            name: documentData.ImgName + ".jpg",
+            type: selectedImageForEdit?.type || "image/jpeg",
+            name: selectedImageForEdit?.name || documentData.ImgName + ".jpg",
           };
 
           formData.append("ImgContent", imageFile);
@@ -2106,6 +2222,7 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
+
   const formatDateForAPI = (date) => {
     try {
       const day = date.getDate().toString().padStart(2, "0");
@@ -2122,7 +2239,7 @@ const EditClaimIntimation = ({ route }) => {
     }
   };
 
-  const handleSaveDocumentEdit = async () => {
+  const handleSaveDocumentEditWithImage = async () => {
     try {
       // Start loading animation
       setIsSavingDocument(true);
@@ -2154,7 +2271,6 @@ const EditClaimIntimation = ({ route }) => {
         return;
       }
 
-      // Rest of the function remains the same...
       const storedNic = await SecureStore.getItemAsync("user_nic");
       if (!storedNic) {
         showPopup(
@@ -2169,10 +2285,6 @@ const EditClaimIntimation = ({ route }) => {
         selectedDocument.clmMemSeqNo
       );
 
-      const originalDocData = documents.find(
-        (doc) => doc.id === selectedDocument.id
-      );
-
       // Remove commas from amount before sending to API
       const cleanAmount = removeCommasFromAmount(newDocument.amount);
 
@@ -2182,14 +2294,15 @@ const EditClaimIntimation = ({ route }) => {
         DocSeq: parseInt(docSeq),
         NewDocRef: editDocumentType,
         DocDate: formatDateForAPI(editDocumentDate),
-        ImgContent: originalDocData?.imgContent || "",
         DocAmount: parseFloat(cleanAmount || "0"),
         CreatedBy: storedNic,
         ImgName: `${claimDetails.claimNo}_${clmMemSeqNo}_${docSeq}_${editDocumentType}`,
       };
 
-      // Call API (this is where the loading animation is most important)
-      await updateDocumentAPI(updateDocumentData);
+      console.log("Updating document with data:", updateDocumentData);
+
+      // Call API with image handling
+      await updateDocumentAPIWithImage(updateDocumentData);
 
       const updatedDocument = {
         ...newDocument,
@@ -2204,10 +2317,12 @@ const EditClaimIntimation = ({ route }) => {
         )
       );
 
+      // Close modal and reset form
       setEditDocumentModalVisible(false);
       setNewDocument({ type: "", date: "", amount: "" });
       setEditDocumentType("");
       setEditDocumentDate(new Date());
+      setSelectedImageForEdit(null); // Clear selected image
 
       showPopup("Success", "Document updated successfully!", "success");
 
@@ -2218,7 +2333,6 @@ const EditClaimIntimation = ({ route }) => {
 
       await refreshClaimAmount();
     } catch (error) {
-      // Error handling remains the same...
       console.error("Error in handleSaveDocumentEdit:", error);
 
       if (error.message.includes("404")) {
@@ -2237,6 +2351,7 @@ const EditClaimIntimation = ({ route }) => {
             setNewDocument({ type: "", date: "", amount: "" });
             setEditDocumentType("");
             setEditDocumentDate(new Date());
+            setSelectedImageForEdit(null);
           }
         );
       } else {
@@ -2262,6 +2377,7 @@ const EditClaimIntimation = ({ route }) => {
             setNewDocument({ type: "", date: "", amount: "" });
             setEditDocumentType("");
             setEditDocumentDate(new Date());
+            setSelectedImageForEdit(null);
           }
         );
       }
@@ -2614,8 +2730,8 @@ const EditClaimIntimation = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -2803,15 +2919,12 @@ const EditClaimIntimation = ({ route }) => {
           <TouchableOpacity
             style={[
               styles.submitButton,
-              isSubmitDisabled() && styles.submitButtonDisabled,
             ]}
-            onPress={isSubmitDisabled() ? null : handleSubmitClaim}
-            disabled={isSubmitDisabled()}
+            onPress={handleSubmitClaim}
           >
             <Text
               style={[
                 styles.submitButtonText,
-                isSubmitDisabled() && styles.submitButtonTextDisabled,
               ]}
             >
               Submit Claim
@@ -2896,7 +3009,7 @@ const EditClaimIntimation = ({ route }) => {
             >
               <Text style={styles.modalTitle}>Edit Document</Text>
 
-              {/* Document Type Dropdown */}
+              {/* Document Type Dropdown - existing code remains the same */}
               <Text style={styles.documentFieldLabel}>Document Type</Text>
               <TouchableOpacity
                 style={[
@@ -2913,10 +3026,10 @@ const EditClaimIntimation = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -2927,7 +3040,7 @@ const EditClaimIntimation = ({ route }) => {
                 />
               </TouchableOpacity>
 
-              {/* Document Type Dropdown Options */}
+              {/* Document Type Dropdown Options - existing code remains the same */}
               {isEditDocTypeDropdownVisible && !loadingDocumentTypes && (
                 <View style={styles.documentDropdownOptions}>
                   {documentTypes.map((docType) => {
@@ -2944,7 +3057,7 @@ const EditClaimIntimation = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -2954,7 +3067,7 @@ const EditClaimIntimation = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -2967,7 +3080,7 @@ const EditClaimIntimation = ({ route }) => {
                 </View>
               )}
 
-              {/* Document Date */}
+              {/* Document Date - existing code remains the same */}
               <Text style={styles.documentFieldLabel}>Document Date</Text>
               <TouchableOpacity
                 style={styles.documentDropdownButton}
@@ -2979,7 +3092,6 @@ const EditClaimIntimation = ({ route }) => {
                 <Ionicons name="calendar-outline" size={20} color="#666" />
               </TouchableOpacity>
 
-              {/* Help text showing allowed date range */}
               <Text style={styles.helpText}>{getDatePickerHelpText()}</Text>
 
               {showEditDatePicker && documentDateRange && (
@@ -2995,7 +3107,7 @@ const EditClaimIntimation = ({ route }) => {
                 />
               )}
 
-              {/* Document Amount */}
+              {/* Document Amount - existing code remains the same */}
               <Text style={styles.documentFieldLabel}>
                 Document Amount
                 {(editDocumentType === "O01" || editDocumentType === "O04") && (
@@ -3007,15 +3119,15 @@ const EditClaimIntimation = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                    !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.textInputError,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                    ? "Enter amount"
-                    : "0.00"
+                      ? "Enter amount"
+                      : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -3024,7 +3136,7 @@ const EditClaimIntimation = ({ route }) => {
                 editable={isEditAmountEditable()}
               />
 
-              {/* Help text for amount field */}
+              {/* Amount validation help text - existing code remains the same */}
               {editDocumentType === "O02" || editDocumentType === "O03" ? (
                 <Text style={styles.helpText}>
                   Amount is automatically set to 0.00 for{" "}
@@ -3035,7 +3147,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3047,7 +3159,7 @@ const EditClaimIntimation = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3059,6 +3171,72 @@ const EditClaimIntimation = ({ route }) => {
                   Please select a document type first
                 </Text>
               ) : null}
+
+              {/* NEW: Image Upload Section */}
+              <Text style={styles.documentFieldLabel}>Document Image</Text>
+
+              {selectedImageForEdit ? (
+                // Show selected image with options to change or remove
+                <View style={styles.imagePreviewContainer}>
+                  <Image
+                    source={{ uri: selectedImageForEdit.uri }}
+                    style={styles.imagePreview}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.imageActionButtons}>
+                    <TouchableOpacity
+                      style={styles.imageActionButton}
+                      onPress={showImagePickerOptions}
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={20}
+                        color="#2E7D7D"
+                      />
+                      <Text style={styles.imageActionButtonText}>Change</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.imageActionButton,
+                        styles.removeImageButton,
+                      ]}
+                      onPress={handleRemoveImage}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color="#FF6B6B"
+                      />
+                      <Text
+                        style={[
+                          styles.imageActionButtonText,
+                          styles.removeImageButtonText,
+                        ]}
+                      >
+                        Remove
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                // Show upload options when no image selected
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={showImagePickerOptions}
+                >
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={32}
+                    color="#2E7D7D"
+                  />
+                  <Text style={styles.imageUploadButtonText}>
+                    Upload New Image
+                  </Text>
+                  <Text style={styles.imageUploadSubText}>
+                    Camera or Gallery
+                  </Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
 
             <View style={styles.documentModalButtons}>
@@ -3068,6 +3246,7 @@ const EditClaimIntimation = ({ route }) => {
                   setEditDocTypeDropdownVisible(false);
                   setEditDocumentType("");
                   setEditDocumentDate(new Date());
+                  setSelectedImageForEdit(null); // Clear selected image
                 }}
                 style={[styles.cancelBtn, isSavingDocument && { opacity: 0.5 }]}
                 disabled={isSavingDocument}
@@ -3081,13 +3260,14 @@ const EditClaimIntimation = ({ route }) => {
                   Cancel
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                onPress={handleSaveDocumentEdit}
+                onPress={handleSaveDocumentEditWithImage}
                 style={[
                   styles.saveBtn,
                   (!validateEditAmount(newDocument.amount, editDocumentType) ||
                     isSavingDocument) &&
-                    styles.saveBtnDisabled,
+                  styles.saveBtnDisabled,
                 ]}
                 disabled={
                   !validateEditAmount(newDocument.amount, editDocumentType) ||
@@ -3153,6 +3333,56 @@ const EditClaimIntimation = ({ route }) => {
           )}
         </View>
       </Modal>
+      <Modal
+        visible={imagePickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImagePickerVisible(false)}
+      >
+        <View style={styles.imagePickerOverlay}>
+          <View style={styles.imagePickerContainer}>
+            <Text style={styles.imagePickerTitle}>Select Image</Text>
+            <Text style={styles.imagePickerSubtitle}>
+              Choose how you want to add an image
+            </Text>
+
+            <View style={styles.imagePickerOptions}>
+              <TouchableOpacity
+                style={styles.imagePickerOption}
+                onPress={handleCameraCapture}
+              >
+                <View style={styles.imagePickerOptionIcon}>
+                  <Ionicons name="camera" size={32} color="#2E7D7D" />
+                </View>
+                <Text style={styles.imagePickerOptionText}>Camera</Text>
+                <Text style={styles.imagePickerOptionSubtext}>
+                  Take a photo
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.imagePickerOption}
+                onPress={handleGallerySelection}
+              >
+                <View style={styles.imagePickerOptionIcon}>
+                  <Ionicons name="images" size={32} color="#2E7D7D" />
+                </View>
+                <Text style={styles.imagePickerOptionText}>Gallery</Text>
+                <Text style={styles.imagePickerOptionSubtext}>
+                  Choose from photos
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.imagePickerCancelButton}
+              onPress={() => setImagePickerVisible(false)}
+            >
+              <Text style={styles.imagePickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isEditBeneficiaryModalVisible}
@@ -3180,8 +3410,8 @@ const EditClaimIntimation = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : "Select Member"}
+                    ? selectedMember.name
+                    : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -3199,7 +3429,7 @@ const EditClaimIntimation = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -3207,7 +3437,7 @@ const EditClaimIntimation = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -4081,6 +4311,144 @@ const styles = StyleSheet.create({
   },
   saveTextDisabled: {
     color: "#999999",
+  },
+  imageUploadButton: {
+    borderWidth: 2,
+    borderColor: "#E0E0E0",
+    borderStyle: "dashed",
+    borderRadius: 12,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 15,
+  },
+  imageUploadButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2E7D7D",
+    marginTop: 8,
+  },
+  imageUploadSubText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+  },
+  imagePreviewContainer: {
+    marginBottom: 15,
+  },
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  imageActionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  imageActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2E7D7D",
+    backgroundColor: "#FFFFFF",
+  },
+  removeImageButton: {
+    borderColor: "#FF6B6B",
+  },
+  imageActionButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#2E7D7D",
+  },
+  removeImageButtonText: {
+    color: "#FF6B6B",
+  },
+
+  // Image Picker Modal Styles
+  imagePickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePickerContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  imagePickerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2E7D7D",
+    marginBottom: 8,
+  },
+  imagePickerSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  imagePickerOptions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 24,
+  },
+  imagePickerOption: {
+    alignItems: "center",
+    flex: 1,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginHorizontal: 8,
+    borderRadius: 16,
+    backgroundColor: "#F8F9FA",
+    borderWidth: 2,
+    borderColor: "#E9ECEF",
+  },
+  imagePickerOptionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#E8F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  imagePickerOptionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2E7D7D",
+    marginBottom: 4,
+  },
+  imagePickerOptionSubtext: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+  },
+  imagePickerCancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: "#F8F9FA",
+    borderWidth: 1,
+    borderColor: "#DEE2E6",
+  },
+  imagePickerCancelText: {
+    fontSize: 16,
+    color: "#6C757D",
+    fontWeight: "500",
   },
 });
 
