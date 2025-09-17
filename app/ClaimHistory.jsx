@@ -238,6 +238,32 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
     }
   };
 
+  // Format currency amount with thousands separator and decimal places
+  const formatCurrency = (amount) => {
+    if (!amount || amount === "Not Available" || amount === "" || amount === null || amount === undefined) {
+      return null;
+    }
+    
+    try {
+      // Convert to number if it's a string
+      const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+      
+      // Check if it's a valid number
+      if (isNaN(numericAmount)) {
+        return null;
+      }
+      
+      // Format with thousands separator and 2 decimal places
+      return numericAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    } catch (error) {
+      console.error('Currency formatting error:', error);
+      return null;
+    }
+  };
+
   const handleRetry = () => {
     if (policyNo && policyNo !== "Not Available" && memberNo && memberNo !== "Not Available") {
       setLoading(true);
@@ -305,6 +331,22 @@ const ClaimHistory = ({ onClose, availableHeight }) => {
           <Text style={styles.missingDataText}>Not Available</Text>
         </View>
       );
+    }
+
+    // Handle currency formatting for Claim Amount
+    if (fieldName === 'Claim Amount') {
+      const formattedAmount = formatCurrency(value);
+      
+      if (formattedAmount) {
+        return <Text style={styles.fieldValue}>{formattedAmount}</Text>;
+      } else {
+        return (
+          <View style={styles.missingDataContainer}>
+            <Ionicons name="information-circle-outline" size={14} color="#00ADBB" />
+            <Text style={styles.missingDataText}>Invalid Amount</Text>
+          </View>
+        );
+      }
     }
   
     // Handle date formatting for any date field
