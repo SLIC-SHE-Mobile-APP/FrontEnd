@@ -8,6 +8,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+
   BackHandler,
   Dimensions,
   Image,
@@ -18,7 +19,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
@@ -1700,9 +1701,9 @@ const EditClaimIntimation1 = ({ route }) => {
       patientData:
         beneficiaries.length > 0
           ? {
-              patientName: beneficiaries[0].name,
-              illness: beneficiaries[0].illness,
-            }
+            patientName: beneficiaries[0].name,
+            illness: beneficiaries[0].illness,
+          }
           : {},
     });
   };
@@ -2690,8 +2691,8 @@ const EditClaimIntimation1 = ({ route }) => {
           {isLoadingThisImage
             ? "Loading..."
             : document.hasImage
-            ? "View"
-            : "No Image"}
+              ? "View"
+              : "No Image"}
         </Text>
       </TouchableOpacity>
     );
@@ -3500,8 +3501,8 @@ const EditClaimIntimation1 = ({ route }) => {
                 {loadingMembers
                   ? "Loading members..."
                   : selectedMember
-                  ? selectedMember.name
-                  : "Select Member"}
+                    ? selectedMember.name
+                    : "Select Member"}
               </Text>
               <Ionicons
                 name={isDropdownVisible ? "chevron-up" : "chevron-down"}
@@ -3519,7 +3520,7 @@ const EditClaimIntimation1 = ({ route }) => {
                     style={[
                       styles.dropdownOption,
                       selectedMember?.id === member.id &&
-                        styles.selectedDropdownOption,
+                      styles.selectedDropdownOption,
                     ]}
                     onPress={() => handleMemberSelect(member)}
                   >
@@ -3527,7 +3528,7 @@ const EditClaimIntimation1 = ({ route }) => {
                       style={[
                         styles.dropdownOptionText,
                         selectedMember?.id === member.id &&
-                          styles.selectedDropdownOptionText,
+                        styles.selectedDropdownOptionText,
                       ]}
                     >
                       {member.name} ({member.relationship})
@@ -3608,10 +3609,10 @@ const EditClaimIntimation1 = ({ route }) => {
                   {loadingDocumentTypes
                     ? "Loading document types..."
                     : editDocumentType
-                    ? documentTypes.find(
+                      ? documentTypes.find(
                         (type) => type.docId === editDocumentType
                       )?.docDesc || "Select Document Type"
-                    : "Select Document Type"}
+                      : "Select Document Type"}
                 </Text>
                 <Ionicons
                   name={
@@ -3639,7 +3640,7 @@ const EditClaimIntimation1 = ({ route }) => {
                         style={[
                           styles.documentDropdownOption,
                           editDocumentType === docType.docId &&
-                            styles.selectedDropdownOption,
+                          styles.selectedDropdownOption,
                           isBillDisabled && styles.disabledDropdownOption,
                         ]}
                         onPress={() => handleEditDocTypeSelect(docType)}
@@ -3649,7 +3650,7 @@ const EditClaimIntimation1 = ({ route }) => {
                           style={[
                             styles.dropdownOptionText,
                             editDocumentType === docType.docId &&
-                              styles.selectedDropdownOptionText,
+                            styles.selectedDropdownOptionText,
                             isBillDisabled && styles.disabledDropdownOptionText,
                           ]}
                         >
@@ -3700,15 +3701,15 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.documentModalInput,
                   !isEditAmountEditable() && styles.textInputDisabled,
                   (editDocumentType === "O01" || editDocumentType === "O04") &&
-                    !validateEditAmount(newDocument.amount, editDocumentType) &&
-                    styles.textInputError,
+                  !validateEditAmount(newDocument.amount, editDocumentType) &&
+                  styles.textInputError,
                 ]}
                 placeholder={
                   !editDocumentType
                     ? "Select document type first"
                     : isEditAmountEditable()
-                    ? "Enter amount"
-                    : "0.00"
+                      ? "Enter amount"
+                      : "0.00"
                 }
                 placeholderTextColor="#B0B0B0"
                 value={newDocument.amount}
@@ -3728,7 +3729,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3740,7 +3741,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   style={[
                     styles.helpText,
                     !validateEditAmount(newDocument.amount, editDocumentType) &&
-                      styles.errorText,
+                    styles.errorText,
                   ]}
                 >
                   {!validateEditAmount(newDocument.amount, editDocumentType)
@@ -3757,6 +3758,7 @@ const EditClaimIntimation1 = ({ route }) => {
               <Text style={styles.documentFieldLabel}>Document Image</Text>
 
               {selectedImageForEdit ? (
+                // Show selected image with options to change or remove
                 <View style={styles.imagePreviewContainer}>
                   <TouchableOpacity
                     onPress={() => {
@@ -3861,7 +3863,7 @@ const EditClaimIntimation1 = ({ route }) => {
                   styles.saveBtn,
                   (!validateEditAmount(newDocument.amount, editDocumentType) ||
                     isSavingDocument) &&
-                    styles.saveBtnDisabled,
+                  styles.saveBtnDisabled,
                 ]}
                 disabled={
                   !validateEditAmount(newDocument.amount, editDocumentType) ||
@@ -4958,6 +4960,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6C757D",
     fontWeight: "500",
+  },
+  imagePreviewOverlay: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
   },
   imagePreviewOverlay: {
     position: "absolute",
