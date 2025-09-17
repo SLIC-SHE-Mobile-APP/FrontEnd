@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
-import { Alert } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   BackHandler,
   Dimensions,
@@ -404,11 +404,20 @@ const EditClaimIntimation1 = ({ route }) => {
 
   // Helper function to format amount to 2 decimal places
   const formatAmount = (amount) => {
-    if (!amount || isNaN(parseFloat(amount))) {
-      return "0.00";
-    }
-    return parseFloat(amount).toFixed(2);
-  };
+  if (!amount || amount === "" || isNaN(parseFloat(amount))) {
+    return "0.00";
+  }
+  
+  // Remove commas first to get clean number
+  const cleanAmount = amount.toString().replace(/,/g, "");
+  const numericAmount = parseFloat(cleanAmount);
+  
+  // Format with commas and 2 decimal places
+  return numericAmount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
 
   // Helper function to update loading states
   const updateLoadingState = (key, value) => {
@@ -738,72 +747,53 @@ const EditClaimIntimation1 = ({ route }) => {
   };
 
   const fetchDocuments = async (claimNo) => {
-    try {
-      console.log("Fetching documents for claimNo:", claimNo);
-
-      const response = await fetch(
-        `${API_BASE_URL}/ClaimDocuments/${claimNo}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Documents API Error Response:", errorText);
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/ClaimDocuments/${claimNo}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
+    );
 
-      const result = await response.json();
-
-      if (result.success && result.data && Array.isArray(result.data)) {
-        // Transform API data to match component structure
-        const transformedDocuments = result.data.map((doc, index) => {
-          // Fix: Check if document has an image by trying to load it
-          // Since imgContent is null in the response, assume all documents have images
-          // and let the view API determine if image exists
-          return {
-            id: doc.clmMemSeqNo || `doc_${index}`,
-            clmMemSeqNo: doc.clmMemSeqNo,
-            type: doc.docType || "Unknown",
-            date: formatDate(doc.docDate),
-            amount: formatAmount(doc.docAmount),
-            imagePath: doc.imagePath || "0",
-            hasImage: true, // Changed: Assume all documents have images and let view API handle it
-            imageLoaded: false,
-            imgContent: doc.imgContent || null,
-          };
-        });
-
-        setDocuments(transformedDocuments);
-      } else {
-        setDocuments([]);
-      }
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        claimNo: claimNo,
-      });
-
-      showPopup(
-        "Documents Loading Error",
-        `Unable to fetch documents. Error: ${error.message}`,
-        "error"
-      );
-
-      setDocuments([]);
-    } finally {
-      setDocumentsLoading(false);
-      updateLoadingState("documents", false);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+
+    const result = await response.json();
+
+    if (result.success && result.data && Array.isArray(result.data)) {
+      const transformedDocuments = result.data.map((doc, index) => ({
+        id: doc.clmMemSeqNo || `doc_${index}`,
+        clmMemSeqNo: doc.clmMemSeqNo,
+        type: doc.docType || "Unknown",
+        date: formatDate(doc.docDate),
+        amount: formatAmount(doc.docAmount), // This will now format with commas
+        imagePath: doc.imagePath || "0",
+        hasImage: true,
+        imageLoaded: false,
+        imgContent: doc.imgContent || null,
+      }));
+
+      setDocuments(transformedDocuments);
+    } else {
+      setDocuments([]);
+    }
+  } catch (error) {
+    console.error("Error fetching documents:", error);
+    showPopup(
+      "Documents Loading Error",
+      `Unable to fetch documents. Error: ${error.message}`,
+      "error"
+    );
+    setDocuments([]);
+  } finally {
+    setDocumentsLoading(false);
+    updateLoadingState("documents", false);
+  }
+};
 
   const fetchExistingImageContent = async (clmMemSeqNo) => {
     try {
@@ -2210,6 +2200,25 @@ const EditClaimIntimation1 = ({ route }) => {
       ...prev,
       amount: formattedAmount, // Store clean amount without commas
     }));
+  };
+
+  // Add this function with your other helper functions (around line 200-300)
+  const formatAmountWithCommas = (amount) => {
+    if (!amount || amount === "") return "";
+
+    // Convert to string and handle decimal places
+    const amountStr = amount.toString();
+    const parts = amountStr.split(".");
+
+    // Format the integer part with commas
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    // Return with decimal part if it exists
+    if (parts.length > 1) {
+      return `${integerPart}.${parts[1]}`;
+    }
+
+    return integerPart;
   };
 
   const isEditAmountEditable = () => {
