@@ -25,7 +25,6 @@ import { API_BASE_URL } from "../constants/index.js";
 
 const { width, height } = Dimensions.get("window");
 
-
 // Custom Loading Animation Component
 const LoadingIcon = () => {
   const [rotateAnim] = useState(new Animated.Value(0));
@@ -847,16 +846,31 @@ const PendingRequirement1 = () => {
           setLoading(true);
           setLoadingMessage("Submitting documents...");
 
-          const uniqueDocCodes = [
-            ...new Set(pendingDocuments.map((doc) => doc.DocCode)),
-          ];
+          // Group documents by DocCode and get unique submissions with their metadata
+          const docGroups = pendingDocuments.reduce((groups, doc) => {
+            const key = doc.DocCode;
+            if (!groups[key]) {
+              groups[key] = {
+                docCode: doc.DocCode,
+                memId: doc.MemberId,
+                trnsNo: doc.TransactionNo,
+                documents: [],
+              };
+            }
+            groups[key].documents.push(doc);
+            return groups;
+          }, {});
 
-          const submitPromises = uniqueDocCodes.map(async (docCode) => {
+          const submitPromises = Object.values(docGroups).map(async (group) => {
             const requestBody = {
               claimNo: requirementData.claimNumber,
-              docCode: docCode,
+              docCode: group.docCode,
               polNo: requirementData.polNo,
+              memId: group.memId,
+              trnsNo: group.trnsNo,
             };
+
+            console.log("Submitting with payload:", requestBody);
 
             const response = await fetch(
               `${API_BASE_URL}/DocumentLog/SubmitDocs`,
@@ -873,10 +887,18 @@ const PendingRequirement1 = () => {
 
             if (response.ok) {
               const responseData = await response.json();
-              return { success: true, docCode, data: responseData };
+              return {
+                success: true,
+                docCode: group.docCode,
+                data: responseData,
+              };
             } else {
               const errorData = await response.text();
-              return { success: false, docCode, error: errorData };
+              return {
+                success: false,
+                docCode: group.docCode,
+                error: errorData,
+              };
             }
           });
 
@@ -891,24 +913,23 @@ const PendingRequirement1 = () => {
           if (failedSubmissions.length === 0) {
             await fetchPendingDocuments();
 
-            // Show success popup but handle navigation differently
+            // Show success popup with navigation
             showPopup(
               "Success",
               `All ${successfulSubmissions.length} document type(s) submitted successfully!`,
               "success",
               false,
-              null // Don't pass onConfirm here
+              null
             );
 
-            // Set up a delayed navigation that will happen when the popup is closed
-            // The key is to wait for the popup state to fully reset
+            // Navigate to home after showing success message
             setTimeout(() => {
-              hidePopup(); // Ensure popup is hidden
+              hidePopup();
               setTimeout(() => {
                 console.log("Navigating to home page...");
                 router.push("/home");
-              }, 100); // Small delay after hiding popup
-            }, 2000); // Show success message for 2 seconds
+              }, 100);
+            }, 2000);
           } else {
             const failedDocCodes = failedSubmissions
               .map((f) => f.docCode)
@@ -922,6 +943,7 @@ const PendingRequirement1 = () => {
           }
         } catch (error) {
           setLoading(false);
+          console.error("Submit error:", error);
           showPopup(
             "Error",
             "Failed to submit documents. Please check your connection and try again.",
@@ -932,7 +954,6 @@ const PendingRequirement1 = () => {
     );
   };
 
-  // Alternative approach: Modify the CustomPopup component to handle navigation
   // Update the CustomPopup component's OK button behavior
   const CustomPopupWithNavigation = ({
     visible,
