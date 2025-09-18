@@ -4,16 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { Profiler, useEffect, useRef, useState } from "react";
-import {
-  Animated, BackHandler, Dimensions,
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from "react-native";
+import {Animated, BackHandler, Dimensions,FlatList,Modal,StyleSheet,Text,TextInput,TouchableOpacity,View} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { API_BASE_URL } from "../constants/index.js";
 
@@ -151,6 +142,7 @@ const AddPolicy = () => {
   const [deletedPolicies, setDeletedPolicies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [selectedPolicyNumber, setSelectedPolicyNumber] = useState(null);
   const [removedPoliciesFromAPI, setRemovedPoliciesFromAPI] = useState([]);
   const [popup, setPopup] = useState({
     visible: false,
@@ -186,6 +178,19 @@ const AddPolicy = () => {
   const hidePopup = () => {
     setPopup((prev) => ({ ...prev, visible: false }));
   };
+
+  useEffect(() => {
+    const getCurrentlySelectedPolicy = async () => {
+      try {
+        const currentSelectedPolicy = await SecureStore.getItemAsync("selected_policy_number");
+        setSelectedPolicyNumber(currentSelectedPolicy);
+      } catch (error) {
+        console.error("Error getting selected policy:", error);
+      }
+    };
+
+    getCurrentlySelectedPolicy();
+  }, []);
 
   // Custom Loading Animation Component
   const LoadingIcon = () => {
@@ -645,6 +650,16 @@ const AddPolicy = () => {
   };
 
   const handleDeletePolicy = async (policyToDelete) => {
+    // Don't allow deletion of currently selected policy
+    if (selectedPolicyNumber === policyToDelete.policyNumber) {
+      showPopup(
+        "Cannot Delete Active Policy",
+        "You cannot delete the currently active policy. Please select a different policy first.",
+        "warning"
+      );
+      return;
+    }
+
     showPopup(
       "Delete Policy",
       `Are you sure you want to delete policy ${policyToDelete.policyNumber}?`,
@@ -691,23 +706,6 @@ const AddPolicy = () => {
           // Add to deleted policies list
           setDeletedPolicies(prev => [...prev, policyToDelete.policyNumber]);
 
-          // Check if the deleted policy was currently selected and clear if needed
-          try {
-            const selectedPolicyNumber = await SecureStore.getItemAsync("selected_policy_number");
-            if (selectedPolicyNumber === policyToDelete.policyNumber) {
-              // Clear stored policy data
-              await SecureStore.deleteItemAsync("selected_policy_number");
-              await SecureStore.deleteItemAsync("selected_member_number");
-              await SecureStore.deleteItemAsync("selected_policy_id");
-              await SecureStore.deleteItemAsync("selected_policy_period");
-              await SecureStore.deleteItemAsync("selected_policy_type");
-              await SecureStore.deleteItemAsync("selected_policy_data");
-              console.log("Cleared stored policy data for deleted policy");
-            }
-          } catch (error) {
-            console.error("Error clearing stored policy data:", error);
-          }
-
           // Hide the confirmation popup
           hidePopup();
 
@@ -733,7 +731,6 @@ const AddPolicy = () => {
     );
   };
 
-
   const handleBackPress = React.useCallback(() => {
     // Disable back button if no policies exist
     if (policyList.length === 0) {
@@ -752,44 +749,65 @@ const AddPolicy = () => {
     }
   }, [router, policyList.length]);
 
+  const renderPolicyItem = ({ item }) => {
+    const isCurrentlySelected = selectedPolicyNumber === item.policyNumber;
+    
+    return (
+      <TouchableOpacity
+        style={styles.policyCard}
+        onPress={() => {
+          if (!isCurrentlySelected) {
+            handlePolicySelect(item);
+          }
+        }}
+        activeOpacity={isCurrentlySelected ? 1 : 0.7}
+        disabled={isCurrentlySelected}
+      >
+        <View style={styles.policyCardContent}>
+          {/* Delete Button - disabled if this is the currently selected policy */}
+          <TouchableOpacity
+            style={[
+              styles.deleteButtonTopRight,
+              isCurrentlySelected && styles.deleteButtonDisabled
+            ]}
+            onPress={(e) => {
+              e.stopPropagation(); // Prevent triggering the card's onPress
+              if (!isCurrentlySelected) {
+                handleDeletePolicy(item);
+              }
+            }}
+            activeOpacity={isCurrentlySelected ? 1 : 0.7}
+            disabled={isCurrentlySelected}
+          >
+            <Icon 
+              name="trash" 
+              size={16} 
+              color={isCurrentlySelected ? "#CCCCCC" : "#FF4444"} 
+            />
+          </TouchableOpacity>
 
-  const renderPolicyItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.policyCard}
-      onPress={() => handlePolicySelect(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.policyCardContent}>
-        {/* Delete Button - moved to top right */}
-        <TouchableOpacity
-          style={styles.deleteButtonTopRight}
-          onPress={(e) => {
-            e.stopPropagation(); // Prevent triggering the card's onPress
-            handleDeletePolicy(item);
-          }}
-          activeOpacity={0.7}
-        >
-          <Icon name="trash" size={16} color="#FF4444" />
-        </TouchableOpacity>
-
-        <View style={styles.policyInfo}>
-          <View style={styles.row}>
-            <Text style={styles.label}>Policy Number :</Text>
-            <Text style={styles.value}>{item.policyNumber}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Member Number :</Text>
-            <Text style={styles.value}>{item.memberId}</Text>
-          </View>
-          {/* Add a visual indicator that items are clickable */}
-          <View style={styles.clickIndicator}>
-            <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
-            <Icon name="arrow-right" size={16} color="#FFFFFF" />
+          <View style={styles.policyInfo}>
+            <View style={styles.row}>
+              <Text style={styles.label}>Policy Number :</Text>
+              <Text style={styles.value}>{item.policyNumber}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Member Number :</Text>
+              <Text style={styles.value}>{item.memberId}</Text>
+            </View>
+            
+            {/* Show indicator only for non-selected policies */}
+            {!isCurrentlySelected && (
+              <View style={styles.clickIndicator}>
+                <Text style={styles.clickIndicatorText}>Tap to select this policy</Text>
+                <Icon name="arrow-right" size={16} color="#FFFFFF" />
+              </View>
+            )}
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   // Show loading screen during initial load
   if (initialLoading) {
@@ -1031,6 +1049,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
   },
+  selectedPolicyCard: {
+    // Removed - no special styling for selected policy
+  },
   infoText: {
     color: "white",
     marginBottom: 4,
@@ -1084,7 +1105,7 @@ const styles = StyleSheet.create({
     color: "#05445E",
     marginBottom: 10,
     marginTop: 20,
-    fontWeight: "normal", // This removes the bold
+    fontWeight: "normal",
   },
   // Popup Styles with Blur Background
   popupOverlay: {
@@ -1197,66 +1218,10 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     opacity: 0.8,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    marginTop: 30,
-  },
-  backButton: {
-    padding: 5, // Add some padding for better touch area
-  },
-  title: {
-    fontSize: 20,
-    color: "#05445E",
-    fontWeight: "bold",
-    // marginLeft: 15,
-  },
-
-  policyCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  policyInfo: {
-    flex: 1,
-  },
-  deleteButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: 8,
-    marginLeft: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  }, deleteButtonTopRight: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 15,
-    padding: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-    zIndex: 1,
-  },
-  policyCardContent: {
-    position: 'relative',
-    paddingRight: 50,
-  },
-  policyInfo: {
-    flex: 1,
+  selectedIndicatorText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "600",
   },
   header: {
     flexDirection: "row",
@@ -1277,6 +1242,28 @@ const styles = StyleSheet.create({
   backButtonDisabled: {
     opacity: 0.5,
   },
+  policyCardContent: {
+    position: 'relative',
+    paddingRight: 50,
+  },
+  policyInfo: {
+    flex: 1,
+  },
+  deleteButtonTopRight: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 1,
+  },
 });
-
-
